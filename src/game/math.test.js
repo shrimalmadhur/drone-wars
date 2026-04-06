@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { clamp, createRng, segmentIntersectsSphere } from './math.js';
+import { clamp, createRng, projectRadarContact, segmentIntersectsSphere } from './math.js';
 
 describe('math helpers', () => {
   it('clamps values into range', () => {
@@ -32,5 +32,33 @@ describe('math helpers', () => {
         1,
       ),
     ).toBe(false);
+  });
+
+  it('projects radar contacts into player-relative space', () => {
+    const contact = projectRadarContact(
+      { x: 0, y: 0, z: 0 },
+      Math.PI / 2,
+      { x: 12, y: 0, z: 0 },
+      180,
+    );
+
+    expect(contact.lateral).toBeCloseTo(0);
+    expect(contact.forward).toBeCloseTo(12);
+    expect(contact.distance).toBe(12);
+    expect(contact.outOfRange).toBe(false);
+  });
+
+  it('clamps off-range radar contacts to the radar edge while preserving bearing', () => {
+    const contact = projectRadarContact(
+      { x: 0, y: 0, z: 0 },
+      0,
+      { x: 90, y: 0, z: 240 },
+      180,
+    );
+
+    expect(contact.distance).toBeCloseTo(Math.hypot(90, 240));
+    expect(contact.outOfRange).toBe(true);
+    expect(Math.hypot(contact.lateral, contact.forward)).toBeCloseTo(180);
+    expect(contact.lateral / contact.forward).toBeCloseTo(90 / 240);
   });
 });
