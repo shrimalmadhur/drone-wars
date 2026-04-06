@@ -110,6 +110,10 @@ export class Simulation {
 
   spawnEnemy(type) {
     const position = this.terrain.getSpawnPoint(type, this.player.group.position);
+    if (!position) {
+      return false;
+    }
+
     if (type === 'tank') {
       this.enemies.push(new TankEnemy(this.scene, position, this.rng));
     } else if (type === 'drone') {
@@ -119,6 +123,7 @@ export class Simulation {
     } else if (type === 'ship') {
       this.enemies.push(new ShipEnemy(this.scene, position));
     }
+    return true;
   }
 
   getActiveCounts() {
@@ -138,14 +143,21 @@ export class Simulation {
     }
 
     const activeCounts = this.getActiveCounts();
-    const index = this.spawnQueue.findIndex((type) => canSpawnType(type, activeCounts));
-    if (index === -1) {
+    for (let index = 0; index < this.spawnQueue.length; index += 1) {
+      const type = this.spawnQueue[index];
+      if (!canSpawnType(type, activeCounts)) {
+        continue;
+      }
+      if (!this.spawnEnemy(type)) {
+        continue;
+      }
+
+      this.spawnQueue.splice(index, 1);
+      this.spawnCooldown = CONFIG.waves.spawnInterval;
       return;
     }
 
-    const [type] = this.spawnQueue.splice(index, 1);
-    this.spawnEnemy(type);
-    this.spawnCooldown = CONFIG.waves.spawnInterval;
+    this.spawnCooldown = 0.35;
   }
 
   spawnEffect(x, y, z, size) {
