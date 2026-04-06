@@ -184,6 +184,31 @@ export class Game {
     ctx.strokeStyle = 'rgba(138, 244, 255, 0.2)';
     ctx.lineWidth = 1;
     ctx.stroke();
+
+    // Crosshair lines
+    ctx.strokeStyle = 'rgba(138, 244, 255, 0.08)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(cx - r, cx);
+    ctx.lineTo(cx + r, cx);
+    ctx.moveTo(cx, cx - r);
+    ctx.lineTo(cx, cx + r);
+    ctx.stroke();
+
+    // Range ring at 75%
+    ctx.beginPath();
+    ctx.arc(cx, cx, r * 0.75, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(138, 244, 255, 0.06)';
+    ctx.stroke();
+
+    // Player chevron (pointing up = forward)
+    ctx.fillStyle = 'rgba(138, 244, 255, 0.9)';
+    ctx.beginPath();
+    ctx.moveTo(cx, cx - 5);
+    ctx.lineTo(cx - 3.5, cx + 3);
+    ctx.lineTo(cx + 3.5, cx + 3);
+    ctx.closePath();
+    ctx.fill();
   }
 
   resize() {
