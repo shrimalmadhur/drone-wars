@@ -18,22 +18,126 @@ export class TankEnemy extends EnemyBase {
     this.fireCooldown = randomRange(rng, 0.5, 1.4);
     this.turnTimer = randomRange(rng, 1.5, 3.2);
 
-    const hull = new THREE.Mesh(
-      new THREE.BoxGeometry(6.2, 2.1, 8.4),
-      new THREE.MeshStandardMaterial({ color: CONFIG.palette.tank, roughness: 0.82 }),
-    );
-    hull.castShadow = true;
-    hull.receiveShadow = true;
-    hull.position.y = 1.3;
-    this.group.add(hull);
+    const hullMat = new THREE.MeshStandardMaterial({
+      color: CONFIG.palette.tank,
+      roughness: 0.82,
+      metalness: 0.15,
+    });
+    const darkGreenMat = new THREE.MeshStandardMaterial({
+      color: 0x2e3d22,
+      roughness: 0.9,
+      metalness: 0.1,
+    });
+    const trackMat = new THREE.MeshStandardMaterial({
+      color: 0x1a1a1a,
+      roughness: 1,
+      metalness: 0.05,
+    });
+    const metalMat = new THREE.MeshStandardMaterial({
+      color: 0x555555,
+      roughness: 0.5,
+      metalness: 0.6,
+    });
 
-    this.turret = new THREE.Mesh(
-      new THREE.CylinderGeometry(1.6, 1.6, 1.1, 12),
-      new THREE.MeshStandardMaterial({ color: 0x405234, roughness: 0.7 }),
+    // Main hull — trapezoidal (wider at bottom)
+    const hullBottom = new THREE.Mesh(
+      new THREE.BoxGeometry(6.4, 1.4, 9),
+      hullMat,
     );
-    this.turret.rotation.z = Math.PI / 2;
-    this.turret.position.set(0, 2.5, 0);
-    this.group.add(this.turret);
+    hullBottom.position.y = 1.0;
+    hullBottom.castShadow = true;
+    hullBottom.receiveShadow = true;
+
+    // Hull top — slightly narrower
+    const hullTop = new THREE.Mesh(
+      new THREE.BoxGeometry(5.4, 0.8, 7.6),
+      hullMat,
+    );
+    hullTop.position.y = 2.0;
+    hullTop.castShadow = true;
+
+    // Front glacis plate — angled
+    const glacis = new THREE.Mesh(
+      new THREE.BoxGeometry(5.4, 0.5, 1.8),
+      darkGreenMat,
+    );
+    glacis.position.set(0, 1.8, 4.2);
+    glacis.rotation.x = -0.35;
+    glacis.castShadow = true;
+
+    // Track assemblies (left and right)
+    for (const side of [-1, 1]) {
+      const track = new THREE.Mesh(
+        new THREE.BoxGeometry(1.2, 1.6, 9.6),
+        trackMat,
+      );
+      track.position.set(side * 3.5, 0.8, 0);
+      track.castShadow = true;
+      this.group.add(track);
+
+      // Track guard / fender
+      const fender = new THREE.Mesh(
+        new THREE.BoxGeometry(1.5, 0.15, 9.8),
+        hullMat,
+      );
+      fender.position.set(side * 3.5, 1.65, 0);
+      this.group.add(fender);
+
+      // Wheels visible between tracks
+      const wheelGeo = new THREE.CylinderGeometry(0.5, 0.5, 0.3, 8);
+      for (let wz = -3.6; wz <= 3.6; wz += 1.8) {
+        const wheel = new THREE.Mesh(wheelGeo, metalMat);
+        wheel.rotation.z = Math.PI / 2;
+        wheel.position.set(side * 3.5, 0.5, wz);
+        this.group.add(wheel);
+      }
+    }
+
+    // Turret base — dome shape
+    this.turret = new THREE.Group();
+    const turretBase = new THREE.Mesh(
+      new THREE.CylinderGeometry(2.0, 2.3, 1.0, 10),
+      darkGreenMat,
+    );
+    turretBase.position.y = 0;
+    turretBase.castShadow = true;
+
+    // Turret dome
+    const turretDome = new THREE.Mesh(
+      new THREE.SphereGeometry(1.5, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2),
+      hullMat,
+    );
+    turretDome.position.y = 0.4;
+    turretDome.castShadow = true;
+
+    // Gun barrel
+    const barrel = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.22, 0.28, 6.5, 8),
+      metalMat,
+    );
+    barrel.rotation.x = Math.PI / 2;
+    barrel.position.set(0, 0.2, 3.8);
+    barrel.castShadow = true;
+    this.barrel = barrel;
+
+    // Muzzle brake — child of barrel so it follows elevation
+    const muzzle = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.35, 0.35, 0.5, 8),
+      metalMat,
+    );
+    muzzle.position.set(0, 3.2, 0);
+    barrel.add(muzzle);
+
+    // Commander's hatch
+    const hatch = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.4, 0.4, 0.25, 8),
+      metalMat,
+    );
+    hatch.position.set(-0.6, 0.9, -0.5);
+
+    this.turret.add(turretBase, turretDome, barrel, hatch);
+    this.turret.position.set(0, 2.5, -0.5);
+    this.group.add(hullBottom, hullTop, glacis, this.turret);
 
     this.scene.add(this.group);
   }
@@ -56,6 +160,12 @@ export class TankEnemy extends EnemyBase {
     this.group.position.y = context.terrain.getGroundHeight(this.group.position.x, this.group.position.z);
 
     this.turret.rotation.y = normalizeAngle(toPlayer - this.heading);
+    // Elevate barrel toward player
+    const dx = playerPos.x - this.group.position.x;
+    const dz = playerPos.z - this.group.position.z;
+    const dy = playerPos.y - (this.group.position.y + 2.5);
+    const horizDist = Math.sqrt(dx * dx + dz * dz);
+    this.barrel.rotation.x = Math.PI / 2 - Math.atan2(dy, horizDist) * 0.3;
     this.group.rotation.y = this.heading;
 
     this.fireCooldown -= dt;
