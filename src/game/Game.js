@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 import { CONFIG } from './config.js';
 import { InputController } from './input.js';
-import { findAimAssistTarget } from './math.js';
+import { findAimAssistTarget, projectRadarContact } from './math.js';
 import { Simulation } from './Simulation.js';
 
 const RADAR_COLORS = Object.fromEntries(
@@ -173,6 +173,10 @@ export class Game {
     const ctx = this.radarCtx;
     const cx = this.radarCenter;
     const r = this.radarDrawRadius;
+    const markerInset = 8;
+    const markerHalfWidth = 3.5;
+    const markerDepth = 2.5;
+    const markerReach = 5.5;
 
     ctx.clearRect(0, 0, this.radarSize, this.radarSize);
 
@@ -218,32 +222,60 @@ export class Game {
     const snapshot = this.simulation.getSnapshot();
     const candidates = this.simulation.getAimCandidates();
     const scale = this.radarDrawRadius / this.radarWorldRadius;
-    const cosYaw = Math.cos(snapshot.playerYaw);
-    const sinYaw = Math.sin(snapshot.playerYaw);
 
     for (const enemy of candidates) {
-      const dx = enemy.position.x - snapshot.playerPosition.x;
-      const dz = enemy.position.z - snapshot.playerPosition.z;
-      const dist = Math.sqrt(dx * dx + dz * dz);
+      const contact = projectRadarContact(
+        snapshot.playerPosition,
+        snapshot.playerYaw,
+        enemy.position,
+        this.radarWorldRadius,
+      );
+      const px = cx + contact.lateral * scale;
+      const py = cx - contact.forward * scale;
+      const color = RADAR_COLORS[enemy.type] || '#ffffff';
 
-      if (dist > this.radarWorldRadius) {
+      if (contact.outOfRange) {
+        const vx = px - cx;
+        const vy = py - cx;
+        const length = Math.hypot(vx, vy) || 1;
+        const dirX = vx / length;
+        const dirY = vy / length;
+        const tangentX = -dirY;
+        const tangentY = dirX;
+        const markerX = cx + dirX * (r - markerInset);
+        const markerY = cx + dirY * (r - markerInset);
+        const falloff = Math.min(
+          Math.max(
+            (contact.distance - this.radarWorldRadius)
+              / (CONFIG.world.enemyDespawnDistance - this.radarWorldRadius),
+            0,
+          ),
+          1,
+        );
+
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 8;
+        ctx.globalAlpha = 1 - falloff * 0.45;
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(markerX + dirX * markerReach, markerY + dirY * markerReach);
+        ctx.lineTo(
+          markerX - dirX * markerDepth + tangentX * markerHalfWidth,
+          markerY - dirY * markerDepth + tangentY * markerHalfWidth,
+        );
+        ctx.lineTo(
+          markerX - dirX * markerDepth - tangentX * markerHalfWidth,
+          markerY - dirY * markerDepth - tangentY * markerHalfWidth,
+        );
+        ctx.closePath();
+        ctx.fill();
         continue;
       }
 
-      // Rotate relative position by negative yaw (forward-up)
-      const rx = dx * cosYaw - dz * sinYaw;
-      const rz = dx * sinYaw + dz * cosYaw;
-
-      // Scale to canvas and flip Z so forward (positive Z in game) is up on radar
-      const px = cx + rx * scale;
-      const py = cx - rz * scale;
-
-      // Fade at edge of range
-      const alpha = dist > this.radarWorldRadius * 0.85
-        ? 1 - (dist - this.radarWorldRadius * 0.85) / (this.radarWorldRadius * 0.15)
+      // Fade nearby dots at the edge of radar range
+      const alpha = contact.distance > this.radarWorldRadius * 0.85
+        ? 1 - (contact.distance - this.radarWorldRadius * 0.85) / (this.radarWorldRadius * 0.15)
         : 1;
-
-      const color = RADAR_COLORS[enemy.type] || '#ffffff';
 
       // Glow
       ctx.shadowColor = color;
