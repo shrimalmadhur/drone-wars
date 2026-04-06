@@ -10,6 +10,27 @@
   </head>
   <body>
     <div id="app"></div>
+    <div id="start-screen" class="start-screen">
+      <div class="start-screen__panel">
+        <p class="start-screen__eyebrow">Pilot registration</p>
+        <h2 class="start-screen__title">Enter your callsign</h2>
+        <p class="start-screen__copy">We&apos;ll remember it on this browser for your next launch.</p>
+        <form id="start-form" class="start-screen__form">
+          <label class="start-screen__label" for="player-name-input">Player name</label>
+          <input
+            id="player-name-input"
+            class="start-screen__input"
+            name="playerName"
+            type="text"
+            maxlength="24"
+            autocomplete="nickname"
+            placeholder="Phoenix Leader"
+            required
+          />
+          <button class="start-screen__button" type="submit">Launch mission</button>
+        </form>
+      </div>
+    </div>
     <div id="reticle" class="reticle">
       <div class="reticle__ring"></div>
       <div class="reticle__cross reticle__cross--h"></div>
@@ -22,6 +43,7 @@
         <div>
           <p class="hud__eyebrow">Single-player combat prototype</p>
           <h1>Drone Wars</h1>
+          <p class="pilot-tag">Pilot <strong id="player-name-value">Awaiting registration</strong></p>
         </div>
         <div class="hud__metrics">
           <div class="metric">
