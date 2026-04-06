@@ -33,6 +33,11 @@ export class Game {
       label: 'CENTER SIGHT',
       target: null,
     };
+    this.radarCtx = hud.radar.getContext('2d');
+    this.radarSize = hud.radar.width;
+    this.radarCenter = this.radarSize / 2;
+    this.radarWorldRadius = 180;
+    this.radarDrawRadius = this.radarCenter - 10;
     this.clock = {
       last: 0,
       accumulator: 0,
@@ -157,6 +162,28 @@ export class Game {
       this.hud.targetName.textContent = 'No target locked';
       this.hud.targetHealth.textContent = 'Bring the reticle over a target to inspect health.';
     }
+    this.renderRadar();
+  }
+
+  renderRadar() {
+    const ctx = this.radarCtx;
+    const cx = this.radarCenter;
+    const r = this.radarDrawRadius;
+
+    ctx.clearRect(0, 0, this.radarSize, this.radarSize);
+
+    // Background circle
+    ctx.beginPath();
+    ctx.arc(cx, cx, r, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(9, 17, 32, 0.8)';
+    ctx.fill();
+
+    // Border ring
+    ctx.beginPath();
+    ctx.arc(cx, cx, r, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(138, 244, 255, 0.2)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
   }
 
   resize() {
