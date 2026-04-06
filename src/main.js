@@ -15,6 +15,7 @@ const hud = {
   hitMarker: document.querySelector('#hit-marker'),
   targetName: document.querySelector('#target-name'),
   targetHealth: document.querySelector('#target-health'),
+  radar: document.querySelector('#radar'),
 };
 
 const game = new Game({ mount, hud });
