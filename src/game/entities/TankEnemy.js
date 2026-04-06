@@ -154,8 +154,15 @@ export class TankEnemy extends EnemyBase {
     const headingError = normalizeAngle(toPlayer - this.heading);
     this.heading += Math.sign(headingError) * Math.min(Math.abs(headingError), dt * 0.55);
 
-    this.group.position.x += Math.sin(this.heading) * CONFIG.enemies.tank.moveSpeed * dt;
-    this.group.position.z += Math.cos(this.heading) * CONFIG.enemies.tank.moveSpeed * dt;
+    const nextX = this.group.position.x + Math.sin(this.heading) * CONFIG.enemies.tank.moveSpeed * dt;
+    const nextZ = this.group.position.z + Math.cos(this.heading) * CONFIG.enemies.tank.moveSpeed * dt;
+    if (context.terrain.canOccupy('tank', nextX, nextZ)) {
+      this.group.position.x = nextX;
+      this.group.position.z = nextZ;
+    } else {
+      const turnDirection = this.rng() < 0.5 ? -1 : 1;
+      this.heading += turnDirection * randomRange(this.rng, Math.PI * 0.35, Math.PI * 0.65);
+    }
     context.terrain.clampToArena(this.group.position);
     this.group.position.y = context.terrain.getGroundHeight(this.group.position.x, this.group.position.z);
 

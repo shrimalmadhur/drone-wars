@@ -74,12 +74,7 @@ function clampToArena(position) {
   return position;
 }
 
-function validSpawn(type, x, z, playerPosition) {
-  const biome = getBiomeAt(x, z);
-  const dist = Math.hypot(x - playerPosition.x, z - playerPosition.z);
-  if (dist < CONFIG.world.spawnMinDistance) {
-    return false;
-  }
+export function canOccupyBiome(type, biome) {
   if (type === 'ship') {
     return biome === 'sea';
   }
@@ -89,10 +84,50 @@ function validSpawn(type, x, z, playerPosition) {
   return true;
 }
 
+export function canOccupyAt(type, x, z) {
+  return canOccupyBiome(type, getBiomeAt(x, z));
+}
+
+function validSpawn(type, x, z, playerPosition) {
+  const dist = Math.hypot(x - playerPosition.x, z - playerPosition.z);
+  if (dist < CONFIG.world.spawnMinDistance) {
+    return false;
+  }
+  return canOccupyAt(type, x, z);
+}
+
+function createSpawnPosition(type, x, z, rng) {
+  const y = type === 'drone'
+    ? randomRange(rng, 18, 36)
+    : type === 'missile'
+      ? randomRange(rng, 20, 48)
+      : getGroundHeightAt(x, z);
+  return new THREE.Vector3(x, y, z);
+}
+
+function searchSpawnRings(type, playerPosition, rng, minRadius, maxRadius) {
+  const angleOffset = randomRange(rng, -Math.PI, Math.PI);
+  for (let radius = minRadius; radius <= maxRadius; radius += 8) {
+    const sampleCount = Math.max(48, Math.ceil((Math.PI * 2 * radius) / 18));
+    for (let step = 0; step < sampleCount; step += 1) {
+      const angle = angleOffset + (step / sampleCount) * Math.PI * 2;
+      const x = playerPosition.x + Math.cos(angle) * radius;
+      const z = playerPosition.z + Math.sin(angle) * radius;
+      if (validSpawn(type, x, z, playerPosition)) {
+        return createSpawnPosition(type, x, z, rng);
+      }
+    }
+  }
+  return null;
+}
+
 function resolveSpawnPosition(type, playerPosition, rng) {
+  const minRadius = CONFIG.world.spawnMinDistance + 24;
+  const maxRadius = CONFIG.world.spawnMaxDistance;
+
   for (let attempt = 0; attempt < 18; attempt += 1) {
     const angle = randomRange(rng, -Math.PI, Math.PI);
-    const radius = randomRange(rng, CONFIG.world.spawnMinDistance + 24, CONFIG.world.spawnMaxDistance);
+    const radius = randomRange(rng, minRadius, maxRadius);
     const x = playerPosition.x + Math.cos(angle) * radius;
     const z = playerPosition.z + Math.sin(angle) * radius;
 
@@ -100,13 +135,22 @@ function resolveSpawnPosition(type, playerPosition, rng) {
       continue;
     }
 
-    const y = type === 'drone'
-      ? randomRange(rng, 18, 36)
-      : type === 'missile'
-        ? randomRange(rng, 20, 48)
-        : getGroundHeightAt(x, z);
+    return createSpawnPosition(type, x, z, rng);
+  }
 
-    return new THREE.Vector3(x, y, z);
+  const exhaustive = searchSpawnRings(
+    type,
+    playerPosition,
+    rng,
+    minRadius,
+    Math.min(CONFIG.world.enemyDespawnDistance - 16, maxRadius + CONFIG.world.chunkSize * 2),
+  );
+  if (exhaustive) {
+    return exhaustive;
+  }
+
+  if (type === 'tank' || type === 'ship') {
+    return null;
   }
 
   const fallback = new THREE.Vector3(
@@ -457,6 +501,7 @@ export function createTerrain(scene, rng) {
     group,
     getBiomeAt,
     getGroundHeight: getGroundHeightAt,
+    canOccupy: canOccupyAt,
     clampToArena,
     update(center, time = 0) {
       refreshTerrain(center, time);
