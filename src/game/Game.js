@@ -5,12 +5,9 @@ import { InputController } from './input.js';
 import { findAimAssistTarget } from './math.js';
 import { Simulation } from './Simulation.js';
 
-const RADAR_COLORS = {
-  tank: '#9bb37d',
-  drone: '#ff8865',
-  missile: '#ff5f5f',
-  ship: '#52c2c8',
-};
+const RADAR_COLORS = Object.fromEntries(
+  ['tank', 'drone', 'missile', 'ship'].map(k => [k, '#' + CONFIG.palette[k].toString(16).padStart(6, '0')])
+);
 
 export class Game {
   constructor({ mount, hud }) {
@@ -43,7 +40,7 @@ export class Game {
     this.radarCtx = hud.radar.getContext('2d');
     this.radarSize = hud.radar.width;
     this.radarCenter = this.radarSize / 2;
-    this.radarWorldRadius = 180;
+    this.radarWorldRadius = CONFIG.world.arenaRadius;
     this.radarDrawRadius = this.radarCenter - 10;
     this.clock = {
       last: 0,
@@ -221,8 +218,8 @@ export class Game {
     const snapshot = this.simulation.getSnapshot();
     const candidates = this.simulation.getAimCandidates();
     const scale = this.radarDrawRadius / this.radarWorldRadius;
-    const cosYaw = Math.cos(-snapshot.playerYaw);
-    const sinYaw = Math.sin(-snapshot.playerYaw);
+    const cosYaw = Math.cos(snapshot.playerYaw);
+    const sinYaw = Math.sin(snapshot.playerYaw);
 
     for (const enemy of candidates) {
       const dx = enemy.position.x - snapshot.playerPosition.x;
