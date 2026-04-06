@@ -5,6 +5,10 @@ import { InputController } from './input.js';
 import { findAimAssistTarget } from './math.js';
 import { Simulation } from './Simulation.js';
 
+const RADAR_COLORS = Object.fromEntries(
+  ['tank', 'drone', 'missile', 'ship'].map(k => [k, '#' + CONFIG.palette[k].toString(16).padStart(6, '0')])
+);
+
 export class Game {
   constructor({ mount, hud }) {
     this.mount = mount;
@@ -33,6 +37,11 @@ export class Game {
       label: 'CENTER SIGHT',
       target: null,
     };
+    this.radarCtx = hud.radar.getContext('2d');
+    this.radarSize = hud.radar.width;
+    this.radarCenter = this.radarSize / 2;
+    this.radarWorldRadius = CONFIG.world.arenaRadius;
+    this.radarDrawRadius = this.radarCenter - 10;
     this.clock = {
       last: 0,
       accumulator: 0,
@@ -157,6 +166,99 @@ export class Game {
       this.hud.targetName.textContent = 'No target locked';
       this.hud.targetHealth.textContent = 'Bring the reticle over a target to inspect health.';
     }
+    this.renderRadar();
+  }
+
+  renderRadar() {
+    const ctx = this.radarCtx;
+    const cx = this.radarCenter;
+    const r = this.radarDrawRadius;
+
+    ctx.clearRect(0, 0, this.radarSize, this.radarSize);
+
+    // Background circle
+    ctx.beginPath();
+    ctx.arc(cx, cx, r, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(9, 17, 32, 0.8)';
+    ctx.fill();
+
+    // Border ring
+    ctx.beginPath();
+    ctx.arc(cx, cx, r, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(138, 244, 255, 0.2)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Crosshair lines
+    ctx.strokeStyle = 'rgba(138, 244, 255, 0.08)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(cx - r, cx);
+    ctx.lineTo(cx + r, cx);
+    ctx.moveTo(cx, cx - r);
+    ctx.lineTo(cx, cx + r);
+    ctx.stroke();
+
+    // Range ring at 75%
+    ctx.beginPath();
+    ctx.arc(cx, cx, r * 0.75, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(138, 244, 255, 0.06)';
+    ctx.stroke();
+
+    // Player chevron (pointing up = forward)
+    ctx.fillStyle = 'rgba(138, 244, 255, 0.9)';
+    ctx.beginPath();
+    ctx.moveTo(cx, cx - 5);
+    ctx.lineTo(cx - 3.5, cx + 3);
+    ctx.lineTo(cx + 3.5, cx + 3);
+    ctx.closePath();
+    ctx.fill();
+
+    // Enemy dots
+    const snapshot = this.simulation.getSnapshot();
+    const candidates = this.simulation.getAimCandidates();
+    const scale = this.radarDrawRadius / this.radarWorldRadius;
+    const cosYaw = Math.cos(snapshot.playerYaw);
+    const sinYaw = Math.sin(snapshot.playerYaw);
+
+    for (const enemy of candidates) {
+      const dx = enemy.position.x - snapshot.playerPosition.x;
+      const dz = enemy.position.z - snapshot.playerPosition.z;
+      const dist = Math.sqrt(dx * dx + dz * dz);
+
+      if (dist > this.radarWorldRadius) {
+        continue;
+      }
+
+      // Rotate relative position by negative yaw (forward-up)
+      const rx = dx * cosYaw - dz * sinYaw;
+      const rz = dx * sinYaw + dz * cosYaw;
+
+      // Scale to canvas and flip Z so forward (positive Z in game) is up on radar
+      const px = cx + rx * scale;
+      const py = cx - rz * scale;
+
+      // Fade at edge of range
+      const alpha = dist > this.radarWorldRadius * 0.85
+        ? 1 - (dist - this.radarWorldRadius * 0.85) / (this.radarWorldRadius * 0.15)
+        : 1;
+
+      const color = RADAR_COLORS[enemy.type] || '#ffffff';
+
+      // Glow
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 6;
+
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(px, py, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Reset shadow and alpha
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
   }
 
   resize() {
