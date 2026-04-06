@@ -5,6 +5,13 @@ import { InputController } from './input.js';
 import { findAimAssistTarget } from './math.js';
 import { Simulation } from './Simulation.js';
 
+const RADAR_COLORS = {
+  tank: '#9bb37d',
+  drone: '#ff8865',
+  missile: '#ff5f5f',
+  ship: '#52c2c8',
+};
+
 export class Game {
   constructor({ mount, hud }) {
     this.mount = mount;
@@ -209,6 +216,52 @@ export class Game {
     ctx.lineTo(cx + 3.5, cx + 3);
     ctx.closePath();
     ctx.fill();
+
+    // Enemy dots
+    const snapshot = this.simulation.getSnapshot();
+    const candidates = this.simulation.getAimCandidates();
+    const scale = this.radarDrawRadius / this.radarWorldRadius;
+    const cosYaw = Math.cos(-snapshot.playerYaw);
+    const sinYaw = Math.sin(-snapshot.playerYaw);
+
+    for (const enemy of candidates) {
+      const dx = enemy.position.x - snapshot.playerPosition.x;
+      const dz = enemy.position.z - snapshot.playerPosition.z;
+      const dist = Math.sqrt(dx * dx + dz * dz);
+
+      if (dist > this.radarWorldRadius) {
+        continue;
+      }
+
+      // Rotate relative position by negative yaw (forward-up)
+      const rx = dx * cosYaw - dz * sinYaw;
+      const rz = dx * sinYaw + dz * cosYaw;
+
+      // Scale to canvas and flip Z so forward (positive Z in game) is up on radar
+      const px = cx + rx * scale;
+      const py = cx - rz * scale;
+
+      // Fade at edge of range
+      const alpha = dist > this.radarWorldRadius * 0.85
+        ? 1 - (dist - this.radarWorldRadius * 0.85) / (this.radarWorldRadius * 0.15)
+        : 1;
+
+      const color = RADAR_COLORS[enemy.type] || '#ffffff';
+
+      // Glow
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 6;
+
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(px, py, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Reset shadow and alpha
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
   }
 
   resize() {
