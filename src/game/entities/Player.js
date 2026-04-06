@@ -21,9 +21,14 @@ export class Player {
 
     const bodyMaterial = new THREE.MeshStandardMaterial({
       color: CONFIG.palette.player,
-      emissive: 0x0f4456,
+      emissive: 0x0a0a0a,
+      roughness: 0.3,
+      metalness: 0.6,
+    });
+    const darkMaterial = new THREE.MeshStandardMaterial({
+      color: 0x1a1a1a,
       roughness: 0.4,
-      metalness: 0.35,
+      metalness: 0.5,
     });
     const accentMaterial = new THREE.MeshStandardMaterial({
       color: CONFIG.palette.playerAccent,
@@ -31,32 +36,124 @@ export class Player {
       roughness: 0.2,
       metalness: 0.5,
     });
+    const ledMaterial = new THREE.MeshStandardMaterial({
+      color: 0x00ff44,
+      emissive: 0x00ff44,
+      emissiveIntensity: 2,
+    });
+    const rotorMaterial = new THREE.MeshStandardMaterial({
+      color: 0x888888,
+      transparent: true,
+      opacity: 0.35,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+    const lensMaterial = new THREE.MeshStandardMaterial({
+      color: 0x111122,
+      roughness: 0.05,
+      metalness: 0.9,
+    });
 
-    const core = new THREE.Mesh(new THREE.BoxGeometry(3.8, 1.2, 6.6), bodyMaterial);
-    const cockpit = new THREE.Mesh(new THREE.BoxGeometry(2.3, 1.1, 1.8), accentMaterial);
-    cockpit.position.set(0, 0.8, 1);
+    // Central body — flattened capsule shape
+    const bodyTop = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.6, 1.8, 0.7, 12),
+      bodyMaterial,
+    );
+    const bodyBottom = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.8, 1.5, 0.5, 12),
+      darkMaterial,
+    );
+    bodyBottom.position.y = -0.5;
 
-    const wing = new THREE.Mesh(new THREE.BoxGeometry(8.6, 0.3, 1.1), bodyMaterial);
-    wing.position.y = 0.2;
+    // Canopy / top shell
+    const canopy = new THREE.Mesh(
+      new THREE.SphereGeometry(1.2, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2),
+      bodyMaterial,
+    );
+    canopy.position.y = 0.3;
 
-    const rotorGeometry = new THREE.CylinderGeometry(0.2, 0.2, 0.16, 10);
-    const rotorOffsets = [
-      [-3.4, 0.5, 2.2],
-      [3.4, 0.5, 2.2],
-      [-3.4, 0.5, -2.2],
-      [3.4, 0.5, -2.2],
+    // Four arms extending to motors
+    const armGeometry = new THREE.BoxGeometry(0.4, 0.25, 3.2);
+    const armPositions = [
+      { x: 1.0, z: 1.0, ry: Math.PI / 4 },
+      { x: -1.0, z: 1.0, ry: -Math.PI / 4 },
+      { x: 1.0, z: -1.0, ry: -Math.PI / 4 },
+      { x: -1.0, z: -1.0, ry: Math.PI / 4 },
     ];
-    for (const [x, y, z] of rotorOffsets) {
-      const rotor = new THREE.Mesh(rotorGeometry, accentMaterial);
-      rotor.rotation.z = Math.PI / 2;
-      rotor.position.set(x, y, z);
-      this.model.add(rotor);
+    const motorTipOffset = 2.8;
+    const motorPositions = [
+      [motorTipOffset * Math.sin(Math.PI / 4), 0.15, motorTipOffset * Math.cos(Math.PI / 4)],
+      [-motorTipOffset * Math.sin(Math.PI / 4), 0.15, motorTipOffset * Math.cos(Math.PI / 4)],
+      [motorTipOffset * Math.sin(Math.PI / 4), 0.15, -motorTipOffset * Math.cos(Math.PI / 4)],
+      [-motorTipOffset * Math.sin(Math.PI / 4), 0.15, -motorTipOffset * Math.cos(Math.PI / 4)],
+    ];
+
+    for (const arm of armPositions) {
+      const armMesh = new THREE.Mesh(armGeometry, darkMaterial);
+      armMesh.position.set(arm.x, 0, arm.z);
+      armMesh.rotation.y = arm.ry;
+      armMesh.castShadow = true;
+      this.model.add(armMesh);
     }
 
-    core.castShadow = true;
-    cockpit.castShadow = true;
-    wing.castShadow = true;
-    this.model.add(core, cockpit, wing);
+    // Motor housings + rotor discs
+    const motorGeometry = new THREE.CylinderGeometry(0.45, 0.5, 0.55, 10);
+    const rotorDiscGeometry = new THREE.CylinderGeometry(1.6, 1.6, 0.06, 20);
+    this.rotors = [];
+    for (const [x, y, z] of motorPositions) {
+      const motor = new THREE.Mesh(motorGeometry, darkMaterial);
+      motor.position.set(x, y, z);
+      motor.castShadow = true;
+      this.model.add(motor);
+
+      const rotor = new THREE.Mesh(rotorDiscGeometry, rotorMaterial);
+      rotor.position.set(x, y + 0.35, z);
+      this.rotors.push(rotor);
+      this.model.add(rotor);
+
+      // LED on each motor
+      const led = new THREE.Mesh(
+        new THREE.SphereGeometry(0.1, 6, 6),
+        z > 0 ? ledMaterial : new THREE.MeshStandardMaterial({
+          color: 0xff2200, emissive: 0xff2200, emissiveIntensity: 2,
+        }),
+      );
+      led.position.set(x, y + 0.3, z + (z > 0 ? 0.5 : -0.5));
+      this.model.add(led);
+    }
+
+    // Camera gimbal underneath
+    const gimbalMount = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.3, 0.3, 0.3, 8),
+      darkMaterial,
+    );
+    gimbalMount.position.set(0, -0.65, 0.5);
+    const cameraLens = new THREE.Mesh(
+      new THREE.SphereGeometry(0.28, 10, 10),
+      lensMaterial,
+    );
+    cameraLens.position.set(0, -0.65, 0.85);
+
+    // Landing skids
+    const skidGeometry = new THREE.BoxGeometry(0.15, 0.12, 2.8);
+    const strutGeometry = new THREE.BoxGeometry(0.12, 0.6, 0.12);
+    for (const side of [-1, 1]) {
+      const skid = new THREE.Mesh(skidGeometry, darkMaterial);
+      skid.position.set(side * 1.2, -0.95, 0);
+      this.model.add(skid);
+      for (const fz of [-0.8, 0.8]) {
+        const strut = new THREE.Mesh(strutGeometry, darkMaterial);
+        strut.position.set(side * 1.2, -0.65, fz);
+        this.model.add(strut);
+      }
+    }
+
+    bodyTop.castShadow = true;
+    bodyBottom.castShadow = true;
+    canopy.castShadow = true;
+    this.model.add(bodyTop, bodyBottom, canopy, gimbalMount, cameraLens);
+    // Scale the whole model to match the original drone's footprint
+    this.model.scale.set(1.3, 1.3, 1.3);
     this.group.add(this.model);
     this.scene.add(this.group);
 
@@ -102,6 +199,11 @@ export class Player {
     this.model.rotation.z = damp(this.model.rotation.z, -controls.strafe * 0.32 - controls.yaw * 0.28, 7, dt);
     this.model.rotation.x = damp(this.model.rotation.x, controls.pitch * 0.22 - controls.thrust * 0.08, 7, dt);
     this.group.rotation.y = this.yaw;
+
+    // Spin rotor discs
+    for (const rotor of this.rotors) {
+      rotor.rotation.y += 35 * dt;
+    }
   }
 
   wantsToFire(controls) {

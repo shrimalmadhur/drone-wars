@@ -18,21 +18,93 @@ export class DroneEnemy extends EnemyBase {
     this.orbitPhase = randomRange(rng, -Math.PI, Math.PI);
     this.fireCooldown = randomRange(rng, 0.9, 1.5);
 
-    const core = new THREE.Mesh(
-      new THREE.OctahedronGeometry(2.3, 0),
-      new THREE.MeshStandardMaterial({
-        color: CONFIG.palette.drone,
-        emissive: 0x5a0f0f,
-        roughness: 0.35,
-      }),
+    const bodyMat = new THREE.MeshStandardMaterial({
+      color: 0x3a3a3a,
+      roughness: 0.35,
+      metalness: 0.5,
+    });
+    const darkMat = new THREE.MeshStandardMaterial({
+      color: 0x222222,
+      roughness: 0.4,
+      metalness: 0.4,
+    });
+    const accentMat = new THREE.MeshStandardMaterial({
+      color: CONFIG.palette.drone,
+      emissive: 0x5a0f0f,
+      roughness: 0.3,
+      metalness: 0.3,
+    });
+    const rotorMat = new THREE.MeshStandardMaterial({
+      color: 0x666666,
+      transparent: true,
+      opacity: 0.3,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+    const eyeMat = new THREE.MeshStandardMaterial({
+      color: 0xff2200,
+      emissive: 0xff2200,
+      emissiveIntensity: 2,
+    });
+
+    // Central body — angular, aggressive
+    const bodyTop = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.0, 1.4, 0.6, 6),
+      bodyMat,
     );
-    const wing = new THREE.Mesh(
-      new THREE.BoxGeometry(6.8, 0.25, 0.8),
-      new THREE.MeshStandardMaterial({ color: 0x46211f, metalness: 0.25 }),
+    const bodyBottom = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.4, 1.0, 0.5, 6),
+      darkMat,
     );
-    core.castShadow = true;
-    wing.castShadow = true;
-    this.group.add(core, wing);
+    bodyBottom.position.y = -0.45;
+
+    // Sensor eye — glowing red
+    const eye = new THREE.Mesh(
+      new THREE.SphereGeometry(0.35, 8, 8),
+      eyeMat,
+    );
+    eye.position.set(0, -0.15, 1.2);
+
+    // Four arms + motors + rotor discs
+    const armGeo = new THREE.BoxGeometry(0.3, 0.18, 2.4);
+    const motorGeo = new THREE.CylinderGeometry(0.35, 0.4, 0.4, 8);
+    const rotorGeo = new THREE.CylinderGeometry(1.2, 1.2, 0.04, 16);
+    const tipDist = 2.1;
+    const armConfigs = [
+      { x: 0.7, z: 0.7, ry: Math.PI / 4 },
+      { x: -0.7, z: 0.7, ry: -Math.PI / 4 },
+      { x: 0.7, z: -0.7, ry: -Math.PI / 4 },
+      { x: -0.7, z: -0.7, ry: Math.PI / 4 },
+    ];
+    const motorTips = [
+      [tipDist * Math.SQRT1_2, 0.1, tipDist * Math.SQRT1_2],
+      [-tipDist * Math.SQRT1_2, 0.1, tipDist * Math.SQRT1_2],
+      [tipDist * Math.SQRT1_2, 0.1, -tipDist * Math.SQRT1_2],
+      [-tipDist * Math.SQRT1_2, 0.1, -tipDist * Math.SQRT1_2],
+    ];
+
+    this.rotors = [];
+    for (let i = 0; i < 4; i++) {
+      const arm = new THREE.Mesh(armGeo, darkMat);
+      arm.position.set(armConfigs[i].x, 0, armConfigs[i].z);
+      arm.rotation.y = armConfigs[i].ry;
+      arm.castShadow = true;
+      this.group.add(arm);
+
+      const motor = new THREE.Mesh(motorGeo, accentMat);
+      motor.position.set(motorTips[i][0], motorTips[i][1], motorTips[i][2]);
+      motor.castShadow = true;
+      this.group.add(motor);
+
+      const rotor = new THREE.Mesh(rotorGeo, rotorMat);
+      rotor.position.set(motorTips[i][0], motorTips[i][1] + 0.25, motorTips[i][2]);
+      this.rotors.push(rotor);
+      this.group.add(rotor);
+    }
+
+    bodyTop.castShadow = true;
+    bodyBottom.castShadow = true;
+    this.group.add(bodyTop, bodyBottom, eye);
     this.scene.add(this.group);
   }
 
@@ -55,6 +127,9 @@ export class DroneEnemy extends EnemyBase {
     this.group.position.y = Math.max(this.group.position.y, context.terrain.getGroundHeight(this.group.position.x, this.group.position.z) + 10);
 
     this.group.lookAt(playerPos.x, playerPos.y, playerPos.z);
+    for (const rotor of this.rotors) {
+      rotor.rotation.y += 30 * dt;
+    }
     this.fireCooldown -= dt;
     if (this.group.position.distanceTo(playerPos) < 86 && this.fireCooldown <= 0) {
       this.fireCooldown = CONFIG.enemies.drone.fireInterval + randomRange(this.rng, -0.2, 0.2);

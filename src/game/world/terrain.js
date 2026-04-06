@@ -133,19 +133,30 @@ function hideRemainingInstances(mesh, startIndex, scratchPosition) {
 }
 
 function buildDecorMeshes(group, maxCounts) {
-  const trunkGeometry = new THREE.CylinderGeometry(0.35, 0.5, 5.2, 7);
-  const crownGeometry = new THREE.ConeGeometry(2.8, 8, 8);
+  const trunkGeometry = new THREE.CylinderGeometry(0.25, 0.55, 6, 8);
+  // Three tiers of foliage: bottom (widest), middle, top (narrowest)
+  const crownBottomGeometry = new THREE.ConeGeometry(3.4, 4.5, 8);
+  const crownMiddleGeometry = new THREE.ConeGeometry(2.6, 4.0, 8);
+  const crownTopGeometry = new THREE.ConeGeometry(1.8, 3.5, 8);
   const rockGeometry = new THREE.DodecahedronGeometry(2.4, 0);
   const landmarkGeometry = new THREE.CylinderGeometry(0.9, 1.8, 14, 6);
   const cloudGeometry = new THREE.SphereGeometry(4, 8, 8);
 
   const trunkMaterial = new THREE.MeshStandardMaterial({
-    color: '#5d3926',
+    color: '#4a2d1a',
     roughness: 1,
   });
-  const crownMaterial = new THREE.MeshStandardMaterial({
+  const crownBottomMaterial = new THREE.MeshStandardMaterial({
+    color: '#1e5e2e',
+    roughness: 0.92,
+  });
+  const crownMiddleMaterial = new THREE.MeshStandardMaterial({
     color: '#2b6b3e',
-    roughness: 0.95,
+    roughness: 0.9,
+  });
+  const crownTopMaterial = new THREE.MeshStandardMaterial({
+    color: '#358748',
+    roughness: 0.88,
   });
   const rockMaterial = new THREE.MeshStandardMaterial({
     color: '#889077',
@@ -165,36 +176,48 @@ function buildDecorMeshes(group, maxCounts) {
   });
 
   const treesTrunk = new THREE.InstancedMesh(trunkGeometry, trunkMaterial, maxCounts.trees);
-  const treesCrown = new THREE.InstancedMesh(crownGeometry, crownMaterial, maxCounts.trees);
+  const treesCrownBottom = new THREE.InstancedMesh(crownBottomGeometry, crownBottomMaterial, maxCounts.trees);
+  const treesCrownMiddle = new THREE.InstancedMesh(crownMiddleGeometry, crownMiddleMaterial, maxCounts.trees);
+  const treesCrownTop = new THREE.InstancedMesh(crownTopGeometry, crownTopMaterial, maxCounts.trees);
   const rocks = new THREE.InstancedMesh(rockGeometry, rockMaterial, maxCounts.rocks);
   const landmarks = new THREE.InstancedMesh(landmarkGeometry, landmarkMaterial, maxCounts.landmarks);
   const clouds = new THREE.InstancedMesh(cloudGeometry, cloudMaterial, maxCounts.clouds);
 
   treesTrunk.castShadow = true;
   treesTrunk.receiveShadow = true;
-  treesCrown.castShadow = true;
-  treesCrown.receiveShadow = true;
+  treesCrownBottom.castShadow = true;
+  treesCrownBottom.receiveShadow = true;
+  treesCrownMiddle.castShadow = true;
+  treesCrownMiddle.receiveShadow = true;
+  treesCrownTop.castShadow = true;
+  treesCrownTop.receiveShadow = true;
   rocks.castShadow = true;
   rocks.receiveShadow = true;
   landmarks.castShadow = true;
   landmarks.receiveShadow = true;
 
-  group.add(treesTrunk, treesCrown, rocks, landmarks, clouds);
+  group.add(treesTrunk, treesCrownBottom, treesCrownMiddle, treesCrownTop, rocks, landmarks, clouds);
 
   return {
     treesTrunk,
-    treesCrown,
+    treesCrownBottom,
+    treesCrownMiddle,
+    treesCrownTop,
     rocks,
     landmarks,
     clouds,
     dispose() {
       trunkGeometry.dispose();
-      crownGeometry.dispose();
+      crownBottomGeometry.dispose();
+      crownMiddleGeometry.dispose();
+      crownTopGeometry.dispose();
       rockGeometry.dispose();
       landmarkGeometry.dispose();
       cloudGeometry.dispose();
       trunkMaterial.dispose();
-      crownMaterial.dispose();
+      crownBottomMaterial.dispose();
+      crownMiddleMaterial.dispose();
+      crownTopMaterial.dispose();
       rockMaterial.dispose();
       landmarkMaterial.dispose();
       cloudMaterial.dispose();
@@ -287,22 +310,46 @@ export function createTerrain(scene, rng) {
 
           const height = getGroundHeightAt(worldX, worldZ);
           const treeHeight = 0.9 + hash2(worldX, worldZ) * 1.2;
+          const rotY = hash2(worldX + 7, worldZ - 5) * Math.PI * 2;
+
+          // Trunk — taller, tapered
           const trunkScale = scratchScale.set(1, treeHeight, 1);
           setInstanceTransform(
             decor.treesTrunk,
             treeIndex,
-            worldToLocal(worldX, height + 2.6 * treeHeight, worldZ, anchorX, anchorZ, scratchPosition),
-            hash2(worldX + 7, worldZ - 5) * Math.PI * 2,
+            worldToLocal(worldX, height + 3 * treeHeight, worldZ, anchorX, anchorZ, scratchPosition),
+            rotY,
             trunkScale,
           );
-          const crownScale = scratchScale.set(0.9 + treeHeight * 0.2, 1 + treeHeight * 0.2, 0.9 + treeHeight * 0.2);
+
+          // Bottom tier — widest
+          const s = 0.85 + treeHeight * 0.25;
           setInstanceTransform(
-            decor.treesCrown,
+            decor.treesCrownBottom,
             treeIndex,
-            worldToLocal(worldX, height + 7.2 * treeHeight, worldZ, anchorX, anchorZ, scratchPosition),
-            hash2(worldX + 17, worldZ + 9) * Math.PI * 2,
-            crownScale,
+            worldToLocal(worldX, height + 5.2 * treeHeight, worldZ, anchorX, anchorZ, scratchPosition),
+            rotY,
+            scratchScale.set(s, s, s),
           );
+
+          // Middle tier
+          setInstanceTransform(
+            decor.treesCrownMiddle,
+            treeIndex,
+            worldToLocal(worldX, height + 7.4 * treeHeight, worldZ, anchorX, anchorZ, scratchPosition),
+            rotY,
+            scratchScale.set(s * 0.9, s * 0.95, s * 0.9),
+          );
+
+          // Top tier — narrowest
+          setInstanceTransform(
+            decor.treesCrownTop,
+            treeIndex,
+            worldToLocal(worldX, height + 9.2 * treeHeight, worldZ, anchorX, anchorZ, scratchPosition),
+            rotY,
+            scratchScale.set(s * 0.75, s * 0.85, s * 0.75),
+          );
+
           treeIndex += 1;
         }
 
@@ -363,7 +410,9 @@ export function createTerrain(scene, rng) {
     }
 
     hideRemainingInstances(decor.treesTrunk, treeIndex, scratchPosition);
-    hideRemainingInstances(decor.treesCrown, treeIndex, scratchPosition);
+    hideRemainingInstances(decor.treesCrownBottom, treeIndex, scratchPosition);
+    hideRemainingInstances(decor.treesCrownMiddle, treeIndex, scratchPosition);
+    hideRemainingInstances(decor.treesCrownTop, treeIndex, scratchPosition);
     hideRemainingInstances(decor.rocks, rockIndex, scratchPosition);
     hideRemainingInstances(decor.landmarks, landmarkIndex, scratchPosition);
     hideRemainingInstances(decor.clouds, cloudIndex, scratchPosition);
