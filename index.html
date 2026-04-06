@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0"
+    />
+    <title>Drone Wars</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="reticle" class="reticle">
+      <div class="reticle__ring"></div>
+      <div class="reticle__cross reticle__cross--h"></div>
+      <div class="reticle__cross reticle__cross--v"></div>
+      <div id="reticle-label" class="reticle__label">FREE AIM</div>
+      <div id="hit-marker" class="reticle__hit-marker">HIT</div>
+    </div>
+    <aside class="hud">
+      <div class="hud__topbar">
+        <div>
+          <p class="hud__eyebrow">Single-player combat prototype</p>
+          <h1>Drone Wars</h1>
+        </div>
+        <div class="hud__metrics">
+          <div class="metric">
+            <span class="metric__label">Score</span>
+            <strong id="score-value">0</strong>
+          </div>
+          <div class="metric">
+            <span class="metric__label">Wave</span>
+            <strong id="wave-value">1</strong>
+          </div>
+          <div class="metric">
+            <span class="metric__label">Enemies</span>
+            <strong id="enemy-count">0</strong>
+          </div>
+        </div>
+      </div>
+
+      <div class="hud__bottom">
+        <div class="health-card">
+          <div class="health-card__label">
+            <span>Hull Integrity</span>
+            <strong id="health-value">100%</strong>
+          </div>
+          <div class="health-bar">
+            <div id="health-fill" class="health-bar__fill"></div>
+          </div>
+        </div>
+
+        <div class="controls-card" id="controls-panel">
+          <p class="controls-card__title">Flight Controls</p>
+          <p>W/S thrust, A/D yaw, arrow keys strafe/pitch, Q/E altitude</p>
+          <p>Space fire, R restart, P pause</p>
+        </div>
+
+        <div class="controls-card">
+          <p class="controls-card__title">Target Feed</p>
+          <p id="target-name">No target locked</p>
+          <p id="target-health">Bring the reticle over a target to inspect health.</p>
+        </div>
+
+        <div id="status-panel" class="status-card">
+          Sweep the battlefield.
+        </div>
+      </div>
+    </aside>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
