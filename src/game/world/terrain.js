@@ -4,6 +4,18 @@ import { CONFIG } from '../config.js';
 import { randomRange } from '../math.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
+const CLOUD_BODY_LOBES = [
+  { x: 0, y: 0, z: 0, sx: 1.8, sy: 1.05, sz: 1.25 },
+  { x: -5.5, y: -0.9, z: 1.6, sx: 1.15, sy: 0.78, sz: 0.92 },
+  { x: 5.1, y: -0.6, z: -1.3, sx: 1.2, sy: 0.82, sz: 0.95 },
+  { x: -1.3, y: 1.5, z: -2.6, sx: 1.05, sy: 0.72, sz: 0.88 },
+  { x: 3.2, y: 1.1, z: 2.4, sx: 0.95, sy: 0.66, sz: 0.82 },
+];
+const CLOUD_WISP_LOBES = [
+  { x: -8.5, y: -1.3, z: 4.8, sx: 1.8, sy: 0.34, sz: 1.35 },
+  { x: 7.8, y: -0.8, z: -4.1, sx: 1.55, sy: 0.3, sz: 1.18 },
+  { x: 0.8, y: -2.2, z: 0.4, sx: 2.15, sy: 0.28, sz: 1.55 },
+];
 
 function fract(value) {
   return value - Math.floor(value);
@@ -184,7 +196,7 @@ function buildDecorMeshes(group, maxCounts) {
   const crownTopGeometry = new THREE.ConeGeometry(1.8, 3.5, 8);
   const rockGeometry = new THREE.DodecahedronGeometry(2.4, 0);
   const landmarkGeometry = new THREE.CylinderGeometry(0.9, 1.8, 14, 6);
-  const cloudGeometry = new THREE.SphereGeometry(4, 8, 8);
+  const cloudGeometry = new THREE.SphereGeometry(4.4, 10, 10);
 
   const trunkMaterial = new THREE.MeshStandardMaterial({
     color: '#4a2d1a',
@@ -211,10 +223,18 @@ function buildDecorMeshes(group, maxCounts) {
     roughness: 0.88,
     metalness: 0.08,
   });
-  const cloudMaterial = new THREE.MeshStandardMaterial({
-    color: '#edf4ff',
+  const cloudBodyMaterial = new THREE.MeshStandardMaterial({
+    color: '#f7fbff',
     transparent: true,
-    opacity: 0.45,
+    opacity: 0.68,
+    roughness: 0.96,
+    metalness: 0.02,
+    depthWrite: false,
+  });
+  const cloudWispMaterial = new THREE.MeshStandardMaterial({
+    color: '#dce8f6',
+    transparent: true,
+    opacity: 0.2,
     roughness: 1,
     depthWrite: false,
   });
@@ -225,7 +245,8 @@ function buildDecorMeshes(group, maxCounts) {
   const treesCrownTop = new THREE.InstancedMesh(crownTopGeometry, crownTopMaterial, maxCounts.trees);
   const rocks = new THREE.InstancedMesh(rockGeometry, rockMaterial, maxCounts.rocks);
   const landmarks = new THREE.InstancedMesh(landmarkGeometry, landmarkMaterial, maxCounts.landmarks);
-  const clouds = new THREE.InstancedMesh(cloudGeometry, cloudMaterial, maxCounts.clouds);
+  const cloudsBody = new THREE.InstancedMesh(cloudGeometry, cloudBodyMaterial, maxCounts.cloudBody);
+  const cloudsWisp = new THREE.InstancedMesh(cloudGeometry, cloudWispMaterial, maxCounts.cloudWisp);
 
   treesTrunk.castShadow = true;
   treesTrunk.receiveShadow = true;
@@ -240,7 +261,7 @@ function buildDecorMeshes(group, maxCounts) {
   landmarks.castShadow = true;
   landmarks.receiveShadow = true;
 
-  group.add(treesTrunk, treesCrownBottom, treesCrownMiddle, treesCrownTop, rocks, landmarks, clouds);
+  group.add(treesTrunk, treesCrownBottom, treesCrownMiddle, treesCrownTop, rocks, landmarks, cloudsBody, cloudsWisp);
 
   return {
     treesTrunk,
@@ -249,7 +270,8 @@ function buildDecorMeshes(group, maxCounts) {
     treesCrownTop,
     rocks,
     landmarks,
-    clouds,
+    cloudsBody,
+    cloudsWisp,
     dispose() {
       trunkGeometry.dispose();
       crownBottomGeometry.dispose();
@@ -264,7 +286,8 @@ function buildDecorMeshes(group, maxCounts) {
       crownTopMaterial.dispose();
       rockMaterial.dispose();
       landmarkMaterial.dispose();
-      cloudMaterial.dispose();
+      cloudBodyMaterial.dispose();
+      cloudWispMaterial.dispose();
     },
   };
 }
@@ -328,7 +351,8 @@ export function createTerrain(scene, rng) {
     trees: maxChunkCount * 12,
     rocks: maxChunkCount * 8,
     landmarks: maxChunkCount * 2,
-    clouds: maxChunkCount * 4,
+    cloudBody: maxChunkCount * CLOUD_BODY_LOBES.length,
+    cloudWisp: maxChunkCount * CLOUD_WISP_LOBES.length,
   });
 
   scene.add(group);
@@ -337,7 +361,8 @@ export function createTerrain(scene, rng) {
     let treeIndex = 0;
     let rockIndex = 0;
     let landmarkIndex = 0;
-    let cloudIndex = 0;
+    let cloudBodyIndex = 0;
+    let cloudWispIndex = 0;
 
     for (let chunkZ = -radius; chunkZ <= radius; chunkZ += 1) {
       for (let chunkX = -radius; chunkX <= radius; chunkX += 1) {
@@ -437,18 +462,63 @@ export function createTerrain(scene, rng) {
 
         const cloudChance = hash2(worldChunkX * 0.17, worldChunkZ * 0.17);
         if (cloudChance > 0.28) {
-          const worldX = worldChunkX + chunkSize * (0.2 + cloudChance * 0.6);
-          const worldZ = worldChunkZ + chunkSize * (0.1 + hash2(worldChunkX + 4, worldChunkZ + 8) * 0.8);
-          const y = 54 + cloudChance * 16;
-          const scaleValue = 1.8 + cloudChance * 2.4;
-          setInstanceTransform(
-            decor.clouds,
-            cloudIndex,
-            worldToLocal(worldX, y, worldZ, anchorX, anchorZ, scratchPosition),
-            0,
-            scratchScale.set(scaleValue * 2.8, scaleValue, scaleValue * 1.5),
-          );
-          cloudIndex += 1;
+          const worldX = worldChunkX + chunkSize * (0.12 + hash2(worldChunkX + 18, worldChunkZ - 7) * 0.76);
+          const worldZ = worldChunkZ + chunkSize * (0.12 + hash2(worldChunkX - 11, worldChunkZ + 13) * 0.76);
+          const y = 50 + hash2(worldChunkX * 0.21, worldChunkZ * 0.19) * 20;
+          const bankWidth = 1.5 + cloudChance * 2.1;
+          const bankHeight = 1.1 + cloudChance * 0.85;
+          const bankDepth = 1.2 + hash2(worldChunkX * 0.09, worldChunkZ * 0.09) * 0.85;
+          const bankRotation = (hash2(worldChunkX + 91, worldChunkZ - 37) - 0.5) * 0.42;
+
+          for (let i = 0; i < CLOUD_BODY_LOBES.length; i += 1) {
+            const lobe = CLOUD_BODY_LOBES[i];
+            const jitter = hash2(worldChunkX * (0.37 + i * 0.11), worldChunkZ * (0.31 + i * 0.07));
+            const puffScale = 0.86 + jitter * 0.42;
+            setInstanceTransform(
+              decor.cloudsBody,
+              cloudBodyIndex,
+              worldToLocal(
+                worldX + lobe.x * bankWidth + (jitter - 0.5) * 4,
+                y + lobe.y * bankHeight + (jitter - 0.5) * 1.8,
+                worldZ + lobe.z * bankDepth + (0.5 - jitter) * 3,
+                anchorX,
+                anchorZ,
+                scratchPosition,
+              ),
+              bankRotation,
+              scratchScale.set(
+                bankWidth * lobe.sx * puffScale,
+                bankHeight * lobe.sy * puffScale,
+                bankDepth * lobe.sz * puffScale,
+              ),
+            );
+            cloudBodyIndex += 1;
+          }
+
+          for (let i = 0; i < CLOUD_WISP_LOBES.length; i += 1) {
+            const lobe = CLOUD_WISP_LOBES[i];
+            const jitter = hash2(worldChunkX * (0.43 + i * 0.09), worldChunkZ * (0.29 + i * 0.12));
+            const puffScale = 0.92 + jitter * 0.34;
+            setInstanceTransform(
+              decor.cloudsWisp,
+              cloudWispIndex,
+              worldToLocal(
+                worldX + lobe.x * bankWidth + (jitter - 0.5) * 6,
+                y + lobe.y * bankHeight + (jitter - 0.5) * 1.4,
+                worldZ + lobe.z * bankDepth + (0.5 - jitter) * 4,
+                anchorX,
+                anchorZ,
+                scratchPosition,
+              ),
+              bankRotation * 0.6,
+              scratchScale.set(
+                bankWidth * lobe.sx * puffScale,
+                bankHeight * lobe.sy * puffScale,
+                bankDepth * lobe.sz * puffScale,
+              ),
+            );
+            cloudWispIndex += 1;
+          }
         }
       }
     }
@@ -459,7 +529,8 @@ export function createTerrain(scene, rng) {
     hideRemainingInstances(decor.treesCrownTop, treeIndex, scratchPosition);
     hideRemainingInstances(decor.rocks, rockIndex, scratchPosition);
     hideRemainingInstances(decor.landmarks, landmarkIndex, scratchPosition);
-    hideRemainingInstances(decor.clouds, cloudIndex, scratchPosition);
+    hideRemainingInstances(decor.cloudsBody, cloudBodyIndex, scratchPosition);
+    hideRemainingInstances(decor.cloudsWisp, cloudWispIndex, scratchPosition);
   };
 
   const refreshTerrain = (center, time = 0) => {
@@ -493,6 +564,8 @@ export function createTerrain(scene, rng) {
         ? '#1f6e9f'
         : '#195f93',
     );
+    decor.cloudsBody.position.set(Math.sin(time * 0.018) * 6, Math.sin(time * 0.042) * 0.9, Math.cos(time * 0.014) * 4);
+    decor.cloudsWisp.position.set(Math.sin(time * 0.026) * 9, Math.sin(time * 0.038) * 1.2, Math.cos(time * 0.021) * 6);
   };
 
   refreshTerrain(new THREE.Vector3(0, 0, 0), 0);
