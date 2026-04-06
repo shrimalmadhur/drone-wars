@@ -253,6 +253,18 @@ canvas {
   min-height: 54px;
 }
 
+.radar {
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  border: 1px solid var(--panel-border);
+  background: var(--panel);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
+  flex-shrink: 0;
+  align-self: flex-start;
+}
+
 @media (max-width: 900px) {
   .reticle {
     width: 62px;
@@ -287,5 +299,11 @@ canvas {
 
   .hud h1 {
     font-size: 2rem;
+  }
+
+  .radar {
+    width: 100px;
+    height: 100px;
+    align-self: flex-end;
   }
 }
