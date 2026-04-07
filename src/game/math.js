@@ -132,3 +132,30 @@ export function findAimAssistTarget(origin, direction, candidates, options = {})
 
   return bestTarget;
 }
+
+export function projectRadarContact(origin, yaw, target, maxDistance) {
+  const dx = target.x - origin.x;
+  const dz = target.z - origin.z;
+  const distance = Math.hypot(dx, dz);
+  const cosYaw = Math.cos(yaw);
+  const sinYaw = Math.sin(yaw);
+  const lateral = dx * cosYaw - dz * sinYaw;
+  const forward = dx * sinYaw + dz * cosYaw;
+
+  if (distance === 0) {
+    return {
+      lateral: 0,
+      forward: 0,
+      distance: 0,
+      outOfRange: false,
+    };
+  }
+
+  const scale = distance > maxDistance ? maxDistance / distance : 1;
+  return {
+    lateral: lateral * scale,
+    forward: forward * scale,
+    distance,
+    outOfRange: distance > maxDistance,
+  };
+}
