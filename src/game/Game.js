@@ -4,6 +4,7 @@ import { CONFIG } from './config.js';
 import { InputController } from './input.js';
 import { findAimAssistTarget, projectRadarContact } from './math.js';
 import { Simulation } from './Simulation.js';
+import { GAME_STATES } from './state.js';
 import { CameraShake } from './effects/CameraShake.js';
 import { ExplosionEffect } from './effects/ExplosionEffect.js';
 import { ScorePop } from './effects/ScorePop.js';
@@ -35,6 +36,7 @@ export class Game {
     this.hitIndicators = [];
     this._lastHitFlash = 0;
     this._lastFireFlash = 0;
+    this._lastMode = null;
     this._recoilDir = new THREE.Vector3();
     this.cameraPosition = new THREE.Vector3(0, 24, 78);
     this.lookTarget = new THREE.Vector3();
@@ -99,6 +101,15 @@ export class Game {
         this.clock.accumulator -= CONFIG.simulation.step;
         steps += 1;
       }
+
+      const currentMode = this.simulation.state.mode;
+      if (this._lastMode === GAME_STATES.GAME_OVER && currentMode === GAME_STATES.RUNNING) {
+        this.cameraShake.reset();
+        this.clearHitIndicators();
+        this.explosions.reset();
+        this.scorePops.reset();
+      }
+      this._lastMode = currentMode;
 
       this.updateCamera();
       this.updateAimSolution();

@@ -297,9 +297,9 @@ export class Simulation {
 
     this.player.applyDamage(projectile.damage);
     this.damageEvents.push({
-      sourceX: projectile.x,
-      sourceY: projectile.y,
-      sourceZ: projectile.z,
+      sourceX: projectile.prevX,
+      sourceY: projectile.prevY,
+      sourceZ: projectile.prevZ,
       damage: projectile.damage,
     });
     this.state.health = this.player.health;
