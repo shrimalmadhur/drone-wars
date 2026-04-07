@@ -2,6 +2,7 @@ import './style.css';
 import { Game } from './game/Game.js';
 import { MAP_THEME_DETAILS } from './mapThemes.js';
 import { loadMapTheme, loadPlayerName, saveMapTheme, savePlayerName } from './playerProfile.js';
+import { trackGameStart } from './game/analytics.js';
 
 const mount = document.querySelector('#app');
 const startScreen = document.querySelector('#start-screen');
@@ -63,5 +64,6 @@ startForm.addEventListener('submit', (event) => {
   if (!game) {
     game = new Game({ mount, hud, mapTheme });
     game.start();
+    trackGameStart(playerName, mapTheme);
   }
 });
