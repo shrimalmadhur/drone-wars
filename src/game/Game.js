@@ -4,6 +4,7 @@ import { CONFIG } from './config.js';
 import { InputController } from './input.js';
 import { findAimAssistTarget, projectRadarContact } from './math.js';
 import { Simulation } from './Simulation.js';
+import { CameraShake } from './effects/CameraShake.js';
 
 const RADAR_COLORS = Object.fromEntries(
   ['tank', 'drone', 'missile', 'ship'].map(k => [k, '#' + CONFIG.palette[k].toString(16).padStart(6, '0')])
@@ -26,6 +27,9 @@ export class Game {
 
     this.input = new InputController(window, document);
     this.simulation = new Simulation(this.scene, { mapTheme });
+    this.cameraShake = new CameraShake();
+    this._lastHitFlash = 0;
+    this._lastFireFlash = 0;
     this.cameraPosition = new THREE.Vector3(0, 24, 78);
     this.lookTarget = new THREE.Vector3();
     this.cameraDirection = new THREE.Vector3();
@@ -93,6 +97,8 @@ export class Game {
       this.updateCamera();
       this.updateAimSolution();
       this.renderHud();
+      this.cameraShake.update(elapsed);
+      this.cameraShake.apply(this.camera);
       this.renderer.render(this.scene, this.camera);
       this.frame = requestAnimationFrame(tick);
     };
@@ -151,6 +157,28 @@ export class Game {
     this.hud.reticle.classList.toggle('reticle--locked', this.aimState.locked);
     this.hud.reticle.classList.toggle('reticle--hit', snapshot.hitFlash > 0);
     this.hud.reticle.classList.toggle('reticle--firing', snapshot.fireFlash > 0);
+
+    // Screen shake on damage
+    if (snapshot.hitFlash > 0 && snapshot.hitFlash > this._lastHitFlash) {
+      const cfg = CONFIG.effects.shake.onDamage;
+      this.cameraShake.add(cfg.intensity, cfg.duration);
+    }
+    this._lastHitFlash = snapshot.hitFlash;
+
+    // Fire recoil shake
+    if (snapshot.fireFlash > 0 && snapshot.fireFlash > this._lastFireFlash) {
+      const cfg = CONFIG.effects.shake.onFire;
+      // Recoil: backward along camera's look direction
+      const dir = new THREE.Vector3(0, 0, 1).applyQuaternion(this.camera.quaternion);
+      this.cameraShake.add(cfg.intensity, cfg.duration, dir.x, dir.y, dir.z);
+    }
+    this._lastFireFlash = snapshot.fireFlash;
+
+    // Kill shake
+    for (const kill of snapshot.killEvents) {
+      const cfg = CONFIG.effects.shake.onKill;
+      this.cameraShake.add(cfg.intensity, cfg.duration);
+    }
 
     if (this.aimState.target) {
       const hp = Math.max(0, Math.ceil(this.aimState.target.health));
@@ -308,6 +336,7 @@ export class Game {
     window.removeEventListener('blur', this.onBlur);
     document.removeEventListener('visibilitychange', this.onVisibility);
     this.renderer.domElement.removeEventListener('webglcontextlost', this.onContextLost);
+    this.cameraShake.reset();
     this.input.dispose();
     this.simulation.dispose();
     this.renderer.dispose();

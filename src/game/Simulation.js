@@ -38,6 +38,7 @@ export class Simulation {
     this.projectiles = new ProjectilePool(scene);
     this.state = createGameState();
     this.enemies = [];
+    this.killEvents = [];
     this.effects = [];
     this.spawnQueue = [];
     this.spawnCooldown = 0;
@@ -70,6 +71,7 @@ export class Simulation {
     this.lastHit = null;
     this.hitFlash = 0;
     this.fireFlash = 0;
+    this.killEvents.length = 0;
     this.beginWave(1);
   }
 
@@ -213,6 +215,11 @@ export class Simulation {
     this.registerEnemyHit(enemy);
     if (destroyed) {
       this.state.score += enemy.scoreValue;
+      this.killEvents.push({
+        position: enemy.group.position.clone(),
+        type: enemy.type,
+        score: enemy.scoreValue,
+      });
       this.spawnEffect(enemy.group.position.x, enemy.group.position.y + 2, enemy.group.position.z, 2);
       trackEnemyKilled(enemy.type, enemy.scoreValue, this.state.wave);
     }
@@ -415,6 +422,8 @@ export class Simulation {
     }
 
     this.state.enemyCount = this.enemies.length + this.spawnQueue.length;
+
+    this.killEvents.length = 0;
   }
 
   getSnapshot() {
@@ -430,6 +439,7 @@ export class Simulation {
       lastHit: this.lastHit,
       hitFlash: this.hitFlash,
       fireFlash: this.fireFlash,
+      killEvents: this.killEvents,
     };
   }
 
