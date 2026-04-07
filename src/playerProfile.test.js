@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { loadPlayerName, sanitizePlayerName, savePlayerName } from './playerProfile.js';
+import { MAP_THEMES } from './mapThemes.js';
+import {
+  loadMapTheme,
+  loadPlayerName,
+  sanitizePlayerName,
+  saveMapTheme,
+  savePlayerName,
+} from './playerProfile.js';
 
 function createStorage() {
   const values = new Map();
@@ -28,6 +35,15 @@ describe('player profile', () => {
     expect(loadPlayerName(storage)).toBe('Phoenix Leader');
   });
 
+  it('loads and saves the selected map theme via storage', () => {
+    const storage = createStorage();
+
+    expect(saveMapTheme(MAP_THEMES.CITY, storage)).toBe(MAP_THEMES.CITY);
+    expect(loadMapTheme(storage)).toBe(MAP_THEMES.CITY);
+    expect(saveMapTheme('bogus-theme', storage)).toBe(MAP_THEMES.FRONTIER);
+    expect(loadMapTheme(storage)).toBe(MAP_THEMES.FRONTIER);
+  });
+
   it('gracefully handles missing or failing storage', () => {
     const brokenStorage = {
       getItem() {
@@ -40,5 +56,7 @@ describe('player profile', () => {
 
     expect(loadPlayerName(brokenStorage)).toBe('');
     expect(savePlayerName('Maverick', brokenStorage)).toBe('Maverick');
+    expect(loadMapTheme(brokenStorage)).toBe(MAP_THEMES.FRONTIER);
+    expect(saveMapTheme(MAP_THEMES.CITY, brokenStorage)).toBe(MAP_THEMES.CITY);
   });
 });

@@ -30,6 +30,11 @@ export class Player {
       roughness: 0.4,
       metalness: 0.5,
     });
+    const panelMaterial = new THREE.MeshStandardMaterial({
+      color: 0x303846,
+      roughness: 0.5,
+      metalness: 0.56,
+    });
     const accentMaterial = new THREE.MeshStandardMaterial({
       color: CONFIG.palette.playerAccent,
       emissive: 0x8f5b12,
@@ -54,106 +59,201 @@ export class Player {
       metalness: 0.9,
     });
 
-    // Central body — flattened capsule shape
-    const bodyTop = new THREE.Mesh(
-      new THREE.CylinderGeometry(1.6, 1.8, 0.7, 12),
+    const glassMaterial = new THREE.MeshStandardMaterial({
+      color: 0x7db1c9,
+      roughness: 0.08,
+      metalness: 0.82,
+      transparent: true,
+      opacity: 0.88,
+    });
+    const warningMaterial = new THREE.MeshStandardMaterial({
+      color: 0xff8a3d,
+      emissive: 0x7a3000,
+      roughness: 0.28,
+      metalness: 0.42,
+    });
+    const rotorRingMaterial = new THREE.MeshStandardMaterial({
+      color: 0x262b34,
+      roughness: 0.72,
+      metalness: 0.22,
+    });
+
+    const fuselage = new THREE.Mesh(
+      new THREE.CapsuleGeometry(0.88, 4.8, 6, 12),
       bodyMaterial,
     );
-    const bodyBottom = new THREE.Mesh(
-      new THREE.CylinderGeometry(1.8, 1.5, 0.5, 12),
+    fuselage.rotation.z = Math.PI * 0.5;
+    fuselage.castShadow = true;
+
+    const belly = new THREE.Mesh(
+      new THREE.BoxGeometry(1.4, 0.45, 3.9),
       darkMaterial,
     );
-    bodyBottom.position.y = -0.5;
+    belly.position.y = -0.42;
+    belly.castShadow = true;
 
-    // Canopy / top shell
-    const canopy = new THREE.Mesh(
-      new THREE.SphereGeometry(1.2, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2),
+    const dorsalSpine = new THREE.Mesh(
+      new THREE.BoxGeometry(0.58, 0.36, 2.4),
+      accentMaterial,
+    );
+    dorsalSpine.position.set(0, 0.62, -0.1);
+    dorsalSpine.castShadow = true;
+
+    const noseCone = new THREE.Mesh(
+      new THREE.ConeGeometry(0.7, 1.45, 10),
       bodyMaterial,
     );
-    canopy.position.y = 0.3;
+    noseCone.rotation.x = Math.PI * 0.5;
+    noseCone.position.set(0, -0.05, 3.1);
+    noseCone.castShadow = true;
 
-    // Four arms extending to motors
-    const armGeometry = new THREE.BoxGeometry(0.4, 0.25, 3.2);
-    const armPositions = [
-      { x: 1.0, z: 1.0, ry: Math.PI / 4 },
-      { x: -1.0, z: 1.0, ry: -Math.PI / 4 },
-      { x: 1.0, z: -1.0, ry: -Math.PI / 4 },
-      { x: -1.0, z: -1.0, ry: Math.PI / 4 },
-    ];
-    const motorTipOffset = 2.8;
-    const motorPositions = [
-      [motorTipOffset * Math.sin(Math.PI / 4), 0.15, motorTipOffset * Math.cos(Math.PI / 4)],
-      [-motorTipOffset * Math.sin(Math.PI / 4), 0.15, motorTipOffset * Math.cos(Math.PI / 4)],
-      [motorTipOffset * Math.sin(Math.PI / 4), 0.15, -motorTipOffset * Math.cos(Math.PI / 4)],
-      [-motorTipOffset * Math.sin(Math.PI / 4), 0.15, -motorTipOffset * Math.cos(Math.PI / 4)],
-    ];
+    const canopy = new THREE.Mesh(
+      new THREE.SphereGeometry(0.95, 16, 12),
+      glassMaterial,
+    );
+    canopy.scale.set(0.9, 0.62, 1.15);
+    canopy.position.set(0, 0.46, 1.46);
+    canopy.castShadow = true;
 
-    for (const arm of armPositions) {
-      const armMesh = new THREE.Mesh(armGeometry, darkMaterial);
-      armMesh.position.set(arm.x, 0, arm.z);
-      armMesh.rotation.y = arm.ry;
-      armMesh.castShadow = true;
-      this.model.add(armMesh);
+    const sensorTurret = new THREE.Mesh(
+      new THREE.SphereGeometry(0.28, 12, 12),
+      lensMaterial,
+    );
+    sensorTurret.position.set(0, -0.48, 2.3);
+    sensorTurret.castShadow = true;
+
+    const chinMount = new THREE.Mesh(
+      new THREE.BoxGeometry(0.34, 0.26, 0.5),
+      darkMaterial,
+    );
+    chinMount.position.set(0, -0.32, 1.92);
+    chinMount.castShadow = true;
+
+    const wingGeometry = new THREE.BoxGeometry(5.2, 0.18, 1.55);
+    const wingletGeometry = new THREE.BoxGeometry(0.14, 0.9, 0.62);
+    const pylonGeometry = new THREE.BoxGeometry(0.34, 0.22, 1.8);
+    const motorGeometry = new THREE.CylinderGeometry(0.44, 0.5, 0.72, 12);
+    const rotorDiscGeometry = new THREE.CylinderGeometry(1.25, 1.25, 0.06, 24);
+    const rotorRingGeometry = new THREE.TorusGeometry(1.28, 0.05, 8, 18);
+    rotorRingGeometry.rotateX(Math.PI * 0.5);
+
+    const mainWing = new THREE.Mesh(wingGeometry, darkMaterial);
+    mainWing.position.set(0, 0.08, 0.55);
+    mainWing.castShadow = true;
+
+    const rearWing = new THREE.Mesh(
+      new THREE.BoxGeometry(3.7, 0.16, 1.1),
+      darkMaterial,
+    );
+    rearWing.position.set(0, 0.02, -1.8);
+    rearWing.castShadow = true;
+
+    const tailBoom = new THREE.Mesh(
+      new THREE.BoxGeometry(0.42, 0.42, 2.85),
+      bodyMaterial,
+    );
+    tailBoom.position.set(0, 0.02, -3.65);
+    tailBoom.castShadow = true;
+
+    const tailPlane = new THREE.Mesh(
+      new THREE.BoxGeometry(2.1, 0.12, 0.75),
+      darkMaterial,
+    );
+    tailPlane.position.set(0, 0.12, -5.05);
+    tailPlane.castShadow = true;
+
+    for (const side of [-1, 1]) {
+      const winglet = new THREE.Mesh(wingletGeometry, darkMaterial);
+      winglet.position.set(side * 0.72, 0.72, -4.95);
+      winglet.castShadow = true;
+      this.model.add(winglet);
     }
 
-    // Motor housings + rotor discs
-    const motorGeometry = new THREE.CylinderGeometry(0.45, 0.5, 0.55, 10);
-    const rotorDiscGeometry = new THREE.CylinderGeometry(1.6, 1.6, 0.06, 20);
+    const nacellePositions = [
+      [2.45, 0.2, 1.45],
+      [-2.45, 0.2, 1.45],
+      [2.18, 0.14, -1.55],
+      [-2.18, 0.14, -1.55],
+    ];
     this.rotors = [];
-    for (const [x, y, z] of motorPositions) {
-      const motor = new THREE.Mesh(motorGeometry, darkMaterial);
+    for (const [x, y, z] of nacellePositions) {
+      const pylon = new THREE.Mesh(pylonGeometry, darkMaterial);
+      pylon.position.set(x * 0.46, 0.14, z);
+      pylon.castShadow = true;
+      this.model.add(pylon);
+
+      const motor = new THREE.Mesh(motorGeometry, panelMaterial);
       motor.position.set(x, y, z);
       motor.castShadow = true;
       this.model.add(motor);
 
+      const rotorRing = new THREE.Mesh(rotorRingGeometry, rotorRingMaterial);
+      rotorRing.position.set(x, y + 0.26, z);
+      rotorRing.castShadow = true;
+      this.model.add(rotorRing);
+
       const rotor = new THREE.Mesh(rotorDiscGeometry, rotorMaterial);
-      rotor.position.set(x, y + 0.35, z);
+      rotor.position.set(x, y + 0.3, z);
       this.rotors.push(rotor);
       this.model.add(rotor);
 
-      // LED on each motor
-      const led = new THREE.Mesh(
-        new THREE.SphereGeometry(0.1, 6, 6),
-        z > 0 ? ledMaterial : new THREE.MeshStandardMaterial({
-          color: 0xff2200, emissive: 0xff2200, emissiveIntensity: 2,
-        }),
+      const positionLight = new THREE.Mesh(
+        new THREE.SphereGeometry(0.11, 8, 8),
+        z > 0 ? ledMaterial : warningMaterial,
       );
-      led.position.set(x, y + 0.3, z + (z > 0 ? 0.5 : -0.5));
-      this.model.add(led);
+      positionLight.position.set(x, y + 0.22, z + (z > 0 ? 0.52 : -0.52));
+      this.model.add(positionLight);
     }
 
-    // Camera gimbal underneath
-    const gimbalMount = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.3, 0.3, 0.3, 8),
-      darkMaterial,
+    const intakeLeft = new THREE.Mesh(
+      new THREE.BoxGeometry(0.34, 0.42, 1.2),
+      panelMaterial,
     );
-    gimbalMount.position.set(0, -0.65, 0.5);
-    const cameraLens = new THREE.Mesh(
-      new THREE.SphereGeometry(0.28, 10, 10),
-      lensMaterial,
-    );
-    cameraLens.position.set(0, -0.65, 0.85);
+    intakeLeft.position.set(0.86, 0.02, 0.72);
+    intakeLeft.castShadow = true;
+    const intakeRight = intakeLeft.clone();
+    intakeRight.position.x = -0.86;
 
-    // Landing skids
-    const skidGeometry = new THREE.BoxGeometry(0.15, 0.12, 2.8);
-    const strutGeometry = new THREE.BoxGeometry(0.12, 0.6, 0.12);
+    const accentStripe = new THREE.Mesh(
+      new THREE.BoxGeometry(0.18, 0.12, 2.9),
+      accentMaterial,
+    );
+    accentStripe.position.set(0, 0.12, 0.5);
+    accentStripe.castShadow = true;
+
+    const skidGeometry = new THREE.CylinderGeometry(0.06, 0.06, 2.95, 10);
+    skidGeometry.rotateX(Math.PI * 0.5);
+    const strutGeometry = new THREE.BoxGeometry(0.08, 0.56, 0.08);
     for (const side of [-1, 1]) {
       const skid = new THREE.Mesh(skidGeometry, darkMaterial);
-      skid.position.set(side * 1.2, -0.95, 0);
+      skid.position.set(side * 1.08, -0.96, 0);
+      skid.castShadow = true;
       this.model.add(skid);
-      for (const fz of [-0.8, 0.8]) {
+      for (const fz of [-0.9, 1]) {
         const strut = new THREE.Mesh(strutGeometry, darkMaterial);
-        strut.position.set(side * 1.2, -0.65, fz);
+        strut.position.set(side * 1.02, -0.64, fz);
+        strut.castShadow = true;
         this.model.add(strut);
       }
     }
 
-    bodyTop.castShadow = true;
-    bodyBottom.castShadow = true;
-    canopy.castShadow = true;
-    this.model.add(bodyTop, bodyBottom, canopy, gimbalMount, cameraLens);
-    // Scale the whole model to match the original drone's footprint
-    this.model.scale.set(1.3, 1.3, 1.3);
+    this.model.add(
+      fuselage,
+      belly,
+      dorsalSpine,
+      noseCone,
+      canopy,
+      chinMount,
+      sensorTurret,
+      mainWing,
+      rearWing,
+      tailBoom,
+      tailPlane,
+      intakeLeft,
+      intakeRight,
+      accentStripe,
+    );
+    this.model.scale.set(1.22, 1.22, 1.22);
     this.group.add(this.model);
     this.scene.add(this.group);
 

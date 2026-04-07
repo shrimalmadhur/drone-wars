@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 import { CONFIG } from '../config.js';
-import { normalizeAngle, randomRange, segmentIntersectsCylinder } from '../math.js';
+import { normalizeAngle, randomRange, segmentIntersectsCylinder, segmentIntersectsCylinderAt } from '../math.js';
 import { EnemyBase } from './EnemyBase.js';
 
 export class TankEnemy extends EnemyBase {
@@ -178,7 +178,6 @@ export class TankEnemy extends EnemyBase {
     this.fireCooldown -= dt;
     const horizontalDistance = Math.hypot(playerPos.x - this.group.position.x, playerPos.z - this.group.position.z);
     if (horizontalDistance < 118 && this.fireCooldown <= 0) {
-      this.fireCooldown = CONFIG.enemies.tank.fireInterval + randomRange(this.rng, -0.35, 0.25);
       const shot = this.buildShot(
         new THREE.Vector3(playerPos.x, playerPos.y + 1.8, playerPos.z),
         CONFIG.enemies.tank.projectileSpeed,
@@ -186,9 +185,18 @@ export class TankEnemy extends EnemyBase {
         CONFIG.enemies.tank.damage,
       );
       shot.origin.y += 3.4;
+      if (!(context.terrain.hasLineOfSight?.(shot.origin, playerPos, shot.radius) ?? true)) {
+        this.fireCooldown = 0.35;
+        return [];
+      }
+      this.fireCooldown = CONFIG.enemies.tank.fireInterval + randomRange(this.rng, -0.35, 0.25);
       return [{ type: 'spawnProjectile', spec: shot }];
     }
     return [];
+  }
+
+  intersectSegmentAt(start, end, radiusPadding) {
+    return segmentIntersectsCylinderAt(start, end, this.group.position, this.radius + radiusPadding, 2.4);
   }
 
   intersectsSegment(start, end, radiusPadding) {

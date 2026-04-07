@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { CONFIG } from './config.js';
 import { createEnvironment } from './world/environment.js';
 import { createTerrain } from './world/terrain.js';
-import { createRng, segmentIntersectsSphere } from './math.js';
+import { createRng, segmentIntersectsSphereAt } from './math.js';
 import { createGameState, GAME_STATES, resetGameState } from './state.js';
 import { Player } from './entities/Player.js';
 import { ProjectilePool } from './entities/Projectile.js';
@@ -27,12 +27,12 @@ function createEffectMesh(size) {
 }
 
 export class Simulation {
-  constructor(scene, seed = 1337) {
+  constructor(scene, { seed = 1337, mapTheme } = {}) {
     this.scene = scene;
     this.seed = seed;
     this.rng = createRng(seed);
-    this.environment = createEnvironment(scene);
-    this.terrain = createTerrain(scene, this.rng);
+    this.environment = createEnvironment(scene, { mapTheme });
+    this.terrain = createTerrain(scene, this.rng, { mapTheme });
     this.player = new Player(scene, this.terrain);
     this.projectiles = new ProjectilePool(scene);
     this.state = createGameState();
@@ -210,17 +210,39 @@ export class Simulation {
   }
 
   resolveEnemyHit(projectile, start, end) {
+    const obstacleHit = this.terrain.getSegmentObstacleHit(start, end, projectile.radius);
+    let nearestTarget = null;
+    let nearestTargetT = Number.POSITIVE_INFINITY;
+
     for (const enemy of this.enemies) {
       if (!enemy.alive) {
         continue;
       }
-      if (!enemy.intersectsSegment(start, end, projectile.radius)) {
+      const hitT = enemy.intersectSegmentAt(start, end, projectile.radius);
+      if (hitT === null) {
+        continue;
+      }
+      if (obstacleHit && obstacleHit.t <= hitT) {
+        continue;
+      }
+      if (hitT >= nearestTargetT) {
         continue;
       }
 
-      this.applyDamageToEnemy(enemy, new THREE.Vector3(projectile.x, projectile.y, projectile.z));
+      nearestTarget = enemy;
+      nearestTargetT = hitT;
+    }
+
+    if (nearestTarget) {
+      this.applyDamageToEnemy(nearestTarget, new THREE.Vector3(projectile.x, projectile.y, projectile.z));
       return true;
     }
+
+    if (obstacleHit) {
+      this.spawnEffect(projectile.x, projectile.y, projectile.z, 0.95);
+      return true;
+    }
+
     return false;
   }
 
@@ -239,7 +261,18 @@ export class Simulation {
   }
 
   resolvePlayerHit(projectile, start, end) {
-    const hit = segmentIntersectsSphere(start, end, this.player.group.position, CONFIG.player.collisionRadius + projectile.radius);
+    const obstacleHit = this.terrain.getSegmentObstacleHit(start, end, projectile.radius);
+    const playerHitT = segmentIntersectsSphereAt(
+      start,
+      end,
+      this.player.group.position,
+      CONFIG.player.collisionRadius + projectile.radius,
+    );
+    if (obstacleHit && (playerHitT === null || obstacleHit.t <= playerHitT)) {
+      this.spawnEffect(projectile.x, projectile.y, projectile.z, 0.95);
+      return true;
+    }
+    const hit = playerHitT !== null;
     if (!hit) {
       return false;
     }

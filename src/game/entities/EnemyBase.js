@@ -40,8 +40,12 @@ export class EnemyBase {
     };
   }
 
+  intersectSegmentAt() {
+    return null;
+  }
+
   intersectsSegment() {
-    return false;
+    return this.intersectSegmentAt(...arguments) !== null;
   }
 
   dispose() {

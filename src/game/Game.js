@@ -10,7 +10,7 @@ const RADAR_COLORS = Object.fromEntries(
 );
 
 export class Game {
-  constructor({ mount, hud }) {
+  constructor({ mount, hud, mapTheme }) {
     this.mount = mount;
     this.hud = hud;
     this.scene = new THREE.Scene();
@@ -25,7 +25,7 @@ export class Game {
     this.mount.appendChild(this.renderer.domElement);
 
     this.input = new InputController(window, document);
-    this.simulation = new Simulation(this.scene);
+    this.simulation = new Simulation(this.scene, { mapTheme });
     this.cameraPosition = new THREE.Vector3(0, 24, 78);
     this.lookTarget = new THREE.Vector3();
     this.cameraDirection = new THREE.Vector3();

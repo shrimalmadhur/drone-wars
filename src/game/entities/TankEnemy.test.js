@@ -35,4 +35,36 @@ describe('TankEnemy', () => {
 
     tank.dispose();
   });
+
+  it('does not fire when a building blocks line of sight', () => {
+    const scene = new THREE.Scene();
+    const tank = new TankEnemy(scene, new THREE.Vector3(0, 0, 0), createRng(7));
+    tank.turnTimer = 10;
+    tank.fireCooldown = 0;
+
+    const events = tank.update(0.1, {
+      player: {
+        group: {
+          position: new THREE.Vector3(0, 0, 40),
+        },
+      },
+      terrain: {
+        canOccupy() {
+          return true;
+        },
+        clampToArena() {},
+        getGroundHeight() {
+          return 0;
+        },
+        hasLineOfSight() {
+          return false;
+        },
+      },
+    });
+
+    expect(events).toEqual([]);
+    expect(tank.fireCooldown).toBe(0.35);
+
+    tank.dispose();
+  });
 });

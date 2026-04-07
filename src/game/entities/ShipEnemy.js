@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 import { CONFIG } from '../config.js';
-import { segmentIntersectsCylinder } from '../math.js';
+import { segmentIntersectsCylinder, segmentIntersectsCylinderAt } from '../math.js';
 import { EnemyBase } from './EnemyBase.js';
 
 export class ShipEnemy extends EnemyBase {
@@ -169,7 +169,6 @@ export class ShipEnemy extends EnemyBase {
 
     this.fireCooldown -= dt;
     if (this.fireCooldown <= 0 && this.group.position.distanceTo(playerPos) < 150) {
-      this.fireCooldown = CONFIG.enemies.ship.fireInterval;
       const shot = this.buildShot(
         new THREE.Vector3(playerPos.x, playerPos.y + 1.5, playerPos.z),
         CONFIG.enemies.ship.projectileSpeed,
@@ -177,9 +176,18 @@ export class ShipEnemy extends EnemyBase {
         CONFIG.enemies.ship.damage,
       );
       shot.origin.y += 5;
+      if (!(context.terrain.hasLineOfSight?.(shot.origin, playerPos, shot.radius) ?? true)) {
+        this.fireCooldown = 0.35;
+        return [];
+      }
+      this.fireCooldown = CONFIG.enemies.ship.fireInterval;
       return [{ type: 'spawnProjectile', spec: shot }];
     }
     return [];
+  }
+
+  intersectSegmentAt(start, end, radiusPadding) {
+    return segmentIntersectsCylinderAt(start, end, this.group.position, this.radius + radiusPadding, 3.6);
   }
 
   intersectsSegment(start, end, radiusPadding) {

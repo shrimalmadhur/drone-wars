@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 import { CONFIG } from '../config.js';
-import { damp, randomRange, segmentIntersectsSphere } from '../math.js';
+import { damp, randomRange, segmentIntersectsSphere, segmentIntersectsSphereAt } from '../math.js';
 import { EnemyBase } from './EnemyBase.js';
 
 export class DroneEnemy extends EnemyBase {
@@ -132,17 +132,25 @@ export class DroneEnemy extends EnemyBase {
     }
     this.fireCooldown -= dt;
     if (this.group.position.distanceTo(playerPos) < 86 && this.fireCooldown <= 0) {
-      this.fireCooldown = CONFIG.enemies.drone.fireInterval + randomRange(this.rng, -0.2, 0.2);
       const shot = this.buildShot(
         new THREE.Vector3(playerPos.x, playerPos.y, playerPos.z),
         CONFIG.enemies.drone.projectileSpeed,
         CONFIG.enemies.drone.projectileLife,
         CONFIG.enemies.drone.damage,
       );
+      if (!(context.terrain.hasLineOfSight?.(shot.origin, playerPos, shot.radius) ?? true)) {
+        this.fireCooldown = 0.25;
+        return [];
+      }
+      this.fireCooldown = CONFIG.enemies.drone.fireInterval + randomRange(this.rng, -0.2, 0.2);
       return [{ type: 'spawnProjectile', spec: shot }];
     }
 
     return [];
+  }
+
+  intersectSegmentAt(start, end, radiusPadding) {
+    return segmentIntersectsSphereAt(start, end, this.group.position, this.radius + radiusPadding);
   }
 
   intersectsSegment(start, end, radiusPadding) {

@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { clamp, createRng, projectRadarContact, segmentIntersectsSphere } from './math.js';
+import {
+  clamp,
+  createRng,
+  projectRadarContact,
+  segmentIntersectsCylinderAt,
+  segmentIntersectsSphere,
+  segmentIntersectsSphereAt,
+} from './math.js';
 
 describe('math helpers', () => {
   it('clamps values into range', () => {
@@ -32,6 +39,27 @@ describe('math helpers', () => {
         1,
       ),
     ).toBe(false);
+  });
+
+  it('returns a hit position fraction for sphere and cylinder collisions', () => {
+    expect(
+      segmentIntersectsSphereAt(
+        { x: 0, y: 0, z: 0 },
+        { x: 10, y: 0, z: 0 },
+        { x: 5, y: 0, z: 0 },
+        1,
+      ),
+    ).toBeCloseTo(0.4, 1);
+
+    expect(
+      segmentIntersectsCylinderAt(
+        { x: 0, y: 1, z: 0 },
+        { x: 10, y: 1, z: 0 },
+        { x: 5, y: 1, z: 0 },
+        1,
+        2,
+      ),
+    ).not.toBeNull();
   });
 
   it('projects radar contacts into player-relative space', () => {
