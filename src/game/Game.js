@@ -5,6 +5,7 @@ import { InputController } from './input.js';
 import { findAimAssistTarget, projectRadarContact } from './math.js';
 import { Simulation } from './Simulation.js';
 import { CameraShake } from './effects/CameraShake.js';
+import { ExplosionEffect } from './effects/ExplosionEffect.js';
 
 const RADAR_COLORS = Object.fromEntries(
   ['tank', 'drone', 'missile', 'ship'].map(k => [k, '#' + CONFIG.palette[k].toString(16).padStart(6, '0')])
@@ -28,6 +29,7 @@ export class Game {
     this.input = new InputController(window, document);
     this.simulation = new Simulation(this.scene, { mapTheme });
     this.cameraShake = new CameraShake();
+    this.explosions = new ExplosionEffect(this.scene);
     this.hitIndicators = [];
     this._lastHitFlash = 0;
     this._lastFireFlash = 0;
@@ -101,6 +103,7 @@ export class Game {
       this.updateHitIndicators(elapsed);
       this.cameraShake.update(elapsed);
       this.cameraShake.apply(this.camera);
+      this.explosions.update(elapsed);
       this.renderer.render(this.scene, this.camera);
       this.frame = requestAnimationFrame(tick);
     };
@@ -176,10 +179,12 @@ export class Game {
     }
     this._lastFireFlash = snapshot.fireFlash;
 
-    // Kill shake
+    // Kill shake + explosion
     for (const kill of snapshot.killEvents) {
       const cfg = CONFIG.effects.shake.onKill;
       this.cameraShake.add(cfg.intensity, cfg.duration);
+      const color = CONFIG.palette[kill.type] || CONFIG.palette.effect;
+      this.explosions.spawn(kill.position.x, kill.position.y, kill.position.z, color);
     }
 
     for (const dmg of snapshot.damageEvents) {
@@ -417,6 +422,7 @@ export class Game {
     document.removeEventListener('visibilitychange', this.onVisibility);
     this.renderer.domElement.removeEventListener('webglcontextlost', this.onContextLost);
     this.cameraShake.reset();
+    this.explosions.dispose();
     this.input.dispose();
     this.simulation.dispose();
     this.renderer.dispose();
