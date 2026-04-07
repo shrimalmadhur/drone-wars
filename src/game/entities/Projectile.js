@@ -184,6 +184,7 @@ export class ProjectilePool {
         return true;
       }
       if (item.y <= context.terrain.getGroundHeight(item.x, item.z) + 0.6) {
+        context.recordImpact?.(item.x, item.y, item.z);
         context.spawnEffect(item.x, item.y, item.z, 0.8);
         return true;
       }

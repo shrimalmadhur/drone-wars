@@ -36,6 +36,7 @@ export function readInputSnapshot(inputState) {
     pitch: Number(down('ArrowUp')) - Number(down('ArrowDown')),
     vertical: Number(down('KeyE')) - Number(down('KeyQ')),
     fire: down('Space'),
+    mutePressed: consumePress('KeyM'),
     restartPressed: consumePress('KeyR'),
     pausePressed: consumePress('KeyP'),
   };

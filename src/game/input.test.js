@@ -9,6 +9,7 @@ describe('input state', () => {
     setKeyState(state, 'KeyD', true);
     setKeyState(state, 'ArrowLeft', true);
     setKeyState(state, 'Space', true);
+    setKeyState(state, 'KeyM', true);
     setKeyState(state, 'KeyP', true);
 
     const snapshot = readInputSnapshot(state);
@@ -16,7 +17,9 @@ describe('input state', () => {
     expect(snapshot.yaw).toBe(1);
     expect(snapshot.strafe).toBe(-1);
     expect(snapshot.fire).toBe(true);
+    expect(snapshot.mutePressed).toBe(true);
     expect(snapshot.pausePressed).toBe(true);
+    expect(readInputSnapshot(state).mutePressed).toBe(false);
     expect(readInputSnapshot(state).pausePressed).toBe(false);
   });
 

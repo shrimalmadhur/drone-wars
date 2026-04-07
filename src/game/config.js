@@ -42,6 +42,16 @@ export const CONFIG = {
     playerDamage: 20,
     enemyDamage: 10,
   },
+  audio: {
+    masterVolume: 0.45,
+    distanceRef: 18,
+    distanceMax: 180,
+    lowHealthThreshold: 25,
+    enginePitchRange: {
+      min: 0.85,
+      max: 1.4,
+    },
+  },
   enemies: {
     tank: {
       health: 32,

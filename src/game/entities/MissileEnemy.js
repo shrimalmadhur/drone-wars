@@ -133,7 +133,13 @@ export class MissileEnemy extends EnemyBase {
       this.alive = false;
       return [
         { type: 'effect', position: this.group.position.clone(), size: 1.6 },
-        { type: 'impactPlayer', damage: CONFIG.enemies.missile.damage },
+        {
+          type: 'impactPlayer',
+          damage: CONFIG.enemies.missile.damage,
+          sourceX: this.group.position.x,
+          sourceY: this.group.position.y,
+          sourceZ: this.group.position.z,
+        },
       ];
     }
 
