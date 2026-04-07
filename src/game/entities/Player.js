@@ -296,7 +296,7 @@ export class Player {
     const floor = this.terrain.getGroundHeight(this.group.position.x, this.group.position.z) + CONFIG.world.minAltitude;
     this.group.position.y = clamp(this.group.position.y, floor, CONFIG.world.maxAltitude);
 
-    this.model.rotation.z = damp(this.model.rotation.z, -controls.strafe * 0.32 - controls.yaw * 0.28, 7, dt);
+    this.model.rotation.z = damp(this.model.rotation.z, controls.strafe * 0.32 - controls.yaw * 0.28, 7, dt);
     this.model.rotation.x = damp(this.model.rotation.x, controls.pitch * 0.22 - controls.thrust * 0.08, 7, dt);
     this.group.rotation.y = this.yaw;
 
