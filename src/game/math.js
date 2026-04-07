@@ -41,26 +41,50 @@ export function chooseFrom(rng, items) {
 }
 
 export function segmentIntersectsSphere(start, end, center, radius) {
+  return segmentIntersectsSphereAt(start, end, center, radius) !== null;
+}
+
+export function segmentIntersectsSphereAt(start, end, center, radius) {
   const vx = end.x - start.x;
   const vy = end.y - start.y;
   const vz = end.z - start.z;
-  const wx = center.x - start.x;
-  const wy = center.y - start.y;
-  const wz = center.z - start.z;
-  const c1 = vx * wx + vy * wy + vz * wz;
-  const c2 = vx * vx + vy * vy + vz * vz;
-  const t = c2 === 0 ? 0 : clamp(c1 / c2, 0, 1);
-  const px = start.x + vx * t;
-  const py = start.y + vy * t;
-  const pz = start.z + vz * t;
-  const dx = center.x - px;
-  const dy = center.y - py;
-  const dz = center.z - pz;
-  return dx * dx + dy * dy + dz * dz <= radius * radius;
+  const ox = start.x - center.x;
+  const oy = start.y - center.y;
+  const oz = start.z - center.z;
+  const a = vx * vx + vy * vy + vz * vz;
+  const b = 2 * (ox * vx + oy * vy + oz * vz);
+  const c = ox * ox + oy * oy + oz * oz - radius * radius;
+
+  if (a === 0) {
+    return c <= 0 ? 0 : null;
+  }
+
+  const discriminant = b * b - 4 * a * c;
+  if (discriminant < 0) {
+    return null;
+  }
+
+  const sqrtDiscriminant = Math.sqrt(discriminant);
+  const t1 = (-b - sqrtDiscriminant) / (2 * a);
+  const t2 = (-b + sqrtDiscriminant) / (2 * a);
+  if (t1 >= 0 && t1 <= 1) {
+    return t1;
+  }
+  if (t2 >= 0 && t2 <= 1) {
+    return t2;
+  }
+  if (c <= 0) {
+    return 0;
+  }
+  return null;
 }
 
 export function segmentIntersectsCylinder(start, end, center, radius, halfHeight) {
-  const steps = 4;
+  return segmentIntersectsCylinderAt(start, end, center, radius, halfHeight) !== null;
+}
+
+export function segmentIntersectsCylinderAt(start, end, center, radius, halfHeight) {
+  const steps = 12;
   for (let i = 0; i <= steps; i += 1) {
     const t = i / steps;
     const x = lerp(start.x, end.x, t);
@@ -69,10 +93,10 @@ export function segmentIntersectsCylinder(start, end, center, radius, halfHeight
     const dx = x - center.x;
     const dz = z - center.z;
     if (dx * dx + dz * dz <= radius * radius && Math.abs(y - center.y) <= halfHeight) {
-      return true;
+      return t;
     }
   }
-  return false;
+  return null;
 }
 
 export function findAimAssistTarget(origin, direction, candidates, options = {}) {

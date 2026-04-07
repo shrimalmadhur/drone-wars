@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 import { CONFIG } from '../config.js';
-import { segmentIntersectsSphere } from '../math.js';
+import { segmentIntersectsSphere, segmentIntersectsSphereAt } from '../math.js';
 import { EnemyBase } from './EnemyBase.js';
 
 export class MissileEnemy extends EnemyBase {
@@ -99,6 +99,7 @@ export class MissileEnemy extends EnemyBase {
 
   update(dt, context) {
     this.life += dt;
+    const previousPosition = this.group.position.clone();
     const desired = new THREE.Vector3()
       .copy(context.player.group.position)
       .sub(this.group.position)
@@ -117,6 +118,16 @@ export class MissileEnemy extends EnemyBase {
       return [{ type: 'effect', position: this.group.position.clone(), size: 1.2 }];
     }
 
+    const obstacleHit = context.terrain.getSegmentObstacleHit?.(
+      previousPosition,
+      this.group.position,
+      this.radius,
+    ) ?? null;
+    if (obstacleHit) {
+      this.alive = false;
+      return [{ type: 'effect', position: this.group.position.clone(), size: 1.4 }];
+    }
+
     const dist = this.group.position.distanceTo(context.player.group.position);
     if (dist < CONFIG.enemies.missile.radius + CONFIG.player.collisionRadius) {
       this.alive = false;
@@ -127,6 +138,10 @@ export class MissileEnemy extends EnemyBase {
     }
 
     return [];
+  }
+
+  intersectSegmentAt(start, end, radiusPadding) {
+    return segmentIntersectsSphereAt(start, end, this.group.position, this.radius + radiusPadding);
   }
 
   intersectsSegment(start, end, radiusPadding) {

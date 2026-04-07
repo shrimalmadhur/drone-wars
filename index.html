@@ -13,8 +13,8 @@
     <div id="start-screen" class="start-screen">
       <div class="start-screen__panel">
         <p class="start-screen__eyebrow">Pilot registration</p>
-        <h2 class="start-screen__title">Enter your callsign</h2>
-        <p class="start-screen__copy">We&apos;ll remember it on this browser for your next launch.</p>
+        <h2 class="start-screen__title">Name your pilot and pick a battlefield</h2>
+        <p class="start-screen__copy">We&apos;ll remember your callsign and preferred map on this browser for your next launch.</p>
         <form id="start-form" class="start-screen__form">
           <label class="start-screen__label" for="player-name-input">Player name</label>
           <input
@@ -27,6 +27,38 @@
             placeholder="Phoenix Leader"
             required
           />
+          <fieldset class="start-screen__map-picker">
+            <legend class="start-screen__label">Battlefield map</legend>
+            <div class="map-options">
+              <label class="map-option">
+                <input
+                  class="map-option__input"
+                  type="radio"
+                  name="mapTheme"
+                  value="frontier"
+                  checked
+                />
+                <span class="map-option__card map-option__card--frontier">
+                  <span class="map-option__eyebrow">Current terrain</span>
+                  <strong class="map-option__title">Frontier Archipelago</strong>
+                  <span class="map-option__copy">Emerald islands, cliffs, and naval lanes for open-air sweeps.</span>
+                </span>
+              </label>
+              <label class="map-option">
+                <input
+                  class="map-option__input"
+                  type="radio"
+                  name="mapTheme"
+                  value="city"
+                />
+                <span class="map-option__card map-option__card--city">
+                  <span class="map-option__eyebrow">New map</span>
+                  <strong class="map-option__title">Siege City</strong>
+                  <span class="map-option__copy">Hyper-dense towers, riverside roads, traffic, crowds, and rooftop helicopters.</span>
+                </span>
+              </label>
+            </div>
+          </fieldset>
           <button class="start-screen__button" type="submit">Launch mission</button>
         </form>
       </div>
@@ -44,6 +76,7 @@
           <p class="hud__eyebrow">Single-player combat prototype</p>
           <h1>Drone Wars</h1>
           <p class="pilot-tag">Pilot <strong id="player-name-value">Awaiting registration</strong></p>
+          <p class="pilot-tag">Battlefield <strong id="map-theme-value">Frontier Archipelago</strong></p>
         </div>
         <div class="hud__metrics">
           <div class="metric">
