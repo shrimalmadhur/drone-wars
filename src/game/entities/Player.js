@@ -278,13 +278,13 @@ export class Player {
   update(dt, controls) {
     this.cooldown = Math.max(0, this.cooldown - dt);
     this.invulnerability = Math.max(0, this.invulnerability - dt);
-    this.yaw += controls.yaw * CONFIG.player.yawSpeed * dt;
+    this.yaw -= controls.yaw * CONFIG.player.yawSpeed * dt;
 
     const forward = this.getHeading();
     const targetForwardSpeed = controls.thrust >= 0
       ? controls.thrust * CONFIG.player.thrust
       : controls.thrust * CONFIG.player.reverseThrust;
-    const targetStrafeSpeed = controls.strafe * CONFIG.player.strafe;
+    const targetStrafeSpeed = -controls.strafe * CONFIG.player.strafe;
     const targetVerticalSpeed = controls.vertical * CONFIG.player.vertical;
 
     this.velocity.x = damp(this.velocity.x, forward.x * targetForwardSpeed + this.right.x * targetStrafeSpeed, 5, dt);
