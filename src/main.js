@@ -23,6 +23,8 @@ const hud = {
   targetName: document.querySelector('#target-name'),
   targetHealth: document.querySelector('#target-health'),
   radar: document.querySelector('#radar'),
+  hitVignette: document.querySelector('#hit-vignette'),
+  hitChevrons: document.querySelector('#hit-chevrons'),
   playerName: document.querySelector('#player-name-value'),
   mapTheme: document.querySelector('#map-theme-value'),
 };

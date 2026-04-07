@@ -4,6 +4,10 @@ import { CONFIG } from './config.js';
 import { InputController } from './input.js';
 import { findAimAssistTarget, projectRadarContact } from './math.js';
 import { Simulation } from './Simulation.js';
+import { GAME_STATES } from './state.js';
+import { CameraShake } from './effects/CameraShake.js';
+import { ExplosionEffect } from './effects/ExplosionEffect.js';
+import { ScorePop } from './effects/ScorePop.js';
 
 const RADAR_COLORS = Object.fromEntries(
   ['tank', 'drone', 'missile', 'ship'].map(k => [k, '#' + CONFIG.palette[k].toString(16).padStart(6, '0')])
@@ -26,6 +30,14 @@ export class Game {
 
     this.input = new InputController(window, document);
     this.simulation = new Simulation(this.scene, { mapTheme });
+    this.cameraShake = new CameraShake();
+    this.explosions = new ExplosionEffect(this.scene);
+    this.scorePops = new ScorePop(this.scene);
+    this.hitIndicators = [];
+    this._lastHitFlash = 0;
+    this._lastFireFlash = 0;
+    this._lastMode = null;
+    this._recoilDir = new THREE.Vector3();
     this.cameraPosition = new THREE.Vector3(0, 24, 78);
     this.lookTarget = new THREE.Vector3();
     this.cameraDirection = new THREE.Vector3();
@@ -90,9 +102,24 @@ export class Game {
         steps += 1;
       }
 
+      const currentMode = this.simulation.state.mode;
+      if (this._lastMode === GAME_STATES.GAME_OVER && currentMode === GAME_STATES.RUNNING) {
+        this.cameraShake.reset();
+        this.clearHitIndicators();
+        this.explosions.reset();
+        this.scorePops.reset();
+      }
+      this._lastMode = currentMode;
+
       this.updateCamera();
       this.updateAimSolution();
       this.renderHud();
+      this.simulation.clearFrameEvents();
+      this.updateHitIndicators(elapsed);
+      this.cameraShake.update(elapsed);
+      this.cameraShake.apply(this.camera);
+      this.explosions.update(elapsed);
+      this.scorePops.update(elapsed);
       this.renderer.render(this.scene, this.camera);
       this.frame = requestAnimationFrame(tick);
     };
@@ -151,6 +178,35 @@ export class Game {
     this.hud.reticle.classList.toggle('reticle--locked', this.aimState.locked);
     this.hud.reticle.classList.toggle('reticle--hit', snapshot.hitFlash > 0);
     this.hud.reticle.classList.toggle('reticle--firing', snapshot.fireFlash > 0);
+
+    // Screen shake on damage
+    if (snapshot.hitFlash > 0 && snapshot.hitFlash > this._lastHitFlash) {
+      const cfg = CONFIG.effects.shake.onDamage;
+      this.cameraShake.add(cfg.intensity, cfg.duration);
+    }
+    this._lastHitFlash = snapshot.hitFlash;
+
+    // Fire recoil shake
+    if (snapshot.fireFlash > 0 && snapshot.fireFlash > this._lastFireFlash) {
+      const cfg = CONFIG.effects.shake.onFire;
+      // Recoil: backward along camera's look direction
+      this._recoilDir.set(0, 0, 1).applyQuaternion(this.camera.quaternion);
+      this.cameraShake.add(cfg.intensity, cfg.duration, this._recoilDir.x, this._recoilDir.y, this._recoilDir.z);
+    }
+    this._lastFireFlash = snapshot.fireFlash;
+
+    // Kill shake + explosion
+    for (const kill of snapshot.killEvents) {
+      const cfg = CONFIG.effects.shake.onKill;
+      this.cameraShake.add(cfg.intensity, cfg.duration);
+      const color = CONFIG.palette[kill.type] || CONFIG.palette.effect;
+      this.explosions.spawn(kill.position.x, kill.position.y, kill.position.z, color);
+      this.scorePops.spawn(kill.position.x, kill.position.y, kill.position.z, kill.score, color);
+    }
+
+    for (const dmg of snapshot.damageEvents) {
+      this.showHitIndicator(dmg.sourceX, dmg.sourceY, dmg.sourceZ, dmg.damage, snapshot);
+    }
 
     if (this.aimState.target) {
       const hp = Math.max(0, Math.ceil(this.aimState.target.health));
@@ -293,6 +349,88 @@ export class Game {
     ctx.globalAlpha = 1;
   }
 
+  showHitIndicator(sourceX, sourceY, sourceZ, damage, snapshot) {
+    const cfg = CONFIG.effects.hitIndicator;
+    const totalDuration = cfg.fadeIn + cfg.hold + cfg.fadeOut;
+
+    // Compute angle from player forward to damage source
+    const dx = sourceX - snapshot.playerPosition.x;
+    const dz = sourceZ - snapshot.playerPosition.z;
+    const angleToSource = Math.atan2(dx, dz);
+    const relativeAngle = angleToSource - snapshot.playerYaw;
+
+    // Vignette — offset radial gradient toward damage side
+    const vignX = 50 + Math.sin(relativeAngle) * 30;
+    const vignY = 50 - Math.cos(relativeAngle) * 30;
+    const intensity = Math.min(1, damage / 20);
+    this.hud.hitVignette.style.background =
+      `radial-gradient(circle at ${vignX}% ${vignY}%, transparent 30%, rgba(255, 40, 40, ${0.35 * intensity}) 100%)`;
+
+    // Chevron — position on circle around screen center
+    const chevron = document.createElement('div');
+    chevron.className = 'hit-chevron';
+    const arrow = document.createElement('div');
+    arrow.className = 'hit-chevron__arrow';
+    chevron.appendChild(arrow);
+
+    const r = cfg.chevronRadius;
+    const cx = Math.sin(relativeAngle) * r;
+    const cy = -Math.cos(relativeAngle) * r;
+    chevron.style.transform = `translate(${cx}px, ${cy}px) rotate(${relativeAngle}rad)`;
+    this.hud.hitChevrons.appendChild(chevron);
+
+    this.hitIndicators.push({
+      elapsed: 0,
+      duration: totalDuration,
+      fadeIn: cfg.fadeIn,
+      hold: cfg.hold,
+      fadeOut: cfg.fadeOut,
+      chevron,
+    });
+  }
+
+  clearHitIndicators() {
+    for (const ind of this.hitIndicators) {
+      ind.chevron.remove();
+    }
+    this.hitIndicators.length = 0;
+    this.hud.hitVignette.classList.remove('hit-vignette--active');
+    this.hud.hitVignette.style.background = '';
+  }
+
+  updateHitIndicators(dt) {
+    let anyActive = false;
+
+    for (let i = this.hitIndicators.length - 1; i >= 0; i--) {
+      const ind = this.hitIndicators[i];
+      ind.elapsed += dt;
+
+      if (ind.elapsed >= ind.duration) {
+        ind.chevron.remove();
+        this.hitIndicators.splice(i, 1);
+        continue;
+      }
+
+      anyActive = true;
+      let opacity;
+      if (ind.elapsed < ind.fadeIn) {
+        opacity = ind.elapsed / ind.fadeIn;
+      } else if (ind.elapsed < ind.fadeIn + ind.hold) {
+        opacity = 1;
+      } else {
+        opacity = 1 - (ind.elapsed - ind.fadeIn - ind.hold) / ind.fadeOut;
+      }
+      ind.chevron.style.opacity = opacity;
+    }
+
+    if (anyActive) {
+      this.hud.hitVignette.classList.add('hit-vignette--active');
+    } else {
+      this.hud.hitVignette.classList.remove('hit-vignette--active');
+      this.hud.hitVignette.style.background = '';
+    }
+  }
+
   resize() {
     const width = this.mount.clientWidth || window.innerWidth;
     const height = this.mount.clientHeight || window.innerHeight;
@@ -308,6 +446,10 @@ export class Game {
     window.removeEventListener('blur', this.onBlur);
     document.removeEventListener('visibilitychange', this.onVisibility);
     this.renderer.domElement.removeEventListener('webglcontextlost', this.onContextLost);
+    this.cameraShake.reset();
+    this.clearHitIndicators();
+    this.explosions.dispose();
+    this.scorePops.dispose();
     this.input.dispose();
     this.simulation.dispose();
     this.renderer.dispose();

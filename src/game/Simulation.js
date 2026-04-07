@@ -38,6 +38,8 @@ export class Simulation {
     this.projectiles = new ProjectilePool(scene);
     this.state = createGameState();
     this.enemies = [];
+    this.killEvents = [];
+    this.damageEvents = [];
     this.effects = [];
     this.spawnQueue = [];
     this.spawnCooldown = 0;
@@ -70,6 +72,8 @@ export class Simulation {
     this.lastHit = null;
     this.hitFlash = 0;
     this.fireFlash = 0;
+    this.killEvents.length = 0;
+    this.damageEvents.length = 0;
     this.beginWave(1);
   }
 
@@ -213,6 +217,11 @@ export class Simulation {
     this.registerEnemyHit(enemy);
     if (destroyed) {
       this.state.score += enemy.scoreValue;
+      this.killEvents.push({
+        position: enemy.group.position.clone(),
+        type: enemy.type,
+        score: enemy.scoreValue,
+      });
       this.spawnEffect(enemy.group.position.x, enemy.group.position.y + 2, enemy.group.position.z, 2);
       trackEnemyKilled(enemy.type, enemy.scoreValue, this.state.wave);
     }
@@ -257,13 +266,13 @@ export class Simulation {
 
   firePlayerWeapon(controls) {
     this.player.consumeShotCooldown();
-    const spawned = this.projectiles.spawn(
-      this.player.buildShotSpec(controls.aimDirection, controls.lockedTargetId),
-    );
+    const spec = this.player.buildShotSpec(controls.aimDirection, controls.lockedTargetId);
+    const spawned = this.projectiles.spawn(spec);
     if (!spawned) {
       this.state.status = 'Weapon grid saturated.';
       return;
     }
+    this.player.triggerMuzzleFlash(spec.origin);
     this.spawnEffect(this.player.fireOrigin.x, this.player.fireOrigin.y, this.player.fireOrigin.z, 0.65);
     this.fireFlash = 0.12;
     this.state.status = controls.lockedTargetId ? 'Tracking shot launched.' : 'Weapons firing.';
@@ -287,6 +296,12 @@ export class Simulation {
     }
 
     this.player.applyDamage(projectile.damage);
+    this.damageEvents.push({
+      sourceX: projectile.prevX,
+      sourceY: projectile.prevY,
+      sourceZ: projectile.prevZ,
+      damage: projectile.damage,
+    });
     this.state.health = this.player.health;
     this.spawnEffect(this.player.group.position.x, this.player.group.position.y, this.player.group.position.z, 1.3);
     if (this.player.health <= 0) {
@@ -417,6 +432,11 @@ export class Simulation {
     this.state.enemyCount = this.enemies.length + this.spawnQueue.length;
   }
 
+  clearFrameEvents() {
+    this.killEvents.length = 0;
+    this.damageEvents.length = 0;
+  }
+
   getSnapshot() {
     return {
       mode: this.state.mode,
@@ -430,6 +450,8 @@ export class Simulation {
       lastHit: this.lastHit,
       hitFlash: this.hitFlash,
       fireFlash: this.fireFlash,
+      killEvents: this.killEvents.slice(),
+      damageEvents: this.damageEvents.slice(),
     };
   }
 
