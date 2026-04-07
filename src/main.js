@@ -65,6 +65,10 @@ startForm.addEventListener('submit', (event) => {
 
   if (!game) {
     game = new Game({ mount, hud, mapTheme });
+  }
+
+  void game.resumeAudio().catch(() => {});
+  if (!game.frame) {
     game.start();
     trackGameStart(playerName, mapTheme);
   }

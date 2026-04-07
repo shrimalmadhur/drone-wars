@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { createProjectileStore, resetProjectileStore, spawnProjectile, stepProjectileStore } from './Projectile.js';
+import { ProjectilePool, createProjectileStore, resetProjectileStore, spawnProjectile, stepProjectileStore } from './Projectile.js';
 
 describe('projectile store', () => {
   it('spawns and expires projectiles by lifetime', () => {
@@ -30,5 +30,54 @@ describe('projectile store', () => {
     });
     resetProjectileStore(store);
     expect(store.items[0].active).toBe(false);
+  });
+
+  it('records an impact when a projectile strikes the ground', () => {
+    const pool = {
+      store: {
+        items: [{
+          active: true,
+          team: 'player',
+          damage: 10,
+          radius: 0.9,
+          x: 0,
+          y: 0.4,
+          z: 0,
+          prevX: 0,
+          prevY: 1.4,
+          prevZ: 0,
+          vx: 0,
+          vy: -4,
+          vz: 0,
+          age: 0,
+          maxLife: 1,
+          targetId: null,
+          turnRate: 0,
+          mesh: { visible: true, position: { set() {} }, scale: { setScalar() {} } },
+          trail: { visible: true, position: { set() {} }, lookAt() {}, scale: {} },
+          light: { visible: true, position: { set() {} }, color: { setHex() {} } },
+        }],
+      },
+    };
+    const recordImpact = vi.fn();
+    const spawnEffect = vi.fn();
+
+    ProjectilePool.prototype.update.call(pool, 0.1, {
+      terrain: { getGroundHeight() { return 0; } },
+      playerPosition: { x: 0, y: 0, z: 0 },
+      recordImpact,
+      spawnEffect,
+      resolveEnemyHit() { return false; },
+      resolvePlayerHit() { return false; },
+      getEnemyById() { return null; },
+      tempOrigin: { set() { return this; } },
+      tempAim: { copy() { return this; }, add() { return this; }, sub() { return this; }, normalize() { return this; }, multiplyScalar() { return this; } },
+      tempVelocity: { set() { return this; }, lerp() { return this; } },
+      enemyAimOffset: {},
+    });
+
+    expect(recordImpact).toHaveBeenCalledWith(0, 0, 0);
+    expect(spawnEffect).toHaveBeenCalledWith(0, 0, 0, 0.8);
+    expect(pool.store.items[0].active).toBe(false);
   });
 });

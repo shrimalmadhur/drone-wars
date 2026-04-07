@@ -40,11 +40,16 @@ export class Simulation {
     this.enemies = [];
     this.killEvents = [];
     this.damageEvents = [];
+    this.fireEvents = [];
+    this.impactEvents = [];
+    this.waveCompleteEvents = [];
+    this.missilePositions = [];
     this.effects = [];
     this.spawnQueue = [];
     this.spawnCooldown = 0;
     this.interWaveDelay = CONFIG.waves.interWaveDelay;
     this.waveElapsed = 0;
+    this.wasWaveCleared = false;
     this.lastHit = null;
     this.hitFlash = 0;
     this.fireFlash = 0;
@@ -74,6 +79,11 @@ export class Simulation {
     this.fireFlash = 0;
     this.killEvents.length = 0;
     this.damageEvents.length = 0;
+    this.fireEvents.length = 0;
+    this.impactEvents.length = 0;
+    this.waveCompleteEvents.length = 0;
+    this.missilePositions = [];
+    this.wasWaveCleared = false;
     this.beginWave(1);
   }
 
@@ -102,6 +112,7 @@ export class Simulation {
     this.spawnCooldown = 0.25;
     this.waveElapsed = 0;
     this.interWaveDelay = CONFIG.waves.interWaveDelay;
+    this.wasWaveCleared = false;
     this.state.status = `Wave ${wave} incoming.`;
     trackWaveStart(wave);
   }
@@ -211,6 +222,19 @@ export class Simulation {
     this.hitFlash = 0.18;
   }
 
+  recordImpact(x, y, z) {
+    this.impactEvents.push({ x, y, z });
+  }
+
+  recordPlayerDamage(sourceX, sourceY, sourceZ, damage) {
+    this.damageEvents.push({
+      sourceX,
+      sourceY,
+      sourceZ,
+      damage,
+    });
+  }
+
   applyDamageToEnemy(enemy, impactPoint) {
     this.spawnEffect(impactPoint.x, impactPoint.y, impactPoint.z, 1.1);
     const destroyed = enemy.takeDamage(CONFIG.projectiles.playerDamage);
@@ -257,6 +281,7 @@ export class Simulation {
     }
 
     if (obstacleHit) {
+      this.recordImpact(projectile.x, projectile.y, projectile.z);
       this.spawnEffect(projectile.x, projectile.y, projectile.z, 0.95);
       return true;
     }
@@ -287,6 +312,7 @@ export class Simulation {
       CONFIG.player.collisionRadius + projectile.radius,
     );
     if (obstacleHit && (playerHitT === null || obstacleHit.t <= playerHitT)) {
+      this.recordImpact(projectile.x, projectile.y, projectile.z);
       this.spawnEffect(projectile.x, projectile.y, projectile.z, 0.95);
       return true;
     }
@@ -296,12 +322,7 @@ export class Simulation {
     }
 
     this.player.applyDamage(projectile.damage);
-    this.damageEvents.push({
-      sourceX: projectile.prevX,
-      sourceY: projectile.prevY,
-      sourceZ: projectile.prevZ,
-      damage: projectile.damage,
-    });
+    this.recordPlayerDamage(projectile.prevX, projectile.prevY, projectile.prevZ, projectile.damage);
     this.state.health = this.player.health;
     this.spawnEffect(this.player.group.position.x, this.player.group.position.y, this.player.group.position.z, 1.3);
     if (this.player.health <= 0) {
@@ -311,11 +332,24 @@ export class Simulation {
     return true;
   }
 
-  handleEnemyEvents(events) {
+  handleEnemyEvents(enemy, events) {
     for (const event of events) {
       if (event.type === 'spawnProjectile') {
-        this.projectiles.spawn(event.spec);
+        if (this.projectiles.spawn(event.spec)) {
+          this.fireEvents.push({
+            x: event.spec.origin.x,
+            y: event.spec.origin.y,
+            z: event.spec.origin.z,
+            type: enemy.type,
+          });
+        }
       } else if (event.type === 'impactPlayer') {
+        this.recordPlayerDamage(
+          event.sourceX ?? enemy.group.position.x,
+          event.sourceY ?? enemy.group.position.y,
+          event.sourceZ ?? enemy.group.position.z,
+          event.damage,
+        );
         this.player.applyDamage(event.damage);
         this.state.health = this.player.health;
       } else if (event.type === 'effect') {
@@ -344,6 +378,17 @@ export class Simulation {
     this.enemies = survivors;
   }
 
+  syncMissilePositions() {
+    this.missilePositions = this.enemies
+      .filter((enemy) => enemy.alive && enemy.type === 'missile')
+      .map((enemy) => ({
+        id: enemy.group.uuid,
+        x: enemy.group.position.x,
+        y: enemy.group.position.y,
+        z: enemy.group.position.z,
+      }));
+  }
+
   update(dt, controls) {
     if (controls.restartPressed) {
       this.restart();
@@ -366,6 +411,7 @@ export class Simulation {
       return;
     }
 
+    const wasWaveCleared = this.wasWaveCleared;
     this.state.time += dt;
     this.waveElapsed += dt;
     this.hitFlash = Math.max(0, this.hitFlash - dt);
@@ -386,7 +432,7 @@ export class Simulation {
         player: this.player,
         terrain: this.terrain,
       });
-      this.handleEnemyEvents(events);
+      this.handleEnemyEvents(enemy, events);
     }
 
     this.projectiles.update(dt, {
@@ -399,21 +445,30 @@ export class Simulation {
       enemyAimOffset: this.enemyAimOffset,
       resolveEnemyHit: (projectile, start, end) => this.resolveEnemyHit(projectile, start, end),
       resolvePlayerHit: (projectile, start, end) => this.resolvePlayerHit(projectile, start, end),
+      recordImpact: (x, y, z) => this.recordImpact(x, y, z),
       spawnEffect: (x, y, z, size) => this.spawnEffect(x, y, z, size),
     });
 
     this.cleanupEnemies();
+    this.syncMissilePositions();
     this.updateEffects(dt);
 
     if (this.enemies.length === 0 && this.spawnQueue.length > 0) {
       this.spawnCooldown = Math.min(this.spawnCooldown, 0.08);
     }
 
-    if (this.player.health <= 0) {
+    const playerDead = this.player.health <= 0;
+    const waveCleared = this.spawnQueue.length === 0 && this.enemies.length === 0;
+    if (!playerDead && this.state.wave > 0 && !wasWaveCleared && waveCleared) {
+      this.waveCompleteEvents.push({ wave: this.state.wave });
+    }
+    this.wasWaveCleared = waveCleared;
+
+    if (playerDead) {
       this.state.mode = GAME_STATES.GAME_OVER;
       this.state.status = 'Drone destroyed. Press R to relaunch.';
       trackGameOver(this.state.score, this.state.wave, this.state.time);
-    } else if (this.spawnQueue.length === 0 && this.enemies.length === 0) {
+    } else if (waveCleared) {
       this.interWaveDelay -= dt;
       this.state.status = this.interWaveDelay > 0
         ? `Sector clear. Next wave in ${this.interWaveDelay.toFixed(1)}s`
@@ -435,6 +490,9 @@ export class Simulation {
   clearFrameEvents() {
     this.killEvents.length = 0;
     this.damageEvents.length = 0;
+    this.fireEvents.length = 0;
+    this.impactEvents.length = 0;
+    this.waveCompleteEvents.length = 0;
   }
 
   getSnapshot() {
@@ -452,6 +510,10 @@ export class Simulation {
       fireFlash: this.fireFlash,
       killEvents: this.killEvents.slice(),
       damageEvents: this.damageEvents.slice(),
+      fireEvents: this.fireEvents.slice(),
+      impactEvents: this.impactEvents.slice(),
+      waveCompleteEvents: this.waveCompleteEvents.slice(),
+      missilePositions: this.missilePositions.slice(),
     };
   }
 

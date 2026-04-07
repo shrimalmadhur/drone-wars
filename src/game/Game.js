@@ -8,6 +8,8 @@ import { GAME_STATES } from './state.js';
 import { CameraShake } from './effects/CameraShake.js';
 import { ExplosionEffect } from './effects/ExplosionEffect.js';
 import { ScorePop } from './effects/ScorePop.js';
+import { AudioEngine } from './audio/AudioEngine.js';
+import { applyAudioFrame, createAudioFrameState } from './audio/frameAudio.js';
 
 const RADAR_COLORS = Object.fromEntries(
   ['tank', 'drone', 'missile', 'ship'].map(k => [k, '#' + CONFIG.palette[k].toString(16).padStart(6, '0')])
@@ -30,13 +32,14 @@ export class Game {
 
     this.input = new InputController(window, document);
     this.simulation = new Simulation(this.scene, { mapTheme });
+    this.audio = new AudioEngine();
     this.cameraShake = new CameraShake();
     this.explosions = new ExplosionEffect(this.scene);
     this.scorePops = new ScorePop(this.scene);
     this.hitIndicators = [];
     this._lastHitFlash = 0;
     this._lastFireFlash = 0;
-    this._lastMode = null;
+    this._lastMode = this.simulation.state.mode;
     this._recoilDir = new THREE.Vector3();
     this.cameraPosition = new THREE.Vector3(0, 24, 78);
     this.lookTarget = new THREE.Vector3();
@@ -49,6 +52,7 @@ export class Game {
       label: 'CENTER SIGHT',
       target: null,
     };
+    this.audioFrameState = createAudioFrameState(this.simulation.state.mode);
     this.radarCtx = hud.radar.getContext('2d');
     this.radarSize = hud.radar.width;
     this.radarCenter = this.radarSize / 2;
@@ -60,15 +64,22 @@ export class Game {
     };
 
     this.onResize = () => this.resize();
+    this.handleImmediatePause = (reason) => {
+      this.simulation.pause(reason);
+      this.audio.stopContinuous();
+      this.audio.stopLowHealthWarning();
+      this.audioFrameState.lastMode = GAME_STATES.PAUSED;
+      this.audioFrameState.lowHealthActive = false;
+      this._lastMode = GAME_STATES.PAUSED;
+      this.input.reset();
+    };
     this.onVisibility = () => {
       if (document.hidden) {
-        this.simulation.pause('Auto-paused: tab hidden.');
-        this.input.reset();
+        this.handleImmediatePause('Auto-paused: tab hidden.');
       }
     };
     this.onBlur = () => {
-      this.simulation.pause('Auto-paused: focus lost.');
-      this.input.reset();
+      this.handleImmediatePause('Auto-paused: focus lost.');
     };
     this.onContextLost = (event) => {
       event.preventDefault();
@@ -82,6 +93,10 @@ export class Game {
     this.resize();
   }
 
+  resumeAudio() {
+    return this.audio.resume();
+  }
+
   start() {
     this.clock.last = performance.now();
     const tick = (time) => {
@@ -89,10 +104,15 @@ export class Game {
       this.clock.last = time;
       this.clock.accumulator += elapsed;
 
-      this.updateCamera();
-      this.updateAimSolution();
+      let snapshot = this.simulation.getSnapshot();
+      let aimCandidates = this.simulation.getAimCandidates();
+      this.updateCamera(snapshot);
+      this.updateAimSolution(snapshot, aimCandidates);
 
       const controls = this.input.snapshot();
+      if (controls.mutePressed) {
+        this.audio.toggleMute();
+      }
       controls.aimDirection = this.aimDirection;
       controls.lockedTargetId = this.aimState.target?.id ?? null;
       let steps = 0;
@@ -109,11 +129,21 @@ export class Game {
         this.explosions.reset();
         this.scorePops.reset();
       }
-      this._lastMode = currentMode;
 
-      this.updateCamera();
-      this.updateAimSolution();
-      this.renderHud();
+      snapshot = this.simulation.getSnapshot();
+      aimCandidates = this.simulation.getAimCandidates();
+      this.updateCamera(snapshot);
+      this.updateAimSolution(snapshot, aimCandidates);
+      this.audio.updateListener(this.camera);
+      applyAudioFrame({
+        audio: this.audio,
+        snapshot,
+        aimLocked: this.aimState.locked,
+        state: this.audioFrameState,
+        lowHealthThreshold: CONFIG.audio.lowHealthThreshold,
+        playerSpeed: this.simulation.player.velocity.length(),
+      });
+      this.renderHud(snapshot, aimCandidates);
       this.simulation.clearFrameEvents();
       this.updateHitIndicators(elapsed);
       this.cameraShake.update(elapsed);
@@ -121,14 +151,14 @@ export class Game {
       this.explosions.update(elapsed);
       this.scorePops.update(elapsed);
       this.renderer.render(this.scene, this.camera);
+      this._lastMode = currentMode;
       this.frame = requestAnimationFrame(tick);
     };
 
     this.frame = requestAnimationFrame(tick);
   }
 
-  updateCamera() {
-    const snapshot = this.simulation.getSnapshot();
+  updateCamera(snapshot) {
     const forward = new THREE.Vector3(Math.sin(snapshot.playerYaw), 0, Math.cos(snapshot.playerYaw));
     const desiredPosition = snapshot.playerPosition.clone()
       .addScaledVector(forward, -24)
@@ -139,14 +169,13 @@ export class Game {
     this.camera.lookAt(this.lookTarget);
   }
 
-  updateAimSolution() {
-    const snapshot = this.simulation.getSnapshot();
+  updateAimSolution(snapshot, candidates) {
     this.camera.getWorldDirection(this.cameraDirection).normalize();
 
     const lock = findAimAssistTarget(
       this.camera.position,
       this.cameraDirection,
-      this.simulation.getAimCandidates(),
+      candidates,
       { minDot: 0.965, maxDistance: 240 },
     );
 
@@ -166,8 +195,7 @@ export class Game {
     }
   }
 
-  renderHud() {
-    const snapshot = this.simulation.getSnapshot();
+  renderHud(snapshot, candidates) {
     this.hud.score.textContent = snapshot.score.toString();
     this.hud.wave.textContent = snapshot.wave.toString();
     this.hud.enemyCount.textContent = snapshot.enemyCount.toString();
@@ -222,10 +250,10 @@ export class Game {
       this.hud.targetName.textContent = 'No target locked';
       this.hud.targetHealth.textContent = 'Bring the reticle over a target to inspect health.';
     }
-    this.renderRadar();
+    this.renderRadar(snapshot, candidates);
   }
 
-  renderRadar() {
+  renderRadar(snapshot, candidates) {
     const ctx = this.radarCtx;
     const cx = this.radarCenter;
     const r = this.radarDrawRadius;
@@ -275,8 +303,6 @@ export class Game {
     ctx.fill();
 
     // Enemy dots
-    const snapshot = this.simulation.getSnapshot();
-    const candidates = this.simulation.getAimCandidates();
     const scale = this.radarDrawRadius / this.radarWorldRadius;
 
     for (const enemy of candidates) {
@@ -452,6 +478,7 @@ export class Game {
     this.scorePops.dispose();
     this.input.dispose();
     this.simulation.dispose();
+    void this.audio.dispose().catch(() => {});
     this.renderer.dispose();
   }
 }
