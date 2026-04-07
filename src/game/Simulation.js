@@ -430,7 +430,9 @@ export class Simulation {
     }
 
     this.state.enemyCount = this.enemies.length + this.spawnQueue.length;
+  }
 
+  clearFrameEvents() {
     this.killEvents.length = 0;
     this.damageEvents.length = 0;
   }

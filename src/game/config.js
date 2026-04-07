@@ -135,7 +135,6 @@ export const CONFIG = {
       lightRange: 15,
     },
     trail: {
-      segments: 4,
       lightIntensity: 0.6,
       lightRange: 8,
       trackingWidthMultiplier: 1.5,

@@ -35,6 +35,7 @@ export class Game {
     this.hitIndicators = [];
     this._lastHitFlash = 0;
     this._lastFireFlash = 0;
+    this._recoilDir = new THREE.Vector3();
     this.cameraPosition = new THREE.Vector3(0, 24, 78);
     this.lookTarget = new THREE.Vector3();
     this.cameraDirection = new THREE.Vector3();
@@ -102,6 +103,7 @@ export class Game {
       this.updateCamera();
       this.updateAimSolution();
       this.renderHud();
+      this.simulation.clearFrameEvents();
       this.updateHitIndicators(elapsed);
       this.cameraShake.update(elapsed);
       this.cameraShake.apply(this.camera);
@@ -177,8 +179,8 @@ export class Game {
     if (snapshot.fireFlash > 0 && snapshot.fireFlash > this._lastFireFlash) {
       const cfg = CONFIG.effects.shake.onFire;
       // Recoil: backward along camera's look direction
-      const dir = new THREE.Vector3(0, 0, 1).applyQuaternion(this.camera.quaternion);
-      this.cameraShake.add(cfg.intensity, cfg.duration, dir.x, dir.y, dir.z);
+      this._recoilDir.set(0, 0, 1).applyQuaternion(this.camera.quaternion);
+      this.cameraShake.add(cfg.intensity, cfg.duration, this._recoilDir.x, this._recoilDir.y, this._recoilDir.z);
     }
     this._lastFireFlash = snapshot.fireFlash;
 
@@ -192,7 +194,7 @@ export class Game {
     }
 
     for (const dmg of snapshot.damageEvents) {
-      this.showHitIndicator(dmg.sourceX, dmg.sourceY, dmg.sourceZ, dmg.damage);
+      this.showHitIndicator(dmg.sourceX, dmg.sourceY, dmg.sourceZ, dmg.damage, snapshot);
     }
 
     if (this.aimState.target) {
@@ -336,12 +338,11 @@ export class Game {
     ctx.globalAlpha = 1;
   }
 
-  showHitIndicator(sourceX, sourceY, sourceZ, damage) {
+  showHitIndicator(sourceX, sourceY, sourceZ, damage, snapshot) {
     const cfg = CONFIG.effects.hitIndicator;
     const totalDuration = cfg.fadeIn + cfg.hold + cfg.fadeOut;
 
     // Compute angle from player forward to damage source
-    const snapshot = this.simulation.getSnapshot();
     const dx = sourceX - snapshot.playerPosition.x;
     const dz = sourceZ - snapshot.playerPosition.z;
     const angleToSource = Math.atan2(dx, dz);
@@ -375,6 +376,15 @@ export class Game {
       fadeOut: cfg.fadeOut,
       chevron,
     });
+  }
+
+  clearHitIndicators() {
+    for (const ind of this.hitIndicators) {
+      ind.chevron.remove();
+    }
+    this.hitIndicators.length = 0;
+    this.hud.hitVignette.classList.remove('hit-vignette--active');
+    this.hud.hitVignette.style.background = '';
   }
 
   updateHitIndicators(dt) {
@@ -426,6 +436,7 @@ export class Game {
     document.removeEventListener('visibilitychange', this.onVisibility);
     this.renderer.domElement.removeEventListener('webglcontextlost', this.onContextLost);
     this.cameraShake.reset();
+    this.clearHitIndicators();
     this.explosions.dispose();
     this.scorePops.dispose();
     this.input.dispose();

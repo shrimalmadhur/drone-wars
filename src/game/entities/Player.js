@@ -277,6 +277,11 @@ export class Player {
     this.cooldown = 0;
     this.invulnerability = 0;
     this.health = CONFIG.player.maxHealth;
+    this.muzzleFlashTimer = 0;
+    if (this.muzzleLight) {
+      this.muzzleLight.intensity = 0;
+      this.muzzleLight.visible = false;
+    }
   }
 
   getHeading() {

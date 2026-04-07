@@ -228,15 +228,13 @@ export class ProjectilePool {
       const dist = Math.hypot(item.x - item.prevX, item.y - item.prevY, item.z - item.prevZ);
       item.trail.scale.z = Math.max(2.2, dist * 0.7);
 
-      // Widen and brighten trail when tracking a target
+      // Widen trail when tracking a target (don't mutate shared material opacity)
       if (item.targetId) {
         item.trail.scale.x = CONFIG.effects.trail.trackingWidthMultiplier;
         item.trail.scale.y = CONFIG.effects.trail.trackingWidthMultiplier;
-        item.trail.material.opacity = 0.8 + CONFIG.effects.trail.trackingBrightnessBoost;
       } else {
         item.trail.scale.x = 1;
         item.trail.scale.y = 1;
-        item.trail.material.opacity = item.team === 'player' ? 0.58 : 0.52;
       }
       item.light.visible = true;
       item.light.position.set(item.x, item.y, item.z);

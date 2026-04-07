@@ -8,6 +8,11 @@ const _debrisGeos = [
   new THREE.BoxGeometry(0.3, 0.3, 1.0),
 ];
 
+const _white = new THREE.Color(0xffffcc);
+const _orange = new THREE.Color(0xff6622);
+const _gray = new THREE.Color(0x333333);
+const _tempColor = new THREE.Color();
+
 export class ExplosionEffect {
   constructor(scene) {
     this.scene = scene;
@@ -95,12 +100,12 @@ export class ExplosionEffect {
     entry.fireLight.intensity = 5;
     entry.fireLight.visible = true;
 
-    const debrisColor = new THREE.Color(color);
+    _tempColor.set(color);
     for (let i = 0; i < entry.debris.length; i++) {
       const d = entry.debris[i];
       d.mesh.position.set(x, y, z);
       d.mesh.scale.setScalar(0.8 + Math.random() * 0.6);
-      d.mat.color.copy(debrisColor);
+      d.mat.color.copy(_tempColor);
       d.mat.opacity = 1;
       d.mesh.visible = true;
 
@@ -119,10 +124,6 @@ export class ExplosionEffect {
 
   update(dt) {
     const cfg = CONFIG.effects.explosion;
-    const _white = new THREE.Color(0xffffcc);
-    const _orange = new THREE.Color(0xff6622);
-    const _gray = new THREE.Color(0x333333);
-
     for (const entry of this.pool) {
       if (!entry.active) continue;
       entry.elapsed += dt;
