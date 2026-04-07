@@ -87,6 +87,6 @@ describe('math helpers', () => {
     expect(contact.distance).toBeCloseTo(Math.hypot(90, 240));
     expect(contact.outOfRange).toBe(true);
     expect(Math.hypot(contact.lateral, contact.forward)).toBeCloseTo(180);
-    expect(contact.lateral / contact.forward).toBeCloseTo(90 / 240);
+    expect(contact.lateral / contact.forward).toBeCloseTo(-90 / 240);
   });
 });

@@ -4,46 +4,87 @@ import { MAP_THEMES, sanitizeMapTheme } from '../../mapThemes.js';
 
 const SKY_PRESETS = {
   [MAP_THEMES.FRONTIER]: {
-    background: '#08111e',
-    fog: '#5b7f95',
+    background: '#0a1a3a',
+    fog: '#7baacf',
     fogNear: 120,
     fogFar: 360,
-    topColor: '#6ca0d8',
-    horizonColor: '#f4b487',
-    bottomColor: '#08111e',
-    sunGlow: '#ffd79b',
-    haze: '#7fb6da',
-    hemiSky: 0xd5efff,
+    topColor: '#1a5fb4',
+    horizonColor: '#b0d4f1',
+    bottomColor: '#0a1a3a',
+    sunGlow: '#fffce8',
+    haze: '#9ec8e8',
+    hemiSky: 0x87ceeb,
     hemiGround: 0x24425d,
-    hemiIntensity: 1.05,
-    ambient: 0x6f8fac,
-    ambientIntensity: 0.45,
-    sun: 0xfff4d2,
-    sunIntensity: 1.85,
+    hemiIntensity: 1.15,
+    ambient: 0x8ab4d0,
+    ambientIntensity: 0.5,
+    sun: 0xfffff0,
+    sunIntensity: 1.9,
     sunOffset: { x: 120, y: 150, z: -90 },
-    glowOffset: { x: 180, y: 120, z: -140 },
+    glowOffset: { x: 180, y: 140, z: -140 },
   },
   [MAP_THEMES.CITY]: {
-    background: '#0b1019',
-    fog: '#6d7b8b',
+    background: '#0c1830',
+    fog: '#84a8c8',
     fogNear: 95,
     fogFar: 300,
-    topColor: '#7a93b8',
-    horizonColor: '#ffbe7d',
-    bottomColor: '#0b1019',
-    sunGlow: '#ffd2a2',
-    haze: '#9eb5c8',
-    hemiSky: 0xcfdcf1,
-    hemiGround: 0x293445,
-    hemiIntensity: 0.9,
-    ambient: 0x56657a,
-    ambientIntensity: 0.4,
-    sun: 0xffebcb,
-    sunIntensity: 1.55,
-    sunOffset: { x: 95, y: 130, z: -70 },
-    glowOffset: { x: 130, y: 96, z: -108 },
+    topColor: '#2068b8',
+    horizonColor: '#a8d0ee',
+    bottomColor: '#0c1830',
+    sunGlow: '#fff8e0',
+    haze: '#a0c4e0',
+    hemiSky: 0x87ceeb,
+    hemiGround: 0x2a3848,
+    hemiIntensity: 1.0,
+    ambient: 0x7a9cb8,
+    ambientIntensity: 0.45,
+    sun: 0xfffff0,
+    sunIntensity: 1.6,
+    sunOffset: { x: 95, y: 150, z: -70 },
+    glowOffset: { x: 130, y: 130, z: -108 },
   },
 };
+
+function createClouds(count = 18) {
+  const group = new THREE.Group();
+  const material = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0.55,
+    depthWrite: false,
+  });
+
+  for (let i = 0; i < count; i++) {
+    const cloud = new THREE.Group();
+    const puffs = 3 + Math.floor(Math.random() * 4);
+    for (let j = 0; j < puffs; j++) {
+      const size = 8 + Math.random() * 14;
+      const puff = new THREE.Mesh(
+        new THREE.SphereGeometry(size, 8, 6),
+        material,
+      );
+      puff.position.set(
+        (j - puffs / 2) * (size * 0.9) + Math.random() * 4,
+        Math.random() * 4 - 2,
+        Math.random() * 6 - 3,
+      );
+      puff.scale.y = 0.45 + Math.random() * 0.15;
+      cloud.add(puff);
+    }
+
+    const angle = Math.random() * Math.PI * 2;
+    const radius = 80 + Math.random() * 250;
+    cloud.position.set(
+      Math.cos(angle) * radius,
+      90 + Math.random() * 60,
+      Math.sin(angle) * radius,
+    );
+    cloud.rotation.y = Math.random() * Math.PI;
+    group.add(cloud);
+  }
+
+  return { group, material };
+}
 
 function createSkyMaterial(preset) {
   return new THREE.ShaderMaterial({
@@ -109,6 +150,9 @@ export function createEnvironment(scene, { mapTheme } = {}) {
   skyGroup.add(sky, haze, sunGlow);
   scene.add(skyGroup);
 
+  const clouds = createClouds();
+  scene.add(clouds.group);
+
   const hemi = new THREE.HemisphereLight(preset.hemiSky, preset.hemiGround, preset.hemiIntensity);
   const ambient = new THREE.AmbientLight(preset.ambient, preset.ambientIntensity);
   const sun = new THREE.DirectionalLight(preset.sun, preset.sunIntensity);
@@ -140,13 +184,17 @@ export function createEnvironment(scene, { mapTheme } = {}) {
       scene.fog.color.setStyle(preset.fog);
     },
     dispose() {
-      scene.remove(skyGroup, hemi, ambient, sun);
+      scene.remove(skyGroup, hemi, ambient, sun, clouds.group);
       sky.geometry.dispose();
       sky.material.dispose();
       sunGlow.geometry.dispose();
       sunGlow.material.dispose();
       haze.geometry.dispose();
       haze.material.dispose();
+      clouds.group.traverse((child) => {
+        if (child.geometry) child.geometry.dispose();
+      });
+      clouds.material.dispose();
     },
   };
 }

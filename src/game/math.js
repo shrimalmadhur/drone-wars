@@ -139,7 +139,7 @@ export function projectRadarContact(origin, yaw, target, maxDistance) {
   const distance = Math.hypot(dx, dz);
   const cosYaw = Math.cos(yaw);
   const sinYaw = Math.sin(yaw);
-  const lateral = dx * cosYaw - dz * sinYaw;
+  const lateral = dz * sinYaw - dx * cosYaw;
   const forward = dx * sinYaw + dz * cosYaw;
 
   if (distance === 0) {
