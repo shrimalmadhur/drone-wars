@@ -107,4 +107,47 @@ export const CONFIG = {
     mountain: 0x718c61,
     effect: 0xffd7a3,
   },
+  effects: {
+    shake: {
+      maxDisplacement: 1.2,
+      onDamage: { intensity: 0.8, duration: 0.3 },
+      onKill: { intensity: 0.5, duration: 0.2 },
+      onFire: { intensity: 0.15, duration: 0.08 },
+    },
+    hitIndicator: {
+      fadeIn: 0.05,
+      hold: 0.15,
+      fadeOut: 0.3,
+      chevronRadius: 120,
+    },
+    explosion: {
+      poolSize: 15,
+      fireballDuration: 0.6,
+      debrisCount: 4,
+      debrisDuration: 1.5,
+      debrisFadeTime: 0.3,
+      debrisGravity: 18,
+      debrisSpeed: 12,
+    },
+    muzzleFlash: {
+      duration: 0.06,
+      lightIntensity: 3.0,
+      lightRange: 15,
+    },
+    trail: {
+      segments: 4,
+      lightIntensity: 0.6,
+      lightRange: 8,
+      trackingWidthMultiplier: 1.5,
+      trackingBrightnessBoost: 0.4,
+    },
+    scorePop: {
+      poolSize: 10,
+      riseSpeed: 5,
+      duration: 1.0,
+      startScale: 0.8,
+      endScale: 1.3,
+      fontSize: 48,
+    },
+  },
 };
