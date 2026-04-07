@@ -144,26 +144,49 @@ function createToneSequence(context, destination, notes, options = {}) {
 }
 
 export function playPlayerFire(context, destination) {
+  createNoiseBurst(context, destination, {
+    duration: 0.035,
+    peak: 0.12,
+    attack: 0.001,
+    release: 0.028,
+    filter: { type: 'bandpass', frequency: 3400, q: 2.2 },
+  });
+  createToneBurst(context, destination, {
+    type: 'square',
+    frequency: 1480,
+    endFrequency: 820,
+    peak: 0.09,
+    attack: 0.001,
+    release: 0.045,
+    filter: { type: 'bandpass', frequency: 2100, q: 1.6 },
+  });
   return createToneBurst(context, destination, {
-    type: 'sawtooth',
-    frequency: 980,
-    endFrequency: 660,
-    peak: 0.11,
-    attack: 0.003,
-    release: 0.08,
-    filter: { type: 'lowpass', frequency: 2800, q: 0.6 },
+    type: 'triangle',
+    frequency: 180,
+    endFrequency: 110,
+    peak: 0.028,
+    attack: 0.001,
+    release: 0.05,
+    filter: { type: 'lowpass', frequency: 520, q: 0.9 },
   });
 }
 
 export function playEnemyFire(context, destination) {
+  createNoiseBurst(context, destination, {
+    duration: 0.03,
+    peak: 0.07,
+    attack: 0.001,
+    release: 0.025,
+    filter: { type: 'bandpass', frequency: 1800, q: 1.4 },
+  });
   return createToneBurst(context, destination, {
     type: 'square',
-    frequency: 240,
-    endFrequency: 180,
-    peak: 0.12,
-    attack: 0.002,
-    release: 0.11,
-    filter: { type: 'lowpass', frequency: 1100, q: 0.7 },
+    frequency: 420,
+    endFrequency: 250,
+    peak: 0.08,
+    attack: 0.001,
+    release: 0.055,
+    filter: { type: 'bandpass', frequency: 900, q: 1.1 },
   });
 }
 
@@ -300,33 +323,110 @@ export function playLowHealthWarning(context, destination) {
 
 export function createEngineHum(context, destination, pitchRange) {
   const baseOscillator = context.createOscillator();
-  const harmonicOscillator = context.createOscillator();
-  const filter = context.createBiquadFilter();
+  const lowHarmonicOscillator = context.createOscillator();
+  const presenceOscillator = context.createOscillator();
+  const whineOscillator = context.createOscillator();
+  const shimmerOscillator = context.createOscillator();
+  const airOscillator = context.createOscillator();
+  const noiseSource = context.createBufferSource();
+  const baseGain = context.createGain();
+  const lowHarmonicGain = context.createGain();
+  const presenceGain = context.createGain();
+  const whineGain = context.createGain();
+  const shimmerGain = context.createGain();
+  const airGain = context.createGain();
+  const noiseGain = context.createGain();
+  const noiseBandpass = context.createBiquadFilter();
+  const tonalBandpass = context.createBiquadFilter();
+  const highpass = context.createBiquadFilter();
+  const flutterLfo = context.createOscillator();
+  const flutterDepth = context.createGain();
+  const noiseFlutterLfo = context.createOscillator();
+  const noiseFlutterDepth = context.createGain();
   const gain = context.createGain();
 
-  baseOscillator.type = 'sawtooth';
-  harmonicOscillator.type = 'triangle';
-  filter.type = 'lowpass';
+  baseOscillator.type = 'sine';
+  lowHarmonicOscillator.type = 'triangle';
+  presenceOscillator.type = 'triangle';
+  whineOscillator.type = 'sawtooth';
+  shimmerOscillator.type = 'triangle';
+  airOscillator.type = 'sine';
+  noiseSource.buffer = cacheNoiseBuffer(context, AUDIO_CONSTANTS.wind.noiseDuration);
+  noiseSource.loop = true;
+  tonalBandpass.type = 'bandpass';
+  tonalBandpass.Q.value = 1.4;
+  noiseBandpass.type = 'bandpass';
+  noiseBandpass.Q.value = 0.9;
+  highpass.type = 'highpass';
+  highpass.frequency.value = AUDIO_CONSTANTS.engine.highpassCutoff;
+  flutterLfo.type = 'sine';
+  flutterLfo.frequency.value = AUDIO_CONSTANTS.engine.flutterRate;
+  flutterDepth.gain.value = AUDIO_CONSTANTS.engine.flutterDepth;
+  noiseFlutterLfo.type = 'sine';
+  noiseFlutterLfo.frequency.value = AUDIO_CONSTANTS.engine.noiseFlutterRate;
+  noiseFlutterDepth.gain.value = AUDIO_CONSTANTS.engine.noiseFlutterDepth;
   gain.gain.value = AUDIO_CONSTANTS.engine.gain;
+  baseGain.gain.value = AUDIO_CONSTANTS.engine.lowGain;
+  lowHarmonicGain.gain.value = AUDIO_CONSTANTS.engine.lowGain * 0.85;
+  presenceGain.gain.value = AUDIO_CONSTANTS.engine.presenceGain;
+  whineGain.gain.value = AUDIO_CONSTANTS.engine.whineGain;
+  shimmerGain.gain.value = AUDIO_CONSTANTS.engine.shimmerGain;
+  airGain.gain.value = AUDIO_CONSTANTS.engine.shimmerGain * 0.55;
+  noiseGain.gain.value = AUDIO_CONSTANTS.engine.noiseGain;
 
-  baseOscillator.connect(filter);
-  harmonicOscillator.connect(filter);
-  filter.connect(gain);
+  baseOscillator.connect(baseGain);
+  lowHarmonicOscillator.connect(lowHarmonicGain);
+  presenceOscillator.connect(presenceGain);
+  whineOscillator.connect(whineGain);
+  shimmerOscillator.connect(shimmerGain);
+  airOscillator.connect(airGain);
+  noiseSource.connect(noiseBandpass);
+  noiseBandpass.connect(noiseGain);
+  baseGain.connect(tonalBandpass);
+  lowHarmonicGain.connect(tonalBandpass);
+  presenceGain.connect(tonalBandpass);
+  whineGain.connect(tonalBandpass);
+  shimmerGain.connect(tonalBandpass);
+  airGain.connect(tonalBandpass);
+  tonalBandpass.connect(highpass);
+  noiseGain.connect(highpass);
+  highpass.connect(gain);
   gain.connect(destination);
+  flutterLfo.connect(flutterDepth);
+  flutterDepth.connect(presenceGain.gain);
+  flutterDepth.connect(whineGain.gain);
+  noiseFlutterLfo.connect(noiseFlutterDepth);
+  noiseFlutterDepth.connect(noiseGain.gain);
 
   baseOscillator.start();
-  harmonicOscillator.start();
+  lowHarmonicOscillator.start();
+  presenceOscillator.start();
+  whineOscillator.start();
+  shimmerOscillator.start();
+  airOscillator.start();
+  noiseSource.start();
+  flutterLfo.start();
+  noiseFlutterLfo.start();
 
   const setSpeed = (normalized) => {
     const clamped = Math.min(Math.max(normalized, 0), 1);
     const pitch = pitchRange.min + (pitchRange.max - pitchRange.min) * clamped;
     const now = context.currentTime;
     baseOscillator.frequency.setTargetAtTime(AUDIO_CONSTANTS.engine.baseFrequency * pitch, now, 0.08);
-    harmonicOscillator.frequency.setTargetAtTime(AUDIO_CONSTANTS.engine.harmonicFrequency * pitch, now, 0.08);
-    filter.frequency.setTargetAtTime(
+    lowHarmonicOscillator.frequency.setTargetAtTime(AUDIO_CONSTANTS.engine.lowHarmonicFrequency * pitch, now, 0.08);
+    presenceOscillator.frequency.setTargetAtTime(AUDIO_CONSTANTS.engine.presenceFrequency * pitch, now, 0.08);
+    whineOscillator.frequency.setTargetAtTime(AUDIO_CONSTANTS.engine.whineFrequency * pitch, now, 0.08);
+    shimmerOscillator.frequency.setTargetAtTime(AUDIO_CONSTANTS.engine.shimmerFrequency * pitch, now, 0.08);
+    airOscillator.frequency.setTargetAtTime((AUDIO_CONSTANTS.engine.shimmerFrequency + 540) * pitch, now, 0.08);
+    tonalBandpass.frequency.setTargetAtTime(
       AUDIO_CONSTANTS.engine.filterBase + AUDIO_CONSTANTS.engine.filterRange * clamped,
       now,
       0.12,
+    );
+    noiseBandpass.frequency.setTargetAtTime(
+      AUDIO_CONSTANTS.engine.noiseBandBase + AUDIO_CONSTANTS.engine.noiseBandRange * clamped,
+      now,
+      0.16,
     );
   };
 
@@ -340,8 +440,38 @@ export function createEngineHum(context, destination, pitchRange) {
       gain.gain.setValueAtTime(gain.gain.value || AUDIO_CONSTANTS.engine.gain, now);
       gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
       baseOscillator.stop(now + 0.1);
-      harmonicOscillator.stop(now + 0.1);
-      scheduleDisconnect(baseOscillator, harmonicOscillator, filter, gain);
+      lowHarmonicOscillator.stop(now + 0.1);
+      presenceOscillator.stop(now + 0.1);
+      whineOscillator.stop(now + 0.1);
+      shimmerOscillator.stop(now + 0.1);
+      airOscillator.stop(now + 0.1);
+      noiseSource.stop(now + 0.1);
+      flutterLfo.stop(now + 0.1);
+      noiseFlutterLfo.stop(now + 0.1);
+      scheduleDisconnect(
+        baseOscillator,
+        lowHarmonicOscillator,
+        presenceOscillator,
+        whineOscillator,
+        shimmerOscillator,
+        airOscillator,
+        noiseSource,
+        flutterLfo,
+        flutterDepth,
+        noiseFlutterLfo,
+        noiseFlutterDepth,
+        baseGain,
+        lowHarmonicGain,
+        presenceGain,
+        whineGain,
+        shimmerGain,
+        airGain,
+        noiseGain,
+        noiseBandpass,
+        tonalBandpass,
+        highpass,
+        gain,
+      );
     },
   };
 }
