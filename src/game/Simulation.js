@@ -12,6 +12,7 @@ import { DroneEnemy } from './entities/DroneEnemy.js';
 import { MissileEnemy } from './entities/MissileEnemy.js';
 import { ShipEnemy } from './entities/ShipEnemy.js';
 import { canSpawnType, createWaveQueue } from './systems/waves.js';
+import { trackGameRestart, trackWaveStart, trackWaveComplete, trackEnemyKilled, trackGameOver } from './analytics.js';
 
 function createEffectMesh(size) {
   const mesh = new THREE.Mesh(
@@ -52,6 +53,9 @@ export class Simulation {
   }
 
   restart() {
+    if (this.state.mode !== GAME_STATES.BOOT) {
+      trackGameRestart(this.state.score, this.state.wave);
+    }
     resetGameState(this.state);
     this.player.reset();
     this.environment.update(this.player.group.position, 0);
@@ -86,12 +90,16 @@ export class Simulation {
   }
 
   beginWave(wave) {
+    if (wave > 1) {
+      trackWaveComplete(wave - 1, this.waveElapsed);
+    }
     this.state.wave = wave;
     this.spawnQueue = createWaveQueue(wave, this.rng);
     this.spawnCooldown = 0.25;
     this.waveElapsed = 0;
     this.interWaveDelay = CONFIG.waves.interWaveDelay;
     this.state.status = `Wave ${wave} incoming.`;
+    trackWaveStart(wave);
   }
 
   pause(reason = 'Paused') {
@@ -206,6 +214,7 @@ export class Simulation {
     if (destroyed) {
       this.state.score += enemy.scoreValue;
       this.spawnEffect(enemy.group.position.x, enemy.group.position.y + 2, enemy.group.position.z, 2);
+      trackEnemyKilled(enemy.type, enemy.scoreValue, this.state.wave);
     }
   }
 
@@ -388,6 +397,7 @@ export class Simulation {
     if (this.player.health <= 0) {
       this.state.mode = GAME_STATES.GAME_OVER;
       this.state.status = 'Drone destroyed. Press R to relaunch.';
+      trackGameOver(this.state.score, this.state.wave, this.state.time);
     } else if (this.spawnQueue.length === 0 && this.enemies.length === 0) {
       this.interWaveDelay -= dt;
       this.state.status = this.interWaveDelay > 0
