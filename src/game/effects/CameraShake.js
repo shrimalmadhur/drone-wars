@@ -31,10 +31,9 @@ export class CameraShake {
 
       if (e.dirX !== 0 || e.dirY !== 0 || e.dirZ !== 0) {
         // Directional shake (e.g., recoil)
-        const decay = 1 - progress;
-        this.offsetX += e.dirX * strength * decay;
-        this.offsetY += e.dirY * strength * decay;
-        this.offsetZ += e.dirZ * strength * decay;
+        this.offsetX += e.dirX * strength;
+        this.offsetY += e.dirY * strength;
+        this.offsetZ += e.dirZ * strength;
       } else {
         // Random shake
         this.offsetX += (Math.random() - 0.5) * 2 * strength;

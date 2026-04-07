@@ -439,7 +439,7 @@ export class Simulation {
       lastHit: this.lastHit,
       hitFlash: this.hitFlash,
       fireFlash: this.fireFlash,
-      killEvents: this.killEvents,
+      killEvents: this.killEvents.slice(),
     };
   }
 
