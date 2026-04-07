@@ -39,6 +39,7 @@ export class Simulation {
     this.state = createGameState();
     this.enemies = [];
     this.killEvents = [];
+    this.damageEvents = [];
     this.effects = [];
     this.spawnQueue = [];
     this.spawnCooldown = 0;
@@ -72,6 +73,7 @@ export class Simulation {
     this.hitFlash = 0;
     this.fireFlash = 0;
     this.killEvents.length = 0;
+    this.damageEvents.length = 0;
     this.beginWave(1);
   }
 
@@ -294,6 +296,12 @@ export class Simulation {
     }
 
     this.player.applyDamage(projectile.damage);
+    this.damageEvents.push({
+      sourceX: projectile.x,
+      sourceY: projectile.y,
+      sourceZ: projectile.z,
+      damage: projectile.damage,
+    });
     this.state.health = this.player.health;
     this.spawnEffect(this.player.group.position.x, this.player.group.position.y, this.player.group.position.z, 1.3);
     if (this.player.health <= 0) {
@@ -424,6 +432,7 @@ export class Simulation {
     this.state.enemyCount = this.enemies.length + this.spawnQueue.length;
 
     this.killEvents.length = 0;
+    this.damageEvents.length = 0;
   }
 
   getSnapshot() {
@@ -440,6 +449,7 @@ export class Simulation {
       hitFlash: this.hitFlash,
       fireFlash: this.fireFlash,
       killEvents: this.killEvents.slice(),
+      damageEvents: this.damageEvents.slice(),
     };
   }
 

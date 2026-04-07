@@ -28,6 +28,7 @@ export class Game {
     this.input = new InputController(window, document);
     this.simulation = new Simulation(this.scene, { mapTheme });
     this.cameraShake = new CameraShake();
+    this.hitIndicators = [];
     this._lastHitFlash = 0;
     this._lastFireFlash = 0;
     this.cameraPosition = new THREE.Vector3(0, 24, 78);
@@ -97,6 +98,7 @@ export class Game {
       this.updateCamera();
       this.updateAimSolution();
       this.renderHud();
+      this.updateHitIndicators(elapsed);
       this.cameraShake.update(elapsed);
       this.cameraShake.apply(this.camera);
       this.renderer.render(this.scene, this.camera);
@@ -178,6 +180,10 @@ export class Game {
     for (const kill of snapshot.killEvents) {
       const cfg = CONFIG.effects.shake.onKill;
       this.cameraShake.add(cfg.intensity, cfg.duration);
+    }
+
+    for (const dmg of snapshot.damageEvents) {
+      this.showHitIndicator(dmg.sourceX, dmg.sourceY, dmg.sourceZ, dmg.damage);
     }
 
     if (this.aimState.target) {
@@ -319,6 +325,80 @@ export class Game {
     // Reset shadow and alpha
     ctx.shadowBlur = 0;
     ctx.globalAlpha = 1;
+  }
+
+  showHitIndicator(sourceX, sourceY, sourceZ, damage) {
+    const cfg = CONFIG.effects.hitIndicator;
+    const totalDuration = cfg.fadeIn + cfg.hold + cfg.fadeOut;
+
+    // Compute angle from player forward to damage source
+    const snapshot = this.simulation.getSnapshot();
+    const dx = sourceX - snapshot.playerPosition.x;
+    const dz = sourceZ - snapshot.playerPosition.z;
+    const angleToSource = Math.atan2(dx, dz);
+    const relativeAngle = angleToSource - snapshot.playerYaw;
+
+    // Vignette — offset radial gradient toward damage side
+    const vignX = 50 + Math.sin(relativeAngle) * 30;
+    const vignY = 50 - Math.cos(relativeAngle) * 30;
+    const intensity = Math.min(1, damage / 20);
+    this.hud.hitVignette.style.background =
+      `radial-gradient(circle at ${vignX}% ${vignY}%, transparent 30%, rgba(255, 40, 40, ${0.35 * intensity}) 100%)`;
+
+    // Chevron — position on circle around screen center
+    const chevron = document.createElement('div');
+    chevron.className = 'hit-chevron';
+    const arrow = document.createElement('div');
+    arrow.className = 'hit-chevron__arrow';
+    chevron.appendChild(arrow);
+
+    const r = cfg.chevronRadius;
+    const cx = Math.sin(relativeAngle) * r;
+    const cy = -Math.cos(relativeAngle) * r;
+    chevron.style.transform = `translate(${cx}px, ${cy}px) rotate(${relativeAngle}rad)`;
+    this.hud.hitChevrons.appendChild(chevron);
+
+    this.hitIndicators.push({
+      elapsed: 0,
+      duration: totalDuration,
+      fadeIn: cfg.fadeIn,
+      hold: cfg.hold,
+      fadeOut: cfg.fadeOut,
+      chevron,
+    });
+  }
+
+  updateHitIndicators(dt) {
+    let anyActive = false;
+
+    for (let i = this.hitIndicators.length - 1; i >= 0; i--) {
+      const ind = this.hitIndicators[i];
+      ind.elapsed += dt;
+
+      if (ind.elapsed >= ind.duration) {
+        ind.chevron.remove();
+        this.hitIndicators.splice(i, 1);
+        continue;
+      }
+
+      anyActive = true;
+      let opacity;
+      if (ind.elapsed < ind.fadeIn) {
+        opacity = ind.elapsed / ind.fadeIn;
+      } else if (ind.elapsed < ind.fadeIn + ind.hold) {
+        opacity = 1;
+      } else {
+        opacity = 1 - (ind.elapsed - ind.fadeIn - ind.hold) / ind.fadeOut;
+      }
+      ind.chevron.style.opacity = opacity;
+    }
+
+    if (anyActive) {
+      this.hud.hitVignette.classList.add('hit-vignette--active');
+    } else {
+      this.hud.hitVignette.classList.remove('hit-vignette--active');
+      this.hud.hitVignette.style.background = '';
+    }
   }
 
   resize() {

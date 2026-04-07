@@ -471,6 +471,46 @@ canvas {
   align-self: flex-start;
 }
 
+/* Hit direction indicators */
+.hit-vignette {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 80;
+  opacity: 0;
+  transition: opacity 0.05s ease-in;
+}
+
+.hit-vignette--active {
+  opacity: 1;
+}
+
+.hit-chevrons {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 81;
+}
+
+.hit-chevron {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 20px;
+  height: 20px;
+  margin: -10px 0 0 -10px;
+  opacity: 0;
+}
+
+.hit-chevron__arrow {
+  width: 0;
+  height: 0;
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-bottom: 16px solid rgba(255, 80, 80, 0.9);
+  filter: drop-shadow(0 0 6px rgba(255, 0, 0, 0.6));
+}
+
 @media (max-width: 900px) {
   .reticle {
     width: 62px;
