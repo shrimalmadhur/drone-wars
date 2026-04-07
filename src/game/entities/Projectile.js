@@ -117,7 +117,7 @@ export class ProjectilePool {
     for (const item of this.store.items) {
       const mesh = new THREE.Mesh(this.geometry, this.materials.player);
       const trail = new THREE.Mesh(this.trailGeometry, this.trailMaterials.player);
-      const light = new THREE.PointLight(CONFIG.palette.playerShot, 0.7, 10, 2);
+      const light = new THREE.PointLight(CONFIG.palette.playerShot, CONFIG.effects.trail.lightIntensity, CONFIG.effects.trail.lightRange, 2);
       mesh.visible = false;
       trail.visible = false;
       light.visible = false;
@@ -225,7 +225,19 @@ export class ProjectilePool {
         (item.prevZ + item.z) * 0.5,
       );
       item.trail.lookAt(item.prevX, item.prevY, item.prevZ);
-      item.trail.scale.set(1, 1, Math.max(2.2, Math.hypot(item.x - item.prevX, item.y - item.prevY, item.z - item.prevZ) * 0.52));
+      const dist = Math.hypot(item.x - item.prevX, item.y - item.prevY, item.z - item.prevZ);
+      item.trail.scale.z = Math.max(2.2, dist * 0.7);
+
+      // Widen and brighten trail when tracking a target
+      if (item.targetId) {
+        item.trail.scale.x = CONFIG.effects.trail.trackingWidthMultiplier;
+        item.trail.scale.y = CONFIG.effects.trail.trackingWidthMultiplier;
+        item.trail.material.opacity = 0.8 + CONFIG.effects.trail.trackingBrightnessBoost;
+      } else {
+        item.trail.scale.x = 1;
+        item.trail.scale.y = 1;
+        item.trail.material.opacity = item.team === 'player' ? 0.58 : 0.52;
+      }
       item.light.visible = true;
       item.light.position.set(item.x, item.y, item.z);
     }

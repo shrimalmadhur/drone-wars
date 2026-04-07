@@ -257,6 +257,16 @@ export class Player {
     this.group.add(this.model);
     this.scene.add(this.group);
 
+    // Muzzle flash
+    this.muzzleLight = new THREE.PointLight(
+      CONFIG.palette.playerShot,
+      0,
+      CONFIG.effects.muzzleFlash.lightRange,
+    );
+    this.muzzleLight.visible = false;
+    this.group.add(this.muzzleLight);
+    this.muzzleFlashTimer = 0;
+
     this.reset();
   }
 
@@ -304,6 +314,25 @@ export class Player {
     for (const rotor of this.rotors) {
       rotor.rotation.y += 35 * dt;
     }
+
+    if (this.muzzleFlashTimer > 0) {
+      this.muzzleFlashTimer -= dt;
+      if (this.muzzleFlashTimer <= 0) {
+        this.muzzleLight.intensity = 0;
+        this.muzzleLight.visible = false;
+      } else {
+        const progress = 1 - this.muzzleFlashTimer / CONFIG.effects.muzzleFlash.duration;
+        this.muzzleLight.intensity = CONFIG.effects.muzzleFlash.lightIntensity * (1 - progress);
+      }
+    }
+  }
+
+  triggerMuzzleFlash(origin) {
+    const cfg = CONFIG.effects.muzzleFlash;
+    this.muzzleLight.position.copy(origin).sub(this.group.position);
+    this.muzzleLight.intensity = cfg.lightIntensity;
+    this.muzzleLight.visible = true;
+    this.muzzleFlashTimer = cfg.duration;
   }
 
   wantsToFire(controls) {

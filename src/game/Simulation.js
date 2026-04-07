@@ -266,13 +266,13 @@ export class Simulation {
 
   firePlayerWeapon(controls) {
     this.player.consumeShotCooldown();
-    const spawned = this.projectiles.spawn(
-      this.player.buildShotSpec(controls.aimDirection, controls.lockedTargetId),
-    );
+    const spec = this.player.buildShotSpec(controls.aimDirection, controls.lockedTargetId);
+    const spawned = this.projectiles.spawn(spec);
     if (!spawned) {
       this.state.status = 'Weapon grid saturated.';
       return;
     }
+    this.player.triggerMuzzleFlash(spec.origin);
     this.spawnEffect(this.player.fireOrigin.x, this.player.fireOrigin.y, this.player.fireOrigin.z, 0.65);
     this.fireFlash = 0.12;
     this.state.status = controls.lockedTargetId ? 'Tracking shot launched.' : 'Weapons firing.';
