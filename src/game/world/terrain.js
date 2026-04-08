@@ -227,7 +227,8 @@ function searchSpawnRings(type, playerPosition, rng, minRadius, maxRadius, mapTh
   return null;
 }
 
-function resolveSpawnPosition(type, playerPosition, rng, mapTheme) {
+function resolveSpawnPosition(type, playerPosition, rng, mapTheme, options = {}) {
+  const allowDistant = options.allowDistant ?? false;
   const minRadius = CONFIG.world.spawnMinDistance + 24;
   const maxRadius = CONFIG.world.spawnMaxDistance;
 
@@ -254,6 +255,20 @@ function resolveSpawnPosition(type, playerPosition, rng, mapTheme) {
   );
   if (exhaustive) {
     return exhaustive;
+  }
+
+  if (allowDistant) {
+    const distant = searchSpawnRings(
+      type,
+      playerPosition,
+      rng,
+      CONFIG.world.enemyDespawnDistance + 8,
+      CONFIG.world.enemyDespawnDistance + CONFIG.world.chunkSize * 8,
+      mapTheme,
+    );
+    if (distant) {
+      return distant;
+    }
   }
 
   if (type === 'tank' || type === 'ship') {
@@ -1648,8 +1663,8 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
     update(center, time = 0) {
       refreshTerrain(center, time);
     },
-    getSpawnPoint(type, playerPosition) {
-      return resolveSpawnPosition(type, playerPosition, rng, theme);
+    getSpawnPoint(type, playerPosition, options) {
+      return resolveSpawnPosition(type, playerPosition, rng, theme, options);
     },
     dispose() {
       scene.remove(group);

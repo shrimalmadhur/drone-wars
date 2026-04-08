@@ -42,6 +42,9 @@ describe('terrain helpers', () => {
     const terrain = createTerrain(new THREE.Scene(), createRng(1337));
 
     expect(terrain.getSpawnPoint('ship', new THREE.Vector3(0, 0, 0))).toBeNull();
+    const distantShipSpawn = terrain.getSpawnPoint('ship', new THREE.Vector3(0, 0, 0), { allowDistant: true });
+    expect(distantShipSpawn).not.toBeNull();
+    expect(canOccupyBiome('ship', getBiomeAt(distantShipSpawn.x, distantShipSpawn.z))).toBe(true);
 
     terrain.dispose();
   });
