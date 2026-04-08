@@ -14,8 +14,13 @@ export class Player {
     this.velocity = new THREE.Vector3();
     this.projectileDirection = new THREE.Vector3();
     this.fireOrigin = new THREE.Vector3();
+    this.fireRight = new THREE.Vector3();
     this.cooldown = 0;
     this.invulnerability = 0;
+    this.pulseCooldown = 0;
+    this.activePowerUp = null;
+    this.activePowerUpTimer = 0;
+    this.repairFlashTimer = 0;
     this.yaw = 0;
     this.health = CONFIG.player.maxHealth;
 
@@ -267,6 +272,64 @@ export class Player {
     this.group.add(this.muzzleLight);
     this.muzzleFlashTimer = 0;
 
+    const shieldMaterial = new THREE.MeshBasicMaterial({
+      color: CONFIG.palette.pickup.shield,
+      transparent: true,
+      opacity: 0,
+      wireframe: true,
+    });
+    this.shieldShell = new THREE.Mesh(
+      new THREE.SphereGeometry(4.8, 16, 12),
+      shieldMaterial,
+    );
+    this.shieldShell.visible = false;
+    this.group.add(this.shieldShell);
+
+    const overdriveMaterial = new THREE.MeshBasicMaterial({
+      color: CONFIG.palette.pickup.overdrive,
+      transparent: true,
+      opacity: 0,
+    });
+    this.overdriveRing = new THREE.Mesh(
+      new THREE.TorusGeometry(3.35, 0.12, 8, 32),
+      overdriveMaterial,
+    );
+    this.overdriveRing.rotation.x = Math.PI * 0.5;
+    this.overdriveRing.position.y = -0.15;
+    this.overdriveRing.visible = false;
+    this.group.add(this.overdriveRing);
+
+    const spreadMaterial = new THREE.MeshBasicMaterial({
+      color: CONFIG.palette.pickup.spread,
+      transparent: true,
+      opacity: 0,
+    });
+    this.spreadRings = [-1, 1].map((side) => {
+      const ring = new THREE.Mesh(
+        new THREE.TorusGeometry(0.82, 0.08, 8, 24),
+        spreadMaterial.clone(),
+      );
+      ring.rotation.y = Math.PI * 0.5;
+      ring.position.set(side * 2.75, 0.08, 0.65);
+      ring.visible = false;
+      this.group.add(ring);
+      return ring;
+    });
+
+    const repairMaterial = new THREE.MeshBasicMaterial({
+      color: CONFIG.palette.pickup.repair,
+      transparent: true,
+      opacity: 0,
+    });
+    this.repairPulse = new THREE.Mesh(
+      new THREE.TorusGeometry(2.6, 0.14, 8, 32),
+      repairMaterial,
+    );
+    this.repairPulse.rotation.x = Math.PI * 0.5;
+    this.repairPulse.position.y = -0.55;
+    this.repairPulse.visible = false;
+    this.group.add(this.repairPulse);
+
     this.reset();
   }
 
@@ -276,12 +339,17 @@ export class Player {
     this.yaw = Math.PI;
     this.cooldown = 0;
     this.invulnerability = 0;
+    this.pulseCooldown = 0;
+    this.activePowerUp = null;
+    this.activePowerUpTimer = 0;
+    this.repairFlashTimer = 0;
     this.health = CONFIG.player.maxHealth;
     this.muzzleFlashTimer = 0;
     if (this.muzzleLight) {
       this.muzzleLight.intensity = 0;
       this.muzzleLight.visible = false;
     }
+    this.hidePowerVisuals();
   }
 
   getHeading() {
@@ -293,6 +361,12 @@ export class Player {
   update(dt, controls) {
     this.cooldown = Math.max(0, this.cooldown - dt);
     this.invulnerability = Math.max(0, this.invulnerability - dt);
+    this.pulseCooldown = Math.max(0, this.pulseCooldown - dt);
+    this.activePowerUpTimer = Math.max(0, this.activePowerUpTimer - dt);
+    this.repairFlashTimer = Math.max(0, this.repairFlashTimer - dt);
+    if (this.activePowerUpTimer <= 0) {
+      this.activePowerUp = null;
+    }
     this.yaw -= controls.yaw * CONFIG.player.yawSpeed * dt;
 
     const forward = this.getHeading();
@@ -330,6 +404,8 @@ export class Player {
         this.muzzleLight.intensity = CONFIG.effects.muzzleFlash.lightIntensity * (1 - progress);
       }
     }
+
+    this.updatePowerVisuals(dt);
   }
 
   triggerMuzzleFlash(origin) {
@@ -345,7 +421,9 @@ export class Player {
   }
 
   consumeShotCooldown() {
-    this.cooldown = CONFIG.player.fireCooldown;
+    this.cooldown = this.activePowerUp === 'overdrive'
+      ? CONFIG.player.overdriveFireCooldown
+      : CONFIG.player.fireCooldown;
   }
 
   getShotDirection(aimDirection) {
@@ -362,32 +440,141 @@ export class Player {
     return this.fireOrigin.clone();
   }
 
-  buildShotSpec(aimDirection, targetId = null) {
+  buildShotSpecs(aimDirection, targetId = null) {
     const direction = this.getShotDirection(aimDirection);
-    const origin = this.getMuzzleOrigin(direction);
-    return {
-      team: 'player',
-      damage: CONFIG.projectiles.playerDamage,
-      radius: 1.05,
-      maxLife: CONFIG.player.projectileLife,
-      targetId,
-      turnRate: targetId ? CONFIG.player.projectileTurnRate : 0,
-      origin,
-      velocity: new THREE.Vector3(
-        direction.x * CONFIG.player.projectileSpeed + this.velocity.x * 0.18,
-        direction.y * CONFIG.player.projectileSpeed + this.velocity.y * 0.18,
-        direction.z * CONFIG.player.projectileSpeed + this.velocity.z * 0.18,
-      ),
+    const createSpec = (adjustedDirection, lateralOffset = 0) => {
+      const origin = this.getMuzzleOrigin(adjustedDirection);
+      if (lateralOffset !== 0) {
+        this.fireRight.set(adjustedDirection.z, 0, -adjustedDirection.x).normalize();
+        origin.addScaledVector(this.fireRight, lateralOffset);
+      }
+      return {
+        team: 'player',
+        damage: CONFIG.projectiles.playerDamage,
+        radius: 1.05,
+        maxLife: CONFIG.player.projectileLife,
+        targetId,
+        turnRate: targetId ? CONFIG.player.projectileTurnRate : 0,
+        origin,
+        velocity: new THREE.Vector3(
+          adjustedDirection.x * CONFIG.player.projectileSpeed + this.velocity.x * 0.18,
+          adjustedDirection.y * CONFIG.player.projectileSpeed + this.velocity.y * 0.18,
+          adjustedDirection.z * CONFIG.player.projectileSpeed + this.velocity.z * 0.18,
+        ),
+      };
     };
+
+    if (this.activePowerUp !== 'spread') {
+      return [createSpec(direction)];
+    }
+
+    const shots = [createSpec(direction)];
+    for (const side of [-1, 1]) {
+      const spreadDirection = direction.clone();
+      spreadDirection.x += side * CONFIG.player.spreadAngle * Math.cos(this.yaw);
+      spreadDirection.z -= side * CONFIG.player.spreadAngle * Math.sin(this.yaw);
+      spreadDirection.normalize();
+      shots.push(createSpec(spreadDirection, side * 1.4));
+    }
+    return shots;
   }
 
   applyDamage(amount) {
     if (this.invulnerability > 0) {
       return false;
     }
-    this.health = Math.max(0, this.health - amount);
+    const shieldedAmount = this.activePowerUp === 'shield' ? amount * 0.45 : amount;
+    this.health = Math.max(0, this.health - shieldedAmount);
     this.invulnerability = CONFIG.player.invulnerabilityTime;
     return true;
+  }
+
+  canUsePulse() {
+    return this.pulseCooldown <= 0;
+  }
+
+  triggerPulse() {
+    this.pulseCooldown = CONFIG.player.pulseCooldown;
+  }
+
+  applyPowerUp(type) {
+    if (type === 'repair') {
+      this.health = Math.min(CONFIG.player.maxHealth, this.health + CONFIG.powerUps.repairAmount);
+      this.repairFlashTimer = 1.1;
+      return;
+    }
+
+    this.activePowerUp = type;
+    this.activePowerUpTimer = type === 'shield'
+      ? CONFIG.powerUps.shieldDuration
+      : CONFIG.powerUps.timedDuration;
+  }
+
+  hidePowerVisuals() {
+    this.shieldShell.visible = false;
+    this.shieldShell.material.opacity = 0;
+    this.overdriveRing.visible = false;
+    this.overdriveRing.material.opacity = 0;
+    this.repairPulse.visible = false;
+    this.repairPulse.material.opacity = 0;
+    for (const ring of this.spreadRings) {
+      ring.visible = false;
+      ring.material.opacity = 0;
+    }
+  }
+
+  updatePowerVisuals(dt) {
+    const pulse = Math.sin(performance.now() * 0.01);
+
+    this.shieldShell.visible = this.activePowerUp === 'shield';
+    if (this.shieldShell.visible) {
+      this.shieldShell.rotation.y += dt * 0.7;
+      this.shieldShell.material.opacity = 0.14 + (pulse * 0.5 + 0.5) * 0.16;
+      const scale = 1 + (pulse * 0.5 + 0.5) * 0.04;
+      this.shieldShell.scale.setScalar(scale);
+    } else {
+      this.shieldShell.material.opacity = 0;
+    }
+
+    this.overdriveRing.visible = this.activePowerUp === 'overdrive';
+    if (this.overdriveRing.visible) {
+      this.overdriveRing.rotation.z += dt * 1.8;
+      this.overdriveRing.material.opacity = 0.18 + (pulse * 0.5 + 0.5) * 0.22;
+      const scale = 1 + (pulse * 0.5 + 0.5) * 0.08;
+      this.overdriveRing.scale.setScalar(scale);
+    } else {
+      this.overdriveRing.material.opacity = 0;
+    }
+
+    const spreadVisible = this.activePowerUp === 'spread';
+    for (const [index, ring] of this.spreadRings.entries()) {
+      ring.visible = spreadVisible;
+      if (spreadVisible) {
+        ring.rotation.z += dt * (index === 0 ? 2.2 : -2.2);
+        ring.material.opacity = 0.24 + (pulse * 0.5 + 0.5) * 0.18;
+      } else {
+        ring.material.opacity = 0;
+      }
+    }
+
+    this.repairPulse.visible = this.repairFlashTimer > 0;
+    if (this.repairPulse.visible) {
+      const progress = 1 - this.repairFlashTimer / 1.1;
+      this.repairPulse.material.opacity = (1 - progress) * 0.45;
+      const scale = 0.85 + progress * 1.35;
+      this.repairPulse.scale.setScalar(scale);
+    } else {
+      this.repairPulse.material.opacity = 0;
+      this.repairPulse.scale.setScalar(1);
+    }
+  }
+
+  getCombatStatus() {
+    return {
+      activePowerUp: this.activePowerUp,
+      activePowerUpTimer: this.activePowerUpTimer,
+      pulseCooldown: this.pulseCooldown,
+    };
   }
 
   dispose() {

@@ -1,7 +1,7 @@
 import './style.css';
 import { Game } from './game/Game.js';
 import { MAP_THEME_DETAILS } from './mapThemes.js';
-import { loadMapTheme, loadPlayerName, saveMapTheme, savePlayerName } from './playerProfile.js';
+import { loadMapTheme, loadPlayerName, loadPlayerProgress, recordPlayerRun, saveMapTheme, savePlayerName } from './playerProfile.js';
 import { trackGameStart } from './game/analytics.js';
 
 const mount = document.querySelector('#app');
@@ -20,6 +20,9 @@ const hud = {
   reticle: document.querySelector('#reticle'),
   reticleLabel: document.querySelector('#reticle-label'),
   hitMarker: document.querySelector('#hit-marker'),
+  pickupBanner: document.querySelector('#pickup-banner'),
+  pickupBannerTitle: document.querySelector('#pickup-banner-title'),
+  pickupBannerCopy: document.querySelector('#pickup-banner-copy'),
   targetName: document.querySelector('#target-name'),
   targetHealth: document.querySelector('#target-health'),
   radar: document.querySelector('#radar'),
@@ -27,12 +30,21 @@ const hud = {
   hitChevrons: document.querySelector('#hit-chevrons'),
   playerName: document.querySelector('#player-name-value'),
   mapTheme: document.querySelector('#map-theme-value'),
+  bestScore: document.querySelector('#best-score-value'),
+  bestWave: document.querySelector('#best-wave-value'),
+  achievements: document.querySelector('#achievement-count-value'),
+  powerup: document.querySelector('#powerup-value'),
+  pulse: document.querySelector('#pulse-value'),
+  startBestScore: document.querySelector('#start-best-score'),
+  startBestWave: document.querySelector('#start-best-wave'),
+  startAchievements: document.querySelector('#start-achievement-count'),
 };
 
 let game = null;
 
 const savedPlayerName = loadPlayerName();
 const savedMapTheme = loadMapTheme();
+let playerProgress = loadPlayerProgress();
 if (savedPlayerName) {
   playerNameInput.value = savedPlayerName;
 }
@@ -40,6 +52,12 @@ for (const input of mapThemeInputs) {
   input.checked = input.value === savedMapTheme;
 }
 hud.mapTheme.textContent = MAP_THEME_DETAILS[savedMapTheme].label;
+hud.bestScore.textContent = playerProgress.bestScore.toString();
+hud.bestWave.textContent = playerProgress.bestWave.toString();
+hud.achievements.textContent = playerProgress.achievements.length.toString();
+hud.startBestScore.textContent = playerProgress.bestScore.toString();
+hud.startBestWave.textContent = playerProgress.bestWave.toString();
+hud.startAchievements.textContent = playerProgress.achievements.length.toString();
 
 playerNameInput.focus();
 
@@ -64,7 +82,23 @@ startForm.addEventListener('submit', (event) => {
   startScreen.classList.add('start-screen--hidden');
 
   if (!game) {
-    game = new Game({ mount, hud, mapTheme });
+    game = new Game({
+      mount,
+      hud,
+      mapTheme,
+      playerProgress,
+      onRunComplete(runSummary) {
+        const result = recordPlayerRun(runSummary);
+        playerProgress = result.progress;
+        hud.bestScore.textContent = playerProgress.bestScore.toString();
+        hud.bestWave.textContent = playerProgress.bestWave.toString();
+        hud.achievements.textContent = playerProgress.achievements.length.toString();
+        hud.startBestScore.textContent = playerProgress.bestScore.toString();
+        hud.startBestWave.textContent = playerProgress.bestWave.toString();
+        hud.startAchievements.textContent = playerProgress.achievements.length.toString();
+        return result;
+      },
+    });
   }
 
   void game.resumeAudio().catch(() => {});

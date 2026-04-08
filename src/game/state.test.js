@@ -16,6 +16,9 @@ describe('game state', () => {
 
     expect(state.mode).toBe(GAME_STATES.RUNNING);
     expect(state.score).toBe(0);
+    expect(state.bestScore).toBe(0);
+    expect(state.bestWave).toBe(0);
+    expect(state.achievementCount).toBe(0);
     expect(state.wave).toBe(0);
     expect(state.health).toBe(100);
     expect(state.enemyCount).toBe(0);

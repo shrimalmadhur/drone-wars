@@ -2,10 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import { MAP_THEMES } from './mapThemes.js';
 import {
+  loadPlayerProgress,
   loadMapTheme,
   loadPlayerName,
+  recordPlayerRun,
   sanitizePlayerName,
   saveMapTheme,
+  savePlayerProgress,
   savePlayerName,
 } from './playerProfile.js';
 
@@ -42,6 +45,61 @@ describe('player profile', () => {
     expect(loadMapTheme(storage)).toBe(MAP_THEMES.CITY);
     expect(saveMapTheme('bogus-theme', storage)).toBe(MAP_THEMES.FRONTIER);
     expect(loadMapTheme(storage)).toBe(MAP_THEMES.FRONTIER);
+  });
+
+  it('loads and saves persistent player progress', () => {
+    const storage = createStorage();
+
+    expect(loadPlayerProgress(storage)).toEqual({
+      bestScore: 0,
+      bestWave: 0,
+      totalRuns: 0,
+      achievements: [],
+    });
+
+    expect(savePlayerProgress({
+      bestScore: 2400,
+      bestWave: 6,
+      totalRuns: 3,
+      achievements: ['firstBlood'],
+    }, storage)).toEqual({
+      bestScore: 2400,
+      bestWave: 6,
+      totalRuns: 3,
+      achievements: ['firstBlood'],
+    });
+  });
+
+  it('records run progression and only reports newly earned achievements once', () => {
+    const storage = createStorage();
+
+    const first = recordPlayerRun({
+      score: 5200,
+      highestWave: 7,
+      kills: 12,
+      pickupsCollected: 5,
+      flawlessWaves: 1,
+      bossesDefeated: 1,
+      maxPulseHits: 3,
+    }, storage);
+
+    expect(first.progress.bestScore).toBe(5200);
+    expect(first.progress.bestWave).toBe(7);
+    expect(first.progress.totalRuns).toBe(1);
+    expect(first.newAchievements.length).toBeGreaterThan(1);
+
+    const second = recordPlayerRun({
+      score: 100,
+      highestWave: 2,
+      kills: 1,
+      pickupsCollected: 0,
+      flawlessWaves: 0,
+      bossesDefeated: 0,
+      maxPulseHits: 0,
+    }, storage);
+
+    expect(second.progress.totalRuns).toBe(2);
+    expect(second.newAchievements).toEqual([]);
   });
 
   it('gracefully handles missing or failing storage', () => {
