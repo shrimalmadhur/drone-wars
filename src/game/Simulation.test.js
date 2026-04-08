@@ -42,6 +42,43 @@ describe('Simulation spawning', () => {
     expect(simulation.spawnQueue).toEqual(['ship']);
     expect(simulation.spawnCooldown).toBeGreaterThan(0.35);
   });
+
+  it('keeps distant objective spawns alive until the player gets back within range', () => {
+    const simulation = {
+      enemies: [
+        {
+          alive: true,
+          preventAutoDespawn: true,
+          group: {
+            position: { distanceTo() { return 320; } },
+          },
+        },
+      ],
+      player: {
+        group: { position: {} },
+      },
+    };
+
+    Simulation.prototype.cleanupEnemies.call(simulation);
+
+    expect(simulation.enemies).toHaveLength(1);
+    expect(simulation.enemies[0].preventAutoDespawn).toBe(true);
+  });
+
+  it('does not mark distant ground spawns as persistent objectives', () => {
+    const simulation = {
+      player: {
+        group: { position: {} },
+      },
+    };
+    const distantPosition = {
+      distanceTo() { return 320; },
+    };
+
+    expect(Simulation.prototype.shouldPersistDistantSpawn.call(simulation, 'ship', distantPosition)).toBe(true);
+    expect(Simulation.prototype.shouldPersistDistantSpawn.call(simulation, 'tank', distantPosition)).toBe(false);
+    expect(Simulation.prototype.shouldPersistDistantSpawn.call(simulation, 'turret', distantPosition)).toBe(false);
+  });
 });
 
 describe('Simulation audio events', () => {

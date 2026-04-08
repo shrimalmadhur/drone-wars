@@ -13,6 +13,7 @@ export class EnemyBase {
     this.tempOrigin = new THREE.Vector3();
     this.group.position.copy(options.position);
     this.alive = true;
+    this.preventAutoDespawn = false;
   }
 
   takeDamage(amount) {

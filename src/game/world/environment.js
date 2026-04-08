@@ -156,6 +156,7 @@ export function createEnvironment(scene, { mapTheme } = {}) {
   const hemi = new THREE.HemisphereLight(preset.hemiSky, preset.hemiGround, preset.hemiIntensity);
   const ambient = new THREE.AmbientLight(preset.ambient, preset.ambientIntensity);
   const sun = new THREE.DirectionalLight(preset.sun, preset.sunIntensity);
+  const sunTarget = new THREE.Object3D();
   sun.position.set(preset.sunOffset.x, preset.sunOffset.y, preset.sunOffset.z);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
@@ -165,8 +166,11 @@ export function createEnvironment(scene, { mapTheme } = {}) {
   sun.shadow.camera.right = 180;
   sun.shadow.camera.top = 180;
   sun.shadow.camera.bottom = -180;
+  sun.shadow.normalBias = 0.02;
+  sunTarget.position.set(0, 0, 0);
+  sun.target = sunTarget;
 
-  scene.add(hemi, ambient, sun);
+  scene.add(hemi, ambient, sun, sunTarget);
 
   return {
     update(center, time = 0) {
@@ -176,6 +180,8 @@ export function createEnvironment(scene, { mapTheme } = {}) {
         preset.sunOffset.y,
         center.z + preset.sunOffset.z,
       );
+      sunTarget.position.set(center.x, 0, center.z);
+      sunTarget.updateMatrixWorld();
       sunGlow.position.set(
         center.x + preset.glowOffset.x,
         preset.glowOffset.y + Math.sin(time * 0.08) * 8,
@@ -184,7 +190,7 @@ export function createEnvironment(scene, { mapTheme } = {}) {
       scene.fog.color.setStyle(preset.fog);
     },
     dispose() {
-      scene.remove(skyGroup, hemi, ambient, sun, clouds.group);
+      scene.remove(skyGroup, hemi, ambient, sun, sunTarget, clouds.group);
       sky.geometry.dispose();
       sky.material.dispose();
       sunGlow.geometry.dispose();

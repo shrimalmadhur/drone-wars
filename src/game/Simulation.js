@@ -247,25 +247,37 @@ export class Simulation {
   }
 
   spawnEnemy(type) {
-    const terrainSpawnType = type === 'turret' ? 'tank' : type === 'boss' ? 'ship' : type;
-    const position = this.terrain.getSpawnPoint(terrainSpawnType, this.player.group.position);
+    const terrainSpawnType = type === 'turret' ? 'tank' : type === 'boss' ? 'drone' : type;
+    const allowDistantObjectiveSpawn = type === 'ship';
+    const position = this.terrain.getSpawnPoint(
+      terrainSpawnType,
+      this.player.group.position,
+      { allowDistant: allowDistantObjectiveSpawn },
+    );
     if (!position) {
       return false;
     }
 
+    let enemy = null;
     if (type === 'tank') {
-      this.enemies.push(new TankEnemy(this.scene, position, this.rng));
+      enemy = new TankEnemy(this.scene, position, this.rng);
     } else if (type === 'drone') {
-      this.enemies.push(new DroneEnemy(this.scene, position, this.rng));
+      enemy = new DroneEnemy(this.scene, position, this.rng);
     } else if (type === 'missile') {
-      this.enemies.push(new MissileEnemy(this.scene, position));
+      enemy = new MissileEnemy(this.scene, position);
     } else if (type === 'turret') {
-      this.enemies.push(new TurretEnemy(this.scene, position, this.rng));
+      enemy = new TurretEnemy(this.scene, position, this.rng);
     } else if (type === 'ship') {
-      this.enemies.push(new ShipEnemy(this.scene, position));
+      enemy = new ShipEnemy(this.scene, position);
     } else if (type === 'boss') {
-      this.enemies.push(new BossEnemy(this.scene, position, this.rng));
+      enemy = new BossEnemy(this.scene, position, this.rng);
     }
+    if (!enemy) {
+      return false;
+    }
+
+    enemy.preventAutoDespawn = this.shouldPersistDistantSpawn(type, enemy.group.position);
+    this.enemies.push(enemy);
     return true;
   }
 
@@ -277,6 +289,11 @@ export class Simulation {
       }
     }
     return counts;
+  }
+
+  shouldPersistDistantSpawn(type, position) {
+    return type === 'ship'
+      && position.distanceTo(this.player.group.position) > CONFIG.world.enemyDespawnDistance;
   }
 
   trySpawnNext(dt) {
@@ -617,6 +634,13 @@ export class Simulation {
       }
 
       const distance = enemy.group.position.distanceTo(playerPosition);
+      if (enemy.preventAutoDespawn) {
+        if (distance <= CONFIG.world.enemyDespawnDistance) {
+          enemy.preventAutoDespawn = false;
+        }
+        survivors.push(enemy);
+        continue;
+      }
       if (distance > CONFIG.world.enemyDespawnDistance) {
         enemy.dispose();
         continue;
@@ -849,7 +873,9 @@ export class Simulation {
     this.fireEvents.length = 0;
     this.impactEvents.length = 0;
     this.waveCompleteEvents.length = 0;
-    this.pickupEvents.length = 0;
+    if (this.pickupEvents) {
+      this.pickupEvents.length = 0;
+    }
   }
 
   getSnapshot() {

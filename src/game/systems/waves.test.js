@@ -5,7 +5,14 @@ import { canSpawnType, createWaveQueue, getWaveSpec } from './waves.js';
 
 describe('wave system', () => {
   it('scales wave composition by wave number', () => {
-    expect(getWaveSpec(1)).toEqual({ tank: 2, drone: 1, missile: 0, ship: 0 });
+    expect(getWaveSpec(1)).toEqual({
+      tank: 2,
+      drone: 1,
+      missile: 0,
+      turret: 0,
+      ship: 0,
+      boss: 0,
+    });
     expect(getWaveSpec(4).missile).toBeGreaterThan(0);
     expect(getWaveSpec(4).ship).toBeGreaterThan(0);
   });
