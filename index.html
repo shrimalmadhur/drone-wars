@@ -24,6 +24,20 @@
         <p class="start-screen__eyebrow">Pilot registration</p>
         <h2 class="start-screen__title">Name your pilot and pick a battlefield</h2>
         <p class="start-screen__copy">We&apos;ll remember your callsign and preferred map on this browser for your next launch.</p>
+        <div class="start-screen__meta">
+          <div class="start-stat">
+            <span class="start-stat__label">Best score</span>
+            <strong id="start-best-score">0</strong>
+          </div>
+          <div class="start-stat">
+            <span class="start-stat__label">Best wave</span>
+            <strong id="start-best-wave">0</strong>
+          </div>
+          <div class="start-stat">
+            <span class="start-stat__label">Achievements</span>
+            <strong id="start-achievement-count">0</strong>
+          </div>
+        </div>
         <form id="start-form" class="start-screen__form">
           <label class="start-screen__label" for="player-name-input">Player name</label>
           <input
@@ -79,11 +93,15 @@
       <div id="reticle-label" class="reticle__label">FREE AIM</div>
       <div id="hit-marker" class="reticle__hit-marker">HIT</div>
     </div>
+    <div id="pickup-banner" class="pickup-banner">
+      <p id="pickup-banner-title" class="pickup-banner__title">Power-up collected</p>
+      <p id="pickup-banner-copy" class="pickup-banner__copy">Weapons boosted.</p>
+    </div>
     <div id="hit-vignette" class="hit-vignette"></div>
     <div id="hit-chevrons" class="hit-chevrons"></div>
     <aside class="hud">
       <div class="hud__topbar">
-        <div>
+        <div class="hud__identity">
           <p class="hud__eyebrow">Single-player combat prototype</p>
           <h1>Drone Wars</h1>
           <p class="pilot-tag">Pilot <strong id="player-name-value">Awaiting registration</strong></p>
@@ -95,42 +113,63 @@
             <strong id="score-value">0</strong>
           </div>
           <div class="metric">
+            <span class="metric__label">Best</span>
+            <strong id="best-score-value">0</strong>
+          </div>
+          <div class="metric">
             <span class="metric__label">Wave</span>
             <strong id="wave-value">1</strong>
+          </div>
+          <div class="metric">
+            <span class="metric__label">Best wave</span>
+            <strong id="best-wave-value">0</strong>
           </div>
           <div class="metric">
             <span class="metric__label">Enemies</span>
             <strong id="enemy-count">0</strong>
           </div>
+          <div class="metric">
+            <span class="metric__label">Awards</span>
+            <strong id="achievement-count-value">0</strong>
+          </div>
         </div>
-        <canvas id="radar" class="radar" width="140" height="140"></canvas>
+        <div class="hud__command-stack">
+          <canvas id="radar" class="radar" width="140" height="140"></canvas>
+          <div id="status-panel" class="status-card status-card--top">
+            Sweep the battlefield.
+          </div>
+        </div>
       </div>
 
       <div class="hud__bottom">
-        <div class="health-card">
-          <div class="health-card__label">
-            <span>Hull Integrity</span>
-            <strong id="health-value">100%</strong>
+        <div class="hud__rail hud__rail--left">
+          <div class="health-card">
+            <div class="health-card__label">
+              <span>Hull Integrity</span>
+              <strong id="health-value">100%</strong>
+            </div>
+            <div class="health-bar">
+              <div id="health-fill" class="health-bar__fill"></div>
+            </div>
           </div>
-          <div class="health-bar">
-            <div id="health-fill" class="health-bar__fill"></div>
+
+          <div class="controls-card controls-card--compact" id="controls-panel">
+            <p class="controls-card__title">Systems</p>
+            <p class="controls-card__line">W/S thrust, A/D yaw, arrows strafe/pitch, Q/E altitude</p>
+            <p class="controls-card__line">Space fire, F pulse, R restart, P pause</p>
+            <div class="controls-card__readout">
+              <p id="powerup-value">No active power-up</p>
+              <p id="pulse-value">Pulse ready (F)</p>
+            </div>
           </div>
         </div>
 
-        <div class="controls-card" id="controls-panel">
-          <p class="controls-card__title">Flight Controls</p>
-          <p>W/S thrust, A/D yaw, arrow keys strafe/pitch, Q/E altitude</p>
-          <p>Space fire, R restart, P pause</p>
-        </div>
-
-        <div class="controls-card">
+        <div class="hud__rail hud__rail--right">
+          <div class="controls-card controls-card--intel">
           <p class="controls-card__title">Target Feed</p>
           <p id="target-name">No target locked</p>
           <p id="target-health">Bring the reticle over a target to inspect health.</p>
         </div>
-
-        <div id="status-panel" class="status-card">
-          Sweep the battlefield.
         </div>
       </div>
     </aside>

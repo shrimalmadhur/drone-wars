@@ -11,6 +11,9 @@ export function createGameState() {
   return {
     mode: GAME_STATES.BOOT,
     score: 0,
+    bestScore: 0,
+    bestWave: 0,
+    achievementCount: 0,
     wave: 0,
     health: CONFIG.player.maxHealth,
     enemyCount: 0,
@@ -22,6 +25,9 @@ export function createGameState() {
 export function resetGameState(state) {
   state.mode = GAME_STATES.RUNNING;
   state.score = 0;
+  state.bestScore = 0;
+  state.bestWave = 0;
+  state.achievementCount = 0;
   state.wave = 0;
   state.health = CONFIG.player.maxHealth;
   state.enemyCount = 0;

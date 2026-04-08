@@ -12,11 +12,14 @@ import { AudioEngine } from './audio/AudioEngine.js';
 import { applyAudioFrame, createAudioFrameState } from './audio/frameAudio.js';
 
 const RADAR_COLORS = Object.fromEntries(
-  ['tank', 'drone', 'missile', 'ship'].map(k => [k, '#' + CONFIG.palette[k].toString(16).padStart(6, '0')])
+  ['tank', 'drone', 'missile', 'turret', 'ship', 'boss'].map(k => [k, '#' + CONFIG.palette[k].toString(16).padStart(6, '0')])
+);
+const PICKUP_COLORS = Object.fromEntries(
+  Object.entries(CONFIG.palette.pickup).map(([k, v]) => [k, '#' + v.toString(16).padStart(6, '0')])
 );
 
 export class Game {
-  constructor({ mount, hud, mapTheme }) {
+  constructor({ mount, hud, mapTheme, playerProgress, onRunComplete }) {
     this.mount = mount;
     this.hud = hud;
     this.scene = new THREE.Scene();
@@ -31,7 +34,9 @@ export class Game {
     this.mount.appendChild(this.renderer.domElement);
 
     this.input = new InputController(window, document);
-    this.simulation = new Simulation(this.scene, { mapTheme });
+    this.simulation = new Simulation(this.scene, { mapTheme, playerProgress });
+    this.onRunComplete = onRunComplete;
+    this.didRecordRun = false;
     this.audio = new AudioEngine();
     this.cameraShake = new CameraShake();
     this.explosions = new ExplosionEffect(this.scene);
@@ -41,6 +46,7 @@ export class Game {
     this._lastFireFlash = 0;
     this._lastMode = this.simulation.state.mode;
     this._recoilDir = new THREE.Vector3();
+    this.pickupBannerTimer = 0;
     this.cameraPosition = new THREE.Vector3(0, 24, 78);
     this.lookTarget = new THREE.Vector3();
     this.cameraDirection = new THREE.Vector3();
@@ -123,11 +129,24 @@ export class Game {
       }
 
       const currentMode = this.simulation.state.mode;
+      if (currentMode === GAME_STATES.RUNNING) {
+        this.didRecordRun = false;
+      }
+      if (!this.didRecordRun && currentMode === GAME_STATES.GAME_OVER) {
+        this.didRecordRun = true;
+        const result = this.onRunComplete?.(this.simulation.getRunSummary());
+        if (result?.progress) {
+          this.simulation.state.bestScore = result.progress.bestScore;
+          this.simulation.state.bestWave = result.progress.bestWave;
+          this.simulation.state.achievementCount = result.progress.achievements.length;
+        }
+      }
       if (this._lastMode === GAME_STATES.GAME_OVER && currentMode === GAME_STATES.RUNNING) {
         this.cameraShake.reset();
         this.clearHitIndicators();
         this.explosions.reset();
         this.scorePops.reset();
+        this.hidePickupBanner();
       }
 
       snapshot = this.simulation.getSnapshot();
@@ -145,6 +164,7 @@ export class Game {
       });
       this.renderHud(snapshot, aimCandidates);
       this.simulation.clearFrameEvents();
+      this.updatePickupBanner(elapsed);
       this.updateHitIndicators(elapsed);
       this.cameraShake.update(elapsed);
       this.cameraShake.apply(this.camera);
@@ -197,11 +217,20 @@ export class Game {
 
   renderHud(snapshot, candidates) {
     this.hud.score.textContent = snapshot.score.toString();
+    this.hud.bestScore.textContent = snapshot.bestScore.toString();
+    this.hud.bestWave.textContent = snapshot.bestWave.toString();
+    this.hud.achievements.textContent = snapshot.achievementCount.toString();
     this.hud.wave.textContent = snapshot.wave.toString();
     this.hud.enemyCount.textContent = snapshot.enemyCount.toString();
     this.hud.healthValue.textContent = `${Math.round(snapshot.health)}%`;
     this.hud.healthFill.style.width = `${Math.max(0, snapshot.health)}%`;
     this.hud.status.textContent = snapshot.status;
+    this.hud.powerup.textContent = snapshot.activePowerUp
+      ? `${snapshot.activePowerUp.toUpperCase()} ${snapshot.activePowerUpTimer.toFixed(1)}s`
+      : 'No active power-up';
+    this.hud.pulse.textContent = snapshot.pulseCooldown > 0
+      ? `Pulse recharging ${snapshot.pulseCooldown.toFixed(1)}s`
+      : 'Pulse ready (F)';
     this.hud.reticleLabel.textContent = this.aimState.label;
     this.hud.reticle.classList.toggle('reticle--locked', this.aimState.locked);
     this.hud.reticle.classList.toggle('reticle--hit', snapshot.hitFlash > 0);
@@ -236,10 +265,34 @@ export class Game {
       this.showHitIndicator(dmg.sourceX, dmg.sourceY, dmg.sourceZ, dmg.damage, snapshot);
     }
 
+    for (const pickupEvent of snapshot.pickupEvents) {
+      this.showPickupBanner(pickupEvent.type);
+    }
+
+    if (!this.aimState.target && snapshot.pickups.length > 0) {
+      const nearestPickup = snapshot.pickups.reduce((best, pickup) => {
+        const dx = pickup.position.x - snapshot.playerPosition.x;
+        const dz = pickup.position.z - snapshot.playerPosition.z;
+        const distance = Math.hypot(dx, dz);
+        if (!best || distance < best.distance) {
+          return { pickup, distance };
+        }
+        return best;
+      }, null);
+      if (nearestPickup) {
+        this.hud.targetName.textContent = `${nearestPickup.pickup.type.toUpperCase()} PICKUP`;
+        this.hud.targetHealth.textContent = nearestPickup.pickup.type === 'repair'
+          ? 'Red cross restores health on contact.'
+          : 'Fly through it to activate immediately.';
+        this.renderRadar(snapshot, candidates);
+        return;
+      }
+    }
+
     if (this.aimState.target) {
       const hp = Math.max(0, Math.ceil(this.aimState.target.health));
       const maxHp = Math.ceil(this.aimState.target.maxHealth);
-      this.hud.targetName.textContent = `${this.aimState.target.type.toUpperCase()} LOCKED`;
+      this.hud.targetName.textContent = `${this.aimState.target.label.toUpperCase()} LOCKED`;
       this.hud.targetHealth.textContent = `Health ${hp} / ${maxHp}`;
     } else if (snapshot.lastHit && snapshot.hitFlash > 0) {
       this.hud.targetName.textContent = `${snapshot.lastHit.type.toUpperCase()} HIT`;
@@ -251,6 +304,54 @@ export class Game {
       this.hud.targetHealth.textContent = 'Bring the reticle over a target to inspect health.';
     }
     this.renderRadar(snapshot, candidates);
+  }
+
+  showPickupBanner(type) {
+    const copyByType = {
+      repair: {
+        title: 'Repair pickup secured',
+        copy: 'Health restored. Red cross pickups heal on contact.',
+      },
+      overdrive: {
+        title: 'Overdrive online',
+        copy: 'Fire rate boosted for a short burst.',
+      },
+      spread: {
+        title: 'Spread fire engaged',
+        copy: 'Your weapon now fires a 3-shot spread.',
+      },
+      shield: {
+        title: 'Shield activated',
+        copy: 'Incoming damage is reduced for a short time.',
+      },
+    };
+    const content = copyByType[type] ?? {
+      title: 'Pickup collected',
+      copy: 'A temporary combat bonus is now active.',
+    };
+
+    this.hud.pickupBannerTitle.textContent = content.title;
+    this.hud.pickupBannerCopy.textContent = content.copy;
+    this.hud.pickupBanner.dataset.type = type;
+    this.hud.pickupBanner.classList.add('pickup-banner--visible');
+    this.pickupBannerTimer = 2.2;
+  }
+
+  hidePickupBanner() {
+    this.hud.pickupBanner.classList.remove('pickup-banner--visible');
+    delete this.hud.pickupBanner.dataset.type;
+    this.pickupBannerTimer = 0;
+  }
+
+  updatePickupBanner(dt) {
+    if (this.pickupBannerTimer <= 0) {
+      return;
+    }
+
+    this.pickupBannerTimer = Math.max(0, this.pickupBannerTimer - dt);
+    if (this.pickupBannerTimer === 0) {
+      this.hidePickupBanner();
+    }
   }
 
   renderRadar(snapshot, candidates) {
@@ -368,6 +469,47 @@ export class Game {
       ctx.beginPath();
       ctx.arc(px, py, 3.5, 0, Math.PI * 2);
       ctx.fill();
+    }
+
+    const blinkAlpha = 0.45 + (Math.sin(snapshot.time * 7) * 0.5 + 0.5) * 0.55;
+    for (const pickup of snapshot.pickups) {
+      const contact = projectRadarContact(
+        snapshot.playerPosition,
+        snapshot.playerYaw,
+        pickup.position,
+        this.radarWorldRadius,
+      );
+      if (contact.outOfRange) {
+        continue;
+      }
+      const px = cx + contact.lateral * scale;
+      const py = cx - contact.forward * scale;
+      const color = PICKUP_COLORS[pickup.type] || '#ffffff';
+
+      ctx.save();
+      ctx.globalAlpha = blinkAlpha;
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = 2;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 10;
+      if (pickup.type === 'repair') {
+        ctx.beginPath();
+        ctx.moveTo(px - 4, py);
+        ctx.lineTo(px + 4, py);
+        ctx.moveTo(px, py - 4);
+        ctx.lineTo(px, py + 4);
+        ctx.stroke();
+      } else {
+        ctx.beginPath();
+        ctx.moveTo(px, py - 4.5);
+        ctx.lineTo(px + 4.5, py);
+        ctx.lineTo(px, py + 4.5);
+        ctx.lineTo(px - 4.5, py);
+        ctx.closePath();
+        ctx.stroke();
+      }
+      ctx.restore();
     }
 
     // Reset shadow and alpha

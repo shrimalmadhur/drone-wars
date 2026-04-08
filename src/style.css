@@ -89,6 +89,29 @@ canvas {
   line-height: 1.5;
 }
 
+.start-screen__meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0 0 18px;
+}
+
+.start-stat {
+  padding: 12px 14px;
+  border: 1px solid rgba(138, 244, 255, 0.14);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.start-stat__label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
 .start-screen__form {
   display: grid;
   gap: 12px;
@@ -337,6 +360,62 @@ canvas {
   background: rgba(138, 244, 255, 1);
 }
 
+.pickup-banner {
+  position: fixed;
+  left: 50%;
+  top: 22%;
+  transform: translate(-50%, -18px) scale(0.96);
+  width: min(420px, calc(100vw - 32px));
+  padding: 14px 18px;
+  border: 1px solid rgba(138, 244, 255, 0.24);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(9, 16, 35, 0.92), rgba(7, 13, 28, 0.78));
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.34);
+  backdrop-filter: blur(12px);
+  pointer-events: none;
+  z-index: 7;
+  opacity: 0;
+  transition:
+    opacity 160ms ease,
+    transform 180ms ease,
+    border-color 160ms ease;
+}
+
+.pickup-banner--visible {
+  opacity: 1;
+  transform: translate(-50%, 0) scale(1);
+}
+
+.pickup-banner[data-type="repair"] {
+  border-color: rgba(255, 95, 109, 0.46);
+}
+
+.pickup-banner[data-type="overdrive"] {
+  border-color: rgba(255, 209, 102, 0.46);
+}
+
+.pickup-banner[data-type="spread"] {
+  border-color: rgba(138, 244, 255, 0.46);
+}
+
+.pickup-banner[data-type="shield"] {
+  border-color: rgba(199, 138, 255, 0.5);
+}
+
+.pickup-banner__title {
+  margin: 0;
+  font: 700 0.98rem/1.1 'Orbitron', sans-serif;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.pickup-banner__copy {
+  margin: 8px 0 0;
+  color: rgba(244, 248, 255, 0.82);
+  line-height: 1.4;
+}
+
 .hud {
   position: fixed;
   inset: 0;
@@ -344,51 +423,59 @@ canvas {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  padding: 24px;
+  padding: 18px 18px 20px;
 }
 
 .hud__topbar,
 .hud__bottom {
   display: flex;
   justify-content: space-between;
-  gap: 16px;
+  gap: 14px;
   align-items: flex-start;
 }
 
 .hud h1 {
   margin: 0;
-  font: 700 2.5rem/1 'Orbitron', sans-serif;
+  font: 700 2.15rem/0.94 'Orbitron', sans-serif;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  max-width: 4ch;
 }
 
 .hud__eyebrow {
-  margin: 0 0 10px;
+  margin: 0 0 8px;
   color: var(--accent);
   text-transform: uppercase;
   letter-spacing: 0.2em;
-  font-size: 0.72rem;
+  font-size: 0.68rem;
+}
+
+.hud__identity {
+  width: min(220px, 22vw);
 }
 
 .hud__metrics {
-  display: flex;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(88px, 104px));
+  gap: 10px;
+  align-content: start;
 }
 
 .metric,
 .health-card,
 .controls-card,
 .status-card {
-  padding: 14px 16px;
+  padding: 12px 14px;
   border: 1px solid var(--panel-border);
-  background: var(--panel);
-  backdrop-filter: blur(14px);
-  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(8, 14, 30, 0.78), rgba(8, 14, 30, 0.62));
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
 }
 
 .metric {
-  min-width: 110px;
+  min-width: 0;
+  min-height: 74px;
 }
 
 .metric__label,
@@ -403,17 +490,43 @@ canvas {
 .metric strong,
 .health-card strong {
   display: block;
-  margin-top: 8px;
+  margin-top: 6px;
   font-family: 'Orbitron', sans-serif;
-  font-size: 1.35rem;
+  font-size: 1.18rem;
+}
+
+.controls-card p:last-child {
+  margin-bottom: 0;
 }
 
 .hud__bottom {
   align-items: flex-end;
 }
 
+.hud__rail {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.hud__rail--left {
+  width: min(320px, 30vw);
+}
+
+.hud__rail--right {
+  width: min(310px, 28vw);
+  align-items: stretch;
+}
+
+.hud__command-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+
 .health-card {
-  width: min(340px, 100%);
+  width: 100%;
 }
 
 .health-card__label {
@@ -441,7 +554,7 @@ canvas {
 
 .controls-card,
 .status-card {
-  max-width: 340px;
+  width: 100%;
 }
 
 .controls-card p,
@@ -451,24 +564,131 @@ canvas {
 }
 
 .controls-card p + p {
-  margin-top: 8px;
+  margin-top: 6px;
 }
 
 .status-card {
   font-weight: 500;
-  min-height: 54px;
+  min-height: 0;
+}
+
+.status-card--top {
+  width: min(220px, 100%);
+  text-align: right;
+  align-self: flex-end;
+}
+
+.controls-card--compact {
+  padding-top: 11px;
+  padding-bottom: 11px;
+}
+
+.controls-card__line {
+  color: rgba(244, 248, 255, 0.88);
+  font-size: 0.92rem;
+}
+
+.controls-card__readout {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(138, 244, 255, 0.12);
+}
+
+.controls-card__readout p {
+  color: var(--accent);
+  font-size: 0.9rem;
+}
+
+.controls-card--intel {
+  min-height: 122px;
 }
 
 .radar {
-  width: 140px;
-  height: 140px;
+  width: 124px;
+  height: 124px;
   border-radius: 50%;
   border: 1px solid var(--panel-border);
-  background: var(--panel);
-  backdrop-filter: blur(14px);
+  background: linear-gradient(180deg, rgba(8, 14, 30, 0.78), rgba(8, 14, 30, 0.62));
+  backdrop-filter: blur(10px);
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28);
   flex-shrink: 0;
   align-self: flex-start;
+}
+
+@media (max-width: 1100px) {
+  .hud {
+    padding: 16px;
+  }
+
+  .hud__topbar,
+  .hud__bottom {
+    gap: 10px;
+  }
+
+  .hud__metrics {
+    grid-template-columns: repeat(3, minmax(78px, 1fr));
+  }
+
+  .hud__identity {
+    width: min(180px, 26vw);
+  }
+
+  .hud h1 {
+    font-size: 1.7rem;
+  }
+
+  .hud__rail--left,
+  .hud__rail--right {
+    width: min(280px, 34vw);
+  }
+}
+
+@media (max-width: 820px) {
+  .hud {
+    padding: 14px;
+    gap: 12px;
+  }
+
+  .hud__topbar,
+  .hud__bottom {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .hud__identity,
+  .hud__rail--left,
+  .hud__rail--right,
+  .hud__command-stack {
+    width: 100%;
+  }
+
+  .hud h1 {
+    max-width: none;
+  }
+
+  .hud__metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .hud__command-stack {
+    flex-direction: row;
+    align-items: stretch;
+  }
+
+  .status-card--top {
+    width: auto;
+    flex: 1;
+    text-align: left;
+  }
+
+  .radar {
+    width: 96px;
+    height: 96px;
+  }
+
+  .pickup-banner {
+    top: 18%;
+  }
 }
 
 /* Hit direction indicators */
