@@ -711,16 +711,13 @@ export class Simulation {
     this.pickupSpawnTimer -= dt;
     this.emergencyRepairTimer = Math.max(0, this.emergencyRepairTimer - dt);
     if (this.pickupSpawnTimer <= 0) {
-      if (this.pickups.length < CONFIG.powerUps.maxActive) {
-        this.spawnAmbientPickup();
-      }
+      this.spawnAmbientPickup();
       this.scheduleNextPickupSpawn();
     }
 
     if (
       this.player.health <= CONFIG.powerUps.lowHealthRepairThreshold
       && this.emergencyRepairTimer <= 0
-      && this.pickups.length < CONFIG.powerUps.maxActive
       && !this.pickups.some((pickup) => pickup.type === 'repair')
     ) {
       this.spawnEmergencyRepairPickup();

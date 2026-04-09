@@ -145,6 +145,113 @@ describe('Simulation audio events', () => {
     expect(simulation.state.status).toContain('Emergency repair');
   });
 
+  it('still spawns an emergency repair pickup when several other pickups already exist', () => {
+    const simulation = {
+      pickupSpawnTimer: 99,
+      emergencyRepairTimer: 0,
+      pickups: Array.from({ length: 4 }, (_, index) => ({
+        type: index === 0 ? 'overdrive' : 'shield',
+        age: index,
+        baseY: 8,
+        mesh: {
+          position: { x: index * 5, y: 8, z: index * 5 },
+          rotation: { y: 0 },
+          children: [],
+          traverse(callback) { callback(this); },
+        },
+      })),
+      player: {
+        health: 18,
+        runModifiers: { collectionRadius: 5.4 },
+        group: { position: { x: 0, y: 0, z: 0 } },
+      },
+      rng: () => 0,
+      terrain: {
+        getGroundHeight() { return 0; },
+      },
+      spawnPickup: vi.fn(function spawnPickup(position, type) {
+        this.pickups.push({
+          type,
+          age: 0,
+          baseY: position.y,
+          mesh: {
+            position: { x: position.x, y: position.y, z: position.z },
+            rotation: { y: 0 },
+            children: [],
+            traverse(callback) { callback(this); },
+          },
+        });
+      }),
+      spawnEmergencyRepairPickup: Simulation.prototype.spawnEmergencyRepairPickup,
+      scheduleNextPickupSpawn: vi.fn(),
+      state: { status: '' },
+    };
+
+    Simulation.prototype.updatePickups.call(simulation, 0.1);
+
+    expect(simulation.pickups).toHaveLength(5);
+    expect(simulation.pickups.some((pickup) => pickup.type === 'repair')).toBe(true);
+    expect(simulation.state.status).toContain('Emergency repair');
+  });
+
+  it('continues ambient pickup spawning even when many pickups are already active', () => {
+    const simulation = {
+      pickupSpawnTimer: 0,
+      emergencyRepairTimer: 99,
+      pickups: Array.from({ length: 6 }, (_, index) => ({
+        type: 'shield',
+        age: index,
+        baseY: 8,
+        mesh: {
+          position: {
+            x: index * 40,
+            y: 8,
+            z: index * 40,
+            distanceToSquared() { return 9999; },
+          },
+          rotation: { y: 0 },
+          children: [],
+        },
+      })),
+      player: {
+        health: 100,
+        runModifiers: { collectionRadius: 5.4 },
+        group: { position: { x: 0, y: 0, z: 0 } },
+      },
+      rng: () => 0,
+      terrain: {
+        getGroundHeight() { return 0; },
+      },
+      spawnPickup: vi.fn(function spawnPickup(position, type) {
+        this.pickups.push({
+          type,
+          age: 0,
+          baseY: position.y,
+          mesh: {
+            position: {
+              x: position.x,
+              y: position.y,
+              z: position.z,
+              distanceToSquared() { return 9999; },
+            },
+            rotation: { y: 0 },
+            children: [],
+          },
+        });
+      }),
+      spawnAmbientPickup: Simulation.prototype.spawnAmbientPickup,
+      choosePickupType() { return 'overdrive'; },
+      scheduleNextPickupSpawn: vi.fn(),
+      state: { status: '' },
+    };
+
+    Simulation.prototype.updatePickups.call(simulation, 0.1);
+
+    expect(simulation.pickups).toHaveLength(7);
+    expect(simulation.pickups.at(-1).type).toBe('overdrive');
+    expect(simulation.scheduleNextPickupSpawn).toHaveBeenCalled();
+  });
+
   it('records enemy fire and missile damage with compatible payloads', () => {
     const applyDamage = vi.fn(() => true);
     const spawn = vi.fn(() => true);
