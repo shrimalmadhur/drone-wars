@@ -1,6 +1,42 @@
 const AIRBORNE_TYPES = new Set(['drone', 'missile', 'boss']);
 const HEAVY_TYPES = new Set(['tank', 'turret', 'ship', 'boss']);
 
+const MISSION_DEFINITIONS = {
+  survival: {
+    id: 'survival',
+    label: 'Survival',
+    description: 'Reach wave 3',
+    target: 3,
+    initialProgress: 1,
+  },
+  hunter: {
+    id: 'hunter',
+    label: 'Hunter',
+    description: 'Destroy 5 airborne enemies',
+    target: 5,
+    initialProgress: 0,
+  },
+  demolition: {
+    id: 'demolition',
+    label: 'Demolition',
+    description: 'Destroy 4 heavy targets',
+    target: 4,
+    initialProgress: 0,
+  },
+};
+
+function createMission(id) {
+  const definition = MISSION_DEFINITIONS[id];
+  return {
+    id: definition.id,
+    label: definition.label,
+    description: definition.description,
+    target: definition.target,
+    progress: definition.initialProgress,
+    completed: false,
+  };
+}
+
 export function classifyEnemyForMissions(type) {
   return {
     airborne: AIRBORNE_TYPES.has(type),
@@ -8,37 +44,22 @@ export function classifyEnemyForMissions(type) {
   };
 }
 
+export function createMissionForRun(rng = Math.random) {
+  const missionIds = Object.keys(MISSION_DEFINITIONS);
+  const index = Math.min(Math.floor(rng() * missionIds.length), missionIds.length - 1);
+  return createMission(missionIds[index]);
+}
+
 export function createMissionForWave(wave) {
   if (wave >= 4) {
-    return {
-      id: 'demolition',
-      label: 'Demolition',
-      description: 'Destroy 4 heavy targets',
-      target: 4,
-      progress: 0,
-      completed: false,
-    };
+    return createMission('demolition');
   }
 
   if (wave >= 2) {
-    return {
-      id: 'hunter',
-      label: 'Hunter',
-      description: 'Destroy 5 airborne enemies',
-      target: 5,
-      progress: 0,
-      completed: false,
-    };
+    return createMission('hunter');
   }
 
-  return {
-    id: 'survival',
-    label: 'Survival',
-    description: 'Reach wave 3',
-    target: 3,
-    progress: 1,
-    completed: false,
-  };
+  return createMission('survival');
 }
 
 export function updateMissionOnWaveStart(mission, wave) {

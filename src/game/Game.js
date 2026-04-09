@@ -116,6 +116,23 @@ export class Game {
     this.input.reset();
   }
 
+  finalizeCompletedRun(currentMode) {
+    if (currentMode === GAME_STATES.RUNNING) {
+      this.didRecordRun = false;
+      return;
+    }
+
+    if (!this.didRecordRun && currentMode === GAME_STATES.GAME_OVER) {
+      this.didRecordRun = true;
+      const result = this.onRunComplete?.(this.simulation.getRunSummary());
+      if (result?.progress) {
+        this.simulation.state.bestScore = result.progress.bestScore;
+        this.simulation.state.bestWave = result.progress.bestWave;
+        this.simulation.state.achievementCount = result.progress.achievements.length;
+      }
+    }
+  }
+
   start() {
     this.clock.last = performance.now();
     const tick = (time) => {
@@ -142,22 +159,7 @@ export class Game {
       }
 
       const currentMode = this.simulation.state.mode;
-      if (currentMode === GAME_STATES.GAME_OVER && controls.restartPressed) {
-        this.onRestartRequested?.();
-        this.input.reset();
-      }
-      if (currentMode === GAME_STATES.RUNNING) {
-        this.didRecordRun = false;
-      }
-      if (!this.didRecordRun && currentMode === GAME_STATES.GAME_OVER) {
-        this.didRecordRun = true;
-        const result = this.onRunComplete?.(this.simulation.getRunSummary());
-        if (result?.progress) {
-          this.simulation.state.bestScore = result.progress.bestScore;
-          this.simulation.state.bestWave = result.progress.bestWave;
-          this.simulation.state.achievementCount = result.progress.achievements.length;
-        }
-      }
+      this.finalizeCompletedRun(currentMode);
       if (this._lastMode === GAME_STATES.GAME_OVER && currentMode === GAME_STATES.RUNNING) {
         this.cameraShake.reset();
         this.clearHitIndicators();

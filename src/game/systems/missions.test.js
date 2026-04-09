@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   classifyEnemyForMissions,
+  createMissionForRun,
   createMissionForWave,
   updateMissionOnEnemyDestroyed,
   updateMissionOnWaveStart,
@@ -28,6 +29,12 @@ describe('missions', () => {
       id: 'demolition',
       target: 4,
     });
+  });
+
+  it('selects one run mission from the supported mission pool', () => {
+    expect(createMissionForRun(() => 0)).toMatchObject({ id: 'survival' });
+    expect(createMissionForRun(() => 0.4)).toMatchObject({ id: 'hunter' });
+    expect(createMissionForRun(() => 0.9)).toMatchObject({ id: 'demolition' });
   });
 
   it('classifies mission enemy groups deterministically', () => {

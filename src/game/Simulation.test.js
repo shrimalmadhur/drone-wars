@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { Simulation } from './Simulation.js';
 import { GAME_STATES } from './state.js';
-import { createMissionForWave } from './systems/missions.js';
+import { createMissionForRun, createMissionForWave } from './systems/missions.js';
 
 describe('Simulation spawning', () => {
   it('keeps unspawnable terrain-locked enemies queued', () => {
@@ -280,6 +280,29 @@ describe('Simulation audio events', () => {
       id: 'survival',
       completed: true,
     });
+  });
+
+  it('keeps the same mission for the whole run instead of replacing it by wave', () => {
+    const simulation = {
+      state: {
+        wave: 0,
+        mission: createMissionForRun(() => 0.4),
+        status: '',
+      },
+      rng: () => 0.9,
+      spawnQueue: [],
+      spawnCooldown: 0,
+      waveElapsed: 0,
+      interWaveDelay: 0,
+      wasWaveCleared: false,
+      _waveDamageTaken: 0,
+      spawnHazardsForWave: vi.fn(),
+    };
+
+    Simulation.prototype.beginWave.call(simulation, 1);
+    Simulation.prototype.beginWave.call(simulation, 4);
+
+    expect(simulation.state.mission.id).toBe('hunter');
   });
 
   it('emits wave complete exactly once when a running wave is cleared', () => {

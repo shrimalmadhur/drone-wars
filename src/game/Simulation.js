@@ -5,7 +5,7 @@ import { createRng, segmentIntersectsSphereAt } from './math.js';
 import { createRunStats } from './progression.js';
 import { createGameState, GAME_STATES, resetGameState } from './state.js';
 import { trackEnemyKilled, trackGameOver, trackGameRestart, trackWaveComplete, trackWaveStart } from './analytics.js';
-import { createMissionForWave, updateMissionOnEnemyDestroyed, updateMissionOnWaveStart } from './systems/missions.js';
+import { createMissionForRun, updateMissionOnEnemyDestroyed, updateMissionOnWaveStart } from './systems/missions.js';
 import { DroneEnemy } from './entities/DroneEnemy.js';
 import { BossEnemy } from './entities/BossEnemy.js';
 import { MissileEnemy } from './entities/MissileEnemy.js';
@@ -198,6 +198,7 @@ export class Simulation {
     this.wasWaveCleared = false;
     this._waveDamageTaken = 0;
     this.emergencyRepairTimer = 0;
+    this.state.mission = createMissionForRun(this.rng);
     this.scheduleNextPickupSpawn(true);
     this.beginWave(1);
   }
@@ -235,7 +236,7 @@ export class Simulation {
       trackWaveComplete(wave - 1, this.waveElapsed);
     }
     this.state.wave = wave;
-    this.state.mission = this.state.mission ?? createMissionForWave(wave);
+    this.state.mission = this.state.mission ?? createMissionForRun(this.rng);
     this.state.mission = updateMissionOnWaveStart(this.state.mission, wave);
     this.spawnQueue = createWaveQueue(wave, this.rng);
     this.spawnCooldown = 0.25;
