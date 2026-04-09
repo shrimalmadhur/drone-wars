@@ -1,14 +1,49 @@
 import './style.css';
 import { Game } from './game/Game.js';
+import {
+  trackGameStart,
+  trackRunCompleted,
+  trackRunRestartedFromSummary,
+  trackRunStarted,
+  trackRunSummaryViewed,
+  trackUpgradePurchased,
+} from './game/analytics.js';
+import { createRunModifiers } from './game/meta/runModifiers.js';
+import { getUpgradeCost, UPGRADE_DEFINITIONS } from './game/meta/upgrades.js';
 import { MAP_THEME_DETAILS } from './mapThemes.js';
-import { loadMapTheme, loadPlayerName, loadPlayerProgress, recordPlayerRun, saveMapTheme, savePlayerName } from './playerProfile.js';
-import { trackGameStart } from './game/analytics.js';
+import {
+  loadMapTheme,
+  loadPlayerName,
+  loadPlayerProgress,
+  purchaseUpgrade,
+  recordRunComplete,
+  recordRunStart,
+  saveMapTheme,
+  savePlayerName,
+} from './playerProfile.js';
 
 const mount = document.querySelector('#app');
 const startScreen = document.querySelector('#start-screen');
 const startForm = document.querySelector('#start-form');
 const playerNameInput = document.querySelector('#player-name-input');
 const mapThemeInputs = Array.from(document.querySelectorAll('input[name="mapTheme"]'));
+const startCurrency = document.querySelector('#start-currency');
+const hangarCurrency = document.querySelector('#hangar-currency');
+const upgradeShop = document.querySelector('#upgrade-shop');
+const mapThemeNote = document.querySelector('#map-theme-note');
+
+const runSummary = document.querySelector('#run-summary');
+const summaryScore = document.querySelector('#summary-score');
+const summaryWave = document.querySelector('#summary-wave');
+const summaryKills = document.querySelector('#summary-kills');
+const summaryPickups = document.querySelector('#summary-pickups');
+const summaryAchievements = document.querySelector('#summary-achievements');
+const summaryCurrency = document.querySelector('#summary-currency');
+const summaryMission = document.querySelector('#summary-mission');
+const summaryMissionFill = document.querySelector('#summary-mission-fill');
+const summaryHeadline = document.querySelector('#summary-headline');
+const summaryRerunButton = document.querySelector('#summary-rerun');
+const summaryHangarButton = document.querySelector('#summary-hangar');
 
 const hud = {
   score: document.querySelector('#score-value'),
@@ -35,75 +70,244 @@ const hud = {
   achievements: document.querySelector('#achievement-count-value'),
   powerup: document.querySelector('#powerup-value'),
   pulse: document.querySelector('#pulse-value'),
+  missionName: document.querySelector('#mission-name'),
+  missionProgress: document.querySelector('#mission-progress'),
+  missionProgressFill: document.querySelector('#mission-progress-fill'),
   startBestScore: document.querySelector('#start-best-score'),
   startBestWave: document.querySelector('#start-best-wave'),
   startAchievements: document.querySelector('#start-achievement-count'),
 };
 
 let game = null;
+let playerProgress = loadPlayerProgress();
+let activeRunContext = null;
+let lastCompletedRunContext = null;
 
 const savedPlayerName = loadPlayerName();
 const savedMapTheme = loadMapTheme();
-let playerProgress = loadPlayerProgress();
-if (savedPlayerName) {
-  playerNameInput.value = savedPlayerName;
+
+function createRunId() {
+  const cryptoApi = globalThis?.crypto;
+  if (cryptoApi?.randomUUID) {
+    return cryptoApi.randomUUID();
+  }
+  return `run-${Math.random().toString(36).slice(2, 10)}`;
 }
-for (const input of mapThemeInputs) {
-  input.checked = input.value === savedMapTheme;
+
+function updateProfileReadouts() {
+  hud.bestScore.textContent = playerProgress.bestScore.toString();
+  hud.bestWave.textContent = playerProgress.bestWave.toString();
+  hud.achievements.textContent = playerProgress.achievements.length.toString();
+  hud.startBestScore.textContent = playerProgress.bestScore.toString();
+  hud.startBestWave.textContent = playerProgress.bestWave.toString();
+  hud.startAchievements.textContent = playerProgress.achievements.length.toString();
+  startCurrency.textContent = playerProgress.currency.toString();
+  hangarCurrency.textContent = playerProgress.currency.toString();
 }
-hud.mapTheme.textContent = MAP_THEME_DETAILS[savedMapTheme].label;
-hud.bestScore.textContent = playerProgress.bestScore.toString();
-hud.bestWave.textContent = playerProgress.bestWave.toString();
-hud.achievements.textContent = playerProgress.achievements.length.toString();
-hud.startBestScore.textContent = playerProgress.bestScore.toString();
-hud.startBestWave.textContent = playerProgress.bestWave.toString();
-hud.startAchievements.textContent = playerProgress.achievements.length.toString();
 
-playerNameInput.focus();
+function setMapThemeLock(locked) {
+  for (const input of mapThemeInputs) {
+    input.disabled = locked;
+  }
+  mapThemeNote.hidden = !locked;
+}
 
-playerNameInput.addEventListener('input', () => {
-  playerNameInput.setCustomValidity('');
-});
+function hideRunSummary() {
+  runSummary.hidden = true;
+}
 
-startForm.addEventListener('submit', (event) => {
-  event.preventDefault();
+function showRunSummary(result) {
+  const { runSummary: stats, newAchievements, currencyEarned } = result;
+  summaryScore.textContent = stats.score.toString();
+  summaryWave.textContent = stats.highestWave.toString();
+  summaryKills.textContent = stats.kills.toString();
+  summaryPickups.textContent = stats.pickupsCollected.toString();
+  summaryAchievements.textContent = newAchievements.length.toString();
+  summaryCurrency.textContent = currencyEarned.toString();
+  summaryMission.textContent = stats.mission
+    ? `${stats.mission.label} ${stats.mission.progress}/${stats.mission.target}${stats.mission.completed ? ' complete' : ''}`
+    : 'No objective';
+  summaryMissionFill.style.width = stats.mission
+    ? `${Math.max(8, (stats.mission.progress / stats.mission.target) * 100)}%`
+    : '0%';
+  summaryHeadline.textContent = newAchievements.length > 0
+    ? `New awards unlocked: ${newAchievements.join(', ')}.`
+    : 'No new awards this time. Spend your salvage and relaunch.';
+  runSummary.hidden = false;
+}
 
+function renderUpgradeShop() {
+  upgradeShop.innerHTML = Object.values(UPGRADE_DEFINITIONS).map((upgrade) => {
+    const level = playerProgress.upgrades[upgrade.id];
+    const cost = getUpgradeCost(upgrade.id, level);
+    const isMaxed = level >= upgrade.maxLevel;
+    const disabled = isMaxed || playerProgress.currency < (cost ?? 0);
+    const buttonLabel = isMaxed ? 'Fully upgraded' : `Upgrade for ${cost} salvage`;
+    return `
+      <article class="upgrade-card">
+        <div>
+          <h3 class="upgrade-card__title">${upgrade.label}</h3>
+          <p class="upgrade-card__copy">${upgrade.description}</p>
+        </div>
+        <div class="upgrade-card__meta">
+          <span class="upgrade-card__level">Upgrade level ${level} of ${upgrade.maxLevel}</span>
+          <button
+            class="upgrade-card__button"
+            type="button"
+            data-upgrade-id="${upgrade.id}"
+            ${disabled ? 'disabled' : ''}
+          >${buttonLabel}</button>
+        </div>
+      </article>
+    `;
+  }).join('');
+}
+
+function applyIdentity(playerName, mapTheme) {
+  playerNameInput.value = playerName;
+  hud.playerName.textContent = playerName || 'Awaiting registration';
+  hud.mapTheme.textContent = MAP_THEME_DETAILS[mapTheme].label;
+}
+
+function getCurrentMapTheme() {
+  return loadMapTheme();
+}
+
+function beginRun({ fromSummary = false } = {}) {
   const playerName = savePlayerName(playerNameInput.value);
-  const mapTheme = saveMapTheme(new FormData(startForm).get('mapTheme'));
+  const mapTheme = game ? getCurrentMapTheme() : saveMapTheme(new FormData(startForm).get('mapTheme'));
   if (!playerName) {
     playerNameInput.setCustomValidity('Enter a player name to launch.');
     startForm.reportValidity();
     return;
   }
 
-  playerNameInput.value = playerName;
-  hud.playerName.textContent = playerName;
-  hud.mapTheme.textContent = MAP_THEME_DETAILS[mapTheme].label;
+  applyIdentity(playerName, mapTheme);
+  playerProgress = recordRunStart().progress;
+  updateProfileReadouts();
+  renderUpgradeShop();
+
+  const runModifiers = createRunModifiers(playerProgress);
+  activeRunContext = {
+    profileId: playerProgress.profileId,
+    runId: createRunId(),
+    runIndex: playerProgress.lifetimeStats.runsStarted,
+    mapTheme,
+  };
+
+  hideRunSummary();
   startScreen.classList.add('start-screen--hidden');
+  game.restartRun({ playerProgress, runModifiers });
+  void game.resumeAudio().catch(() => {});
+
+  trackRunStarted(activeRunContext);
+  if (fromSummary && lastCompletedRunContext) {
+    trackRunRestartedFromSummary(lastCompletedRunContext);
+  }
+}
+
+function openHangar() {
+  hideRunSummary();
+  renderUpgradeShop();
+  startScreen.classList.remove('start-screen--hidden');
+}
+
+if (savedPlayerName) {
+  playerNameInput.value = savedPlayerName;
+}
+for (const input of mapThemeInputs) {
+  input.checked = input.value === savedMapTheme;
+}
+applyIdentity(savedPlayerName, savedMapTheme);
+updateProfileReadouts();
+renderUpgradeShop();
+setMapThemeLock(false);
+playerNameInput.focus();
+
+playerNameInput.addEventListener('input', () => {
+  playerNameInput.setCustomValidity('');
+});
+
+upgradeShop.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-upgrade-id]');
+  if (!button) {
+    return;
+  }
+
+  const upgradeId = button.dataset.upgradeId;
+  const result = purchaseUpgrade(upgradeId);
+  playerProgress = result.progress;
+  updateProfileReadouts();
+  renderUpgradeShop();
+
+  if (result.ok) {
+    trackUpgradePurchased({
+      profileId: playerProgress.profileId,
+      upgradeId,
+      newLevel: playerProgress.upgrades[upgradeId],
+      cost: result.cost,
+    });
+  }
+});
+
+summaryRerunButton.addEventListener('click', () => {
+  beginRun({ fromSummary: true });
+});
+
+summaryHangarButton.addEventListener('click', () => {
+  openHangar();
+});
+
+startForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const playerName = savePlayerName(playerNameInput.value);
+  if (!playerName) {
+    playerNameInput.setCustomValidity('Enter a player name to launch.');
+    startForm.reportValidity();
+    return;
+  }
+  playerNameInput.value = playerName;
 
   if (!game) {
+    const initialMapTheme = saveMapTheme(new FormData(startForm).get('mapTheme'));
+    const initialRunModifiers = createRunModifiers(playerProgress);
     game = new Game({
       mount,
       hud,
-      mapTheme,
+      mapTheme: initialMapTheme,
       playerProgress,
-      onRunComplete(runSummary) {
-        const result = recordPlayerRun(runSummary);
+      runModifiers: initialRunModifiers,
+      onRestartRequested() {
+        if (!startScreen.classList.contains('start-screen--hidden')) {
+          return;
+        }
+        beginRun({ fromSummary: true });
+      },
+      onRunComplete(runStats) {
+        const result = recordRunComplete(runStats);
         playerProgress = result.progress;
-        hud.bestScore.textContent = playerProgress.bestScore.toString();
-        hud.bestWave.textContent = playerProgress.bestWave.toString();
-        hud.achievements.textContent = playerProgress.achievements.length.toString();
-        hud.startBestScore.textContent = playerProgress.bestScore.toString();
-        hud.startBestWave.textContent = playerProgress.bestWave.toString();
-        hud.startAchievements.textContent = playerProgress.achievements.length.toString();
+        updateProfileReadouts();
+        renderUpgradeShop();
+
+        if (activeRunContext) {
+          lastCompletedRunContext = activeRunContext;
+          trackRunCompleted({
+            ...activeRunContext,
+            score: runStats.score,
+            wave: runStats.highestWave,
+            currencyEarned: result.currencyEarned,
+          });
+          trackRunSummaryViewed(activeRunContext);
+        }
+
+        showRunSummary(result);
         return result;
       },
     });
+    game.start();
+    trackGameStart(playerName, initialMapTheme);
+    setMapThemeLock(true);
   }
 
-  void game.resumeAudio().catch(() => {});
-  if (!game.frame) {
-    game.start();
-    trackGameStart(playerName, mapTheme);
-  }
+  beginRun();
 });

@@ -37,6 +37,10 @@
             <span class="start-stat__label">Achievements</span>
             <strong id="start-achievement-count">0</strong>
           </div>
+          <div class="start-stat">
+            <span class="start-stat__label">Salvage</span>
+            <strong id="start-currency">0</strong>
+          </div>
         </div>
         <form id="start-form" class="start-screen__form">
           <label class="start-screen__label" for="player-name-input">Player name</label>
@@ -82,8 +86,66 @@
               </label>
             </div>
           </fieldset>
-          <button class="start-screen__button" type="submit">Launch mission</button>
+          <section class="hangar-panel">
+            <div class="hangar-panel__header">
+              <div>
+                <p class="start-screen__label">Hangar upgrades</p>
+                <p class="hangar-panel__copy">Permanent passive upgrades bought with salvage from completed runs.</p>
+              </div>
+              <div class="hangar-panel__wallet">
+                <span>Salvage</span>
+                <strong id="hangar-currency">0</strong>
+              </div>
+            </div>
+            <p id="map-theme-note" class="hangar-panel__note" hidden>Map changes only apply on a full relaunch. Between runs, upgrades and loadout changes apply immediately.</p>
+            <div id="upgrade-shop" class="upgrade-shop"></div>
+          </section>
+          <button class="start-screen__button" type="submit">Start run</button>
         </form>
+      </div>
+    </div>
+    <div id="run-summary" class="run-summary" hidden>
+      <div class="run-summary__panel">
+        <p class="run-summary__eyebrow">Run complete</p>
+        <h2 class="run-summary__title">Combat summary</h2>
+        <div class="run-summary__stats">
+          <div class="run-summary__stat">
+            <span>Score</span>
+            <strong id="summary-score">0</strong>
+          </div>
+          <div class="run-summary__stat">
+            <span>Wave</span>
+            <strong id="summary-wave">0</strong>
+          </div>
+          <div class="run-summary__stat">
+            <span>Kills</span>
+            <strong id="summary-kills">0</strong>
+          </div>
+          <div class="run-summary__stat">
+            <span>Pickups</span>
+            <strong id="summary-pickups">0</strong>
+          </div>
+          <div class="run-summary__stat">
+            <span>New awards</span>
+            <strong id="summary-achievements">0</strong>
+          </div>
+          <div class="run-summary__stat">
+            <span>Salvage earned</span>
+            <strong id="summary-currency">0</strong>
+          </div>
+          <div class="run-summary__stat">
+            <span>Mission</span>
+            <strong id="summary-mission">No objective</strong>
+            <div class="run-summary__progress" aria-hidden="true">
+              <div id="summary-mission-fill" class="run-summary__progress-fill"></div>
+            </div>
+          </div>
+        </div>
+        <p id="summary-headline" class="run-summary__headline">Jump straight into another run or open the upgrade hangar to spend salvage first.</p>
+        <div class="run-summary__actions">
+          <button id="summary-rerun" class="run-summary__button" type="button">Replay mission</button>
+          <button id="summary-hangar" class="run-summary__button run-summary__button--ghost" type="button">Upgrade drone</button>
+        </div>
       </div>
     </div>
     <div id="reticle" class="reticle">
@@ -156,11 +218,20 @@
           <div class="controls-card controls-card--compact" id="controls-panel">
             <p class="controls-card__title">Systems</p>
             <p class="controls-card__line">W/S thrust, A/D yaw, arrows strafe/pitch, Q/E altitude</p>
-            <p class="controls-card__line">Space fire, F pulse, R restart, P pause</p>
+            <p class="controls-card__line">Space fire, F EMP pulse (close range), R restart, P pause</p>
             <div class="controls-card__readout">
               <p id="powerup-value">No active power-up</p>
               <p id="pulse-value">Pulse ready (F)</p>
             </div>
+          </div>
+
+          <div class="controls-card controls-card--mission">
+            <p class="controls-card__title">Mission</p>
+            <p id="mission-name">No active objective</p>
+            <div class="mission-progressbar" aria-hidden="true">
+              <div id="mission-progress-fill" class="mission-progressbar__fill"></div>
+            </div>
+            <p id="mission-progress">Complete the run to receive a combat objective.</p>
           </div>
         </div>
 

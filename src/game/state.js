@@ -19,6 +19,7 @@ export function createGameState() {
     enemyCount: 0,
     time: 0,
     status: 'Sweep the battlefield.',
+    mission: null,
   };
 }
 
@@ -33,5 +34,6 @@ export function resetGameState(state) {
   state.enemyCount = 0;
   state.time = 0;
   state.status = 'Sweep the battlefield.';
+  state.mission = null;
   return state;
 }
