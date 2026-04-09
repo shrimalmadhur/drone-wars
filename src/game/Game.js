@@ -19,7 +19,7 @@ const PICKUP_COLORS = Object.fromEntries(
 );
 
 export class Game {
-  constructor({ mount, hud, mapTheme, playerProgress, onRunComplete }) {
+  constructor({ mount, hud, mapTheme, playerProgress, runModifiers, onRunComplete, onRestartRequested }) {
     this.mount = mount;
     this.hud = hud;
     this.scene = new THREE.Scene();
@@ -34,8 +34,10 @@ export class Game {
     this.mount.appendChild(this.renderer.domElement);
 
     this.input = new InputController(window, document);
-    this.simulation = new Simulation(this.scene, { mapTheme, playerProgress });
+    this.simulation = new Simulation(this.scene, { mapTheme, playerProgress, runModifiers });
     this.onRunComplete = onRunComplete;
+    this.onRestartRequested = onRestartRequested;
+    this.currentRunConfig = { playerProgress, runModifiers };
     this.didRecordRun = false;
     this.audio = new AudioEngine();
     this.cameraShake = new CameraShake();
@@ -103,6 +105,17 @@ export class Game {
     return this.audio.resume();
   }
 
+  restartRun({ playerProgress, runModifiers } = {}) {
+    this.currentRunConfig = {
+      playerProgress: playerProgress ?? this.currentRunConfig.playerProgress,
+      runModifiers: runModifiers ?? this.currentRunConfig.runModifiers,
+    };
+    this.simulation.setRunConfig(this.currentRunConfig);
+    this.simulation.restart();
+    this.didRecordRun = false;
+    this.input.reset();
+  }
+
   start() {
     this.clock.last = performance.now();
     const tick = (time) => {
@@ -129,6 +142,10 @@ export class Game {
       }
 
       const currentMode = this.simulation.state.mode;
+      if (currentMode === GAME_STATES.GAME_OVER && controls.restartPressed) {
+        this.onRestartRequested?.();
+        this.input.reset();
+      }
       if (currentMode === GAME_STATES.RUNNING) {
         this.didRecordRun = false;
       }
@@ -229,8 +246,22 @@ export class Game {
       ? `${snapshot.activePowerUp.toUpperCase()} ${snapshot.activePowerUpTimer.toFixed(1)}s`
       : 'No active power-up';
     this.hud.pulse.textContent = snapshot.pulseCooldown > 0
-      ? `Pulse recharging ${snapshot.pulseCooldown.toFixed(1)}s`
-      : 'Pulse ready (F)';
+      ? `EMP recharging ${snapshot.pulseCooldown.toFixed(1)}s`
+      : `EMP ready (F) close range ${CONFIG.player.pulseRadius}m`;
+    if (snapshot.mission) {
+      const missionRatio = snapshot.mission.target > 0
+        ? snapshot.mission.progress / snapshot.mission.target
+        : 0;
+      this.hud.missionName.textContent = snapshot.mission.label;
+      this.hud.missionProgress.textContent = snapshot.mission.completed
+        ? `${snapshot.mission.description} complete`
+        : `${snapshot.mission.description} ${snapshot.mission.progress}/${snapshot.mission.target}`;
+      this.hud.missionProgressFill.style.width = `${Math.max(8, missionRatio * 100)}%`;
+    } else {
+      this.hud.missionName.textContent = 'No active objective';
+      this.hud.missionProgress.textContent = 'Complete the run to receive a combat objective.';
+      this.hud.missionProgressFill.style.width = '0%';
+    }
     this.hud.reticleLabel.textContent = this.aimState.label;
     this.hud.reticle.classList.toggle('reticle--locked', this.aimState.locked);
     this.hud.reticle.classList.toggle('reticle--hit', snapshot.hitFlash > 0);

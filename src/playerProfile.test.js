@@ -5,6 +5,8 @@ import {
   loadPlayerProgress,
   loadMapTheme,
   loadPlayerName,
+  purchaseUpgrade,
+  recordRunStart,
   recordPlayerRun,
   sanitizePlayerName,
   saveMapTheme,
@@ -50,28 +52,48 @@ describe('player profile', () => {
   it('loads and saves persistent player progress', () => {
     const storage = createStorage();
 
-    expect(loadPlayerProgress(storage)).toEqual({
+    expect(loadPlayerProgress(storage)).toMatchObject({
+      version: 2,
       bestScore: 0,
       bestWave: 0,
+      currency: 0,
       totalRuns: 0,
       achievements: [],
+      upgrades: {
+        hull: 0,
+        pulse: 0,
+        magnet: 0,
+        stabilizer: 0,
+      },
     });
 
     expect(savePlayerProgress({
       bestScore: 2400,
       bestWave: 6,
+      currency: 180,
       totalRuns: 3,
       achievements: ['firstBlood'],
-    }, storage)).toEqual({
+      lifetimeStats: {
+        totalKills: 25,
+      },
+    }, storage)).toMatchObject({
+      version: 2,
       bestScore: 2400,
       bestWave: 6,
+      currency: 180,
       totalRuns: 3,
       achievements: ['firstBlood'],
+      lifetimeStats: {
+        totalKills: 25,
+      },
     });
   });
 
   it('records run progression and only reports newly earned achievements once', () => {
     const storage = createStorage();
+    const start = recordRunStart(storage);
+
+    expect(start.progress.lifetimeStats.runsStarted).toBe(1);
 
     const first = recordPlayerRun({
       score: 5200,
@@ -86,6 +108,7 @@ describe('player profile', () => {
     expect(first.progress.bestScore).toBe(5200);
     expect(first.progress.bestWave).toBe(7);
     expect(first.progress.totalRuns).toBe(1);
+    expect(first.progress.currency).toBeGreaterThan(0);
     expect(first.newAchievements.length).toBeGreaterThan(1);
 
     const second = recordPlayerRun({
@@ -100,6 +123,58 @@ describe('player profile', () => {
 
     expect(second.progress.totalRuns).toBe(2);
     expect(second.newAchievements).toEqual([]);
+  });
+
+  it('preserves newer profile fields when recording a completed run', () => {
+    const storage = createStorage();
+
+    savePlayerProgress({
+      currency: 500,
+      upgrades: { hull: 1, pulse: 2, magnet: 0, stabilizer: 1 },
+      loadout: { ability: 'pulse', mutator: null },
+      preRunSelection: { mutator: null },
+    }, storage);
+
+    const result = recordPlayerRun({
+      score: 600,
+      highestWave: 3,
+      kills: 4,
+      pickupsCollected: 1,
+      bossesDefeated: 0,
+      maxPulseHits: 0,
+      flawlessWaves: 0,
+      timePlayed: 28,
+    }, storage);
+
+    expect(result.progress.upgrades).toEqual({
+      hull: 1,
+      pulse: 2,
+      magnet: 0,
+      stabilizer: 1,
+    });
+    expect(result.progress.loadout.ability).toBe('pulse');
+    expect(result.progress.currency).toBeGreaterThan(500);
+  });
+
+  it('purchases upgrades when enough salvage is available', () => {
+    const storage = createStorage();
+
+    savePlayerProgress({ currency: 500 }, storage);
+    const purchase = purchaseUpgrade('hull', storage);
+
+    expect(purchase.ok).toBe(true);
+    expect(purchase.progress.upgrades.hull).toBe(1);
+    expect(purchase.progress.currency).toBeLessThan(500);
+  });
+
+  it('rejects upgrades when salvage is insufficient', () => {
+    const storage = createStorage();
+
+    savePlayerProgress({ currency: 0 }, storage);
+    const purchase = purchaseUpgrade('pulse', storage);
+
+    expect(purchase.ok).toBe(false);
+    expect(purchase.error).toContain('Insufficient');
   });
 
   it('gracefully handles missing or failing storage', () => {

@@ -4,7 +4,7 @@ import { CONFIG } from '../config.js';
 import { clamp, damp } from '../math.js';
 
 export class Player {
-  constructor(scene, terrain) {
+  constructor(scene, terrain, runModifiers = {}) {
     this.scene = scene;
     this.terrain = terrain;
     this.group = new THREE.Group();
@@ -22,7 +22,14 @@ export class Player {
     this.activePowerUpTimer = 0;
     this.repairFlashTimer = 0;
     this.yaw = 0;
-    this.health = CONFIG.player.maxHealth;
+    this.runModifiers = {
+      maxHealth: CONFIG.player.maxHealth,
+      pulseCooldown: CONFIG.player.pulseCooldown,
+      collectionRadius: CONFIG.powerUps.collectionRadius,
+      spreadAngle: CONFIG.player.spreadAngle,
+      ...runModifiers,
+    };
+    this.health = this.runModifiers.maxHealth;
 
     const bodyMaterial = new THREE.MeshStandardMaterial({
       color: CONFIG.palette.player,
@@ -333,6 +340,17 @@ export class Player {
     this.reset();
   }
 
+  setRunModifiers(runModifiers = {}) {
+    this.runModifiers = {
+      maxHealth: CONFIG.player.maxHealth,
+      pulseCooldown: CONFIG.player.pulseCooldown,
+      collectionRadius: CONFIG.powerUps.collectionRadius,
+      spreadAngle: CONFIG.player.spreadAngle,
+      ...runModifiers,
+    };
+    this.health = Math.min(this.health, this.runModifiers.maxHealth);
+  }
+
   reset() {
     this.group.position.set(0, 18, 54);
     this.velocity.set(0, 0, 0);
@@ -343,7 +361,7 @@ export class Player {
     this.activePowerUp = null;
     this.activePowerUpTimer = 0;
     this.repairFlashTimer = 0;
-    this.health = CONFIG.player.maxHealth;
+    this.health = this.runModifiers.maxHealth;
     this.muzzleFlashTimer = 0;
     if (this.muzzleLight) {
       this.muzzleLight.intensity = 0;
@@ -471,8 +489,8 @@ export class Player {
     const shots = [createSpec(direction)];
     for (const side of [-1, 1]) {
       const spreadDirection = direction.clone();
-      spreadDirection.x += side * CONFIG.player.spreadAngle * Math.cos(this.yaw);
-      spreadDirection.z -= side * CONFIG.player.spreadAngle * Math.sin(this.yaw);
+      spreadDirection.x += side * this.runModifiers.spreadAngle * Math.cos(this.yaw);
+      spreadDirection.z -= side * this.runModifiers.spreadAngle * Math.sin(this.yaw);
       spreadDirection.normalize();
       shots.push(createSpec(spreadDirection, side * 1.4));
     }
@@ -483,8 +501,12 @@ export class Player {
     if (this.invulnerability > 0) {
       return false;
     }
-    const shieldedAmount = this.activePowerUp === 'shield' ? amount * 0.45 : amount;
-    this.health = Math.max(0, this.health - shieldedAmount);
+    if (this.activePowerUp === 'shield') {
+      // Shielded hits are fully absorbed while the pickup is active.
+      this.invulnerability = 0.12;
+      return false;
+    }
+    this.health = Math.max(0, this.health - amount);
     this.invulnerability = CONFIG.player.invulnerabilityTime;
     return true;
   }
@@ -494,12 +516,12 @@ export class Player {
   }
 
   triggerPulse() {
-    this.pulseCooldown = CONFIG.player.pulseCooldown;
+    this.pulseCooldown = this.runModifiers.pulseCooldown;
   }
 
   applyPowerUp(type) {
     if (type === 'repair') {
-      this.health = Math.min(CONFIG.player.maxHealth, this.health + CONFIG.powerUps.repairAmount);
+      this.health = Math.min(this.runModifiers.maxHealth, this.health + CONFIG.powerUps.repairAmount);
       this.repairFlashTimer = 1.1;
       return;
     }
@@ -574,6 +596,7 @@ export class Player {
       activePowerUp: this.activePowerUp,
       activePowerUpTimer: this.activePowerUpTimer,
       pulseCooldown: this.pulseCooldown,
+      collectionRadius: this.runModifiers.collectionRadius,
     };
   }
 

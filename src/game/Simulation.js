@@ -5,6 +5,7 @@ import { createRng, segmentIntersectsSphereAt } from './math.js';
 import { createRunStats } from './progression.js';
 import { createGameState, GAME_STATES, resetGameState } from './state.js';
 import { trackEnemyKilled, trackGameOver, trackGameRestart, trackWaveComplete, trackWaveStart } from './analytics.js';
+import { createMissionForWave, updateMissionOnEnemyDestroyed, updateMissionOnWaveStart } from './systems/missions.js';
 import { DroneEnemy } from './entities/DroneEnemy.js';
 import { BossEnemy } from './entities/BossEnemy.js';
 import { MissileEnemy } from './entities/MissileEnemy.js';
@@ -107,13 +108,13 @@ function disposeObject3D(scene, object) {
 }
 
 export class Simulation {
-  constructor(scene, { seed = 1337, mapTheme, playerProgress } = {}) {
+  constructor(scene, { seed = 1337, mapTheme, playerProgress, runModifiers } = {}) {
     this.scene = scene;
     this.seed = seed;
     this.rng = createRng(seed);
     this.environment = createEnvironment(scene, { mapTheme });
     this.terrain = createTerrain(scene, this.rng, { mapTheme });
-    this.player = new Player(scene, this.terrain);
+    this.player = new Player(scene, this.terrain, runModifiers);
     this.projectiles = new ProjectilePool(scene);
     this.state = createGameState();
     this.state.bestScore = playerProgress?.bestScore ?? 0;
@@ -145,6 +146,18 @@ export class Simulation {
     this.tempVelocity = new THREE.Vector3();
     this.enemyAimOffset = new THREE.Vector3(0, 1.5, 0);
     this._waveDamageTaken = 0;
+    this.emergencyRepairTimer = 0;
+  }
+
+  setRunConfig({ playerProgress, runModifiers } = {}) {
+    if (playerProgress) {
+      this.state.bestScore = playerProgress.bestScore ?? this.state.bestScore;
+      this.state.bestWave = playerProgress.bestWave ?? this.state.bestWave;
+      this.state.achievementCount = playerProgress.achievements?.length ?? this.state.achievementCount;
+    }
+    if (runModifiers) {
+      this.player.setRunModifiers(runModifiers);
+    }
   }
 
   restart() {
@@ -184,6 +197,7 @@ export class Simulation {
     this.runStats = createRunStats();
     this.wasWaveCleared = false;
     this._waveDamageTaken = 0;
+    this.emergencyRepairTimer = 0;
     this.scheduleNextPickupSpawn(true);
     this.beginWave(1);
   }
@@ -221,6 +235,8 @@ export class Simulation {
       trackWaveComplete(wave - 1, this.waveElapsed);
     }
     this.state.wave = wave;
+    this.state.mission = this.state.mission ?? createMissionForWave(wave);
+    this.state.mission = updateMissionOnWaveStart(this.state.mission, wave);
     this.spawnQueue = createWaveQueue(wave, this.rng);
     this.spawnCooldown = 0.25;
     this.waveElapsed = 0;
@@ -391,10 +407,14 @@ export class Simulation {
 
   choosePickupType() {
     const weights = CONFIG.powerUps.weights ?? {};
-    const total = CONFIG.powerUps.types.reduce((sum, type) => sum + (weights[type] ?? 1), 0);
+    const isLowHealth = this.player.health <= CONFIG.powerUps.lowHealthRepairThreshold;
+    const total = CONFIG.powerUps.types.reduce((sum, type) => {
+      const bonus = isLowHealth && type === 'repair' ? 5 : 0;
+      return sum + (weights[type] ?? 1) + bonus;
+    }, 0);
     let roll = this.rng() * total;
     for (const type of CONFIG.powerUps.types) {
-      roll -= weights[type] ?? 1;
+      roll -= (weights[type] ?? 1) + (isLowHealth && type === 'repair' ? 5 : 0);
       if (roll <= 0) {
         return type;
       }
@@ -433,6 +453,25 @@ export class Simulation {
     return false;
   }
 
+  spawnEmergencyRepairPickup() {
+    const playerPosition = this.player.group.position;
+    for (let attempts = 0; attempts < 10; attempts += 1) {
+      const angle = this.rng() * Math.PI * 2;
+      const distance = 20 + this.rng() * 28;
+      const x = playerPosition.x + Math.cos(angle) * distance;
+      const z = playerPosition.z + Math.sin(angle) * distance;
+      if (Math.hypot(x, z) > CONFIG.world.arenaRadius - 8) {
+        continue;
+      }
+      const y = this.terrain.getGroundHeight(x, z) + 8;
+      this.spawnPickup(new THREE.Vector3(x, y, z), 'repair');
+      this.emergencyRepairTimer = CONFIG.powerUps.emergencyRepairCooldown;
+      this.state.status = 'Emergency repair drop deployed nearby.';
+      return true;
+    }
+    return false;
+  }
+
   spawnHazardsForWave(wave) {
     this.clearHazards();
     if (wave < 4) {
@@ -464,6 +503,7 @@ export class Simulation {
     const destroyed = enemy.takeDamage(damage);
     this.registerEnemyHit(enemy);
     if (destroyed) {
+      this.state.mission = updateMissionOnEnemyDestroyed(this.state.mission, enemy.type);
       this.state.score += enemy.scoreValue;
       if (this.runStats) {
         this.runStats.score = this.state.score;
@@ -562,6 +602,9 @@ export class Simulation {
       this.recordPlayerDamage(projectile.prevX, projectile.prevY, projectile.prevZ, projectile.damage);
       this.state.health = this.player.health;
       this.spawnEffect(this.player.group.position.x, this.player.group.position.y, this.player.group.position.z, 1.3);
+    } else if (this.player.activePowerUp === 'shield') {
+      this.state.status = 'Shield absorbed incoming fire.';
+      this.spawnEffect(this.player.group.position.x, this.player.group.position.y, this.player.group.position.z, 0.9);
     }
     if (this.player.health <= 0) {
       this.state.mode = GAME_STATES.GAME_OVER;
@@ -582,13 +625,23 @@ export class Simulation {
           });
         }
       } else if (event.type === 'impactPlayer') {
-        this.recordPlayerDamage(
-          event.sourceX ?? enemy.group.position.x,
-          event.sourceY ?? enemy.group.position.y,
-          event.sourceZ ?? enemy.group.position.z,
-          event.damage,
-        );
-        this.player.applyDamage(event.damage);
+        const applied = this.player.applyDamage(event.damage);
+        if (applied) {
+          this.recordPlayerDamage(
+            event.sourceX ?? enemy.group.position.x,
+            event.sourceY ?? enemy.group.position.y,
+            event.sourceZ ?? enemy.group.position.z,
+            event.damage,
+          );
+        } else if (this.player.activePowerUp === 'shield') {
+          this.state.status = 'Shield absorbed incoming fire.';
+          this.spawnEffect(
+            event.sourceX ?? enemy.group.position.x,
+            event.sourceY ?? enemy.group.position.y,
+            event.sourceZ ?? enemy.group.position.z,
+            0.9,
+          );
+        }
         this.state.health = this.player.health;
       } else if (event.type === 'effect') {
         this.spawnEffect(event.position.x, event.position.y, event.position.z, event.size);
@@ -619,8 +672,10 @@ export class Simulation {
     if (this.runStats) {
       this.runStats.maxPulseHits = Math.max(this.runStats.maxPulseHits, hits);
     }
-    this.spawnEffect(pulseOrigin.x, pulseOrigin.y, pulseOrigin.z, 3.2);
-    this.state.status = hits > 0 ? `Pulse burst hit ${hits} target${hits === 1 ? '' : 's'}.` : 'Pulse burst discharged.';
+    this.spawnEffect(pulseOrigin.x, pulseOrigin.y, pulseOrigin.z, 5.2);
+    this.state.status = hits > 0
+      ? `EMP pulse hit ${hits} target${hits === 1 ? '' : 's'} within close range.`
+      : `EMP pulse missed. No enemies were inside ${CONFIG.player.pulseRadius}m.`;
     return true;
   }
 
@@ -653,11 +708,21 @@ export class Simulation {
 
   updatePickups(dt) {
     this.pickupSpawnTimer -= dt;
+    this.emergencyRepairTimer = Math.max(0, this.emergencyRepairTimer - dt);
     if (this.pickupSpawnTimer <= 0) {
       if (this.pickups.length < CONFIG.powerUps.maxActive) {
         this.spawnAmbientPickup();
       }
       this.scheduleNextPickupSpawn();
+    }
+
+    if (
+      this.player.health <= CONFIG.powerUps.lowHealthRepairThreshold
+      && this.emergencyRepairTimer <= 0
+      && this.pickups.length < CONFIG.powerUps.maxActive
+      && !this.pickups.some((pickup) => pickup.type === 'repair')
+    ) {
+      this.spawnEmergencyRepairPickup();
     }
 
     const survivors = [];
@@ -685,7 +750,7 @@ export class Simulation {
         ring.scale.setScalar(0.92 + (Math.sin(pickup.age * 6) * 0.5 + 0.5) * 0.3);
       }
 
-      if (horizontalDistance <= CONFIG.powerUps.collectionRadius + 2.2 && verticalDistance <= 8) {
+      if (horizontalDistance <= this.player.runModifiers.collectionRadius + 2.2 && verticalDistance <= 8) {
         this.player.applyPowerUp(pickup.type);
         if (this.runStats) {
           this.runStats.pickupsCollected += 1;
@@ -755,21 +820,12 @@ export class Simulation {
   }
 
   update(dt, controls) {
-    if (controls.restartPressed) {
-      this.restart();
-      return;
-    }
-
     if (controls.pausePressed) {
       if (this.state.mode === GAME_STATES.PAUSED) {
         this.resume();
       } else if (this.state.mode === GAME_STATES.RUNNING) {
         this.pause('Paused');
       }
-    }
-
-    if (this.state.mode === GAME_STATES.BOOT) {
-      this.restart();
     }
 
     if (this.state.mode !== GAME_STATES.RUNNING) {
@@ -889,6 +945,7 @@ export class Simulation {
       health: this.state.health,
       enemyCount: this.state.enemyCount,
       status: this.state.status,
+      mission: this.state.mission ? { ...this.state.mission } : null,
       playerPosition: this.player.group.position,
       playerYaw: this.player.yaw,
       lastHit: this.lastHit,
@@ -934,12 +991,15 @@ export class Simulation {
         maxPulseHits: 0,
         flawlessWaves: 0,
         damageTaken: 0,
+        mission: this.state.mission ? { ...this.state.mission } : null,
       };
     }
     return {
       ...this.runStats,
       score: this.state.score,
       highestWave: Math.max(this.runStats.highestWave, this.state.wave),
+      timePlayed: this.state.time,
+      mission: this.state.mission ? { ...this.state.mission } : null,
     };
   }
 
