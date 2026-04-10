@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { createRng } from '../math.js';
-import { canSpawnType, createWaveQueue, getSpawnBaseType, getWaveSpec } from './waves.js';
+import { buildEnemySpawnProfile, canSpawnType, createWaveQueue, getSpawnBaseType, getWaveDifficultyModifiers, getWaveSpec } from './waves.js';
 
 describe('wave system', () => {
   it('scales wave composition by wave number', () => {
@@ -32,5 +32,22 @@ describe('wave system', () => {
     expect(canSpawnType('tank', { tank: 6, drone: 0, missile: 0, turret: 0, ship: 0, boss: 0 })).toBe(false);
     expect(canSpawnType('droneSupport', { tank: 0, drone: 7, missile: 0, turret: 0, ship: 0, boss: 0 })).toBe(false);
     expect(getSpawnBaseType('droneJammer')).toBe('drone');
+  });
+
+  it('builds stronger spawn profiles as waves climb', () => {
+    const earlyTank = buildEnemySpawnProfile('tank', 1);
+    const lateTank = buildEnemySpawnProfile('tank', 8);
+
+    expect(lateTank.health).toBeGreaterThan(earlyTank.health);
+    expect(lateTank.damage).toBeGreaterThan(earlyTank.damage);
+    expect(lateTank.fireInterval).toBeLessThan(earlyTank.fireInterval);
+    expect(lateTank.burstCount).toBeGreaterThan(earlyTank.burstCount);
+  });
+
+  it('unlocks higher weapon tiers at milestone waves', () => {
+    expect(getWaveDifficultyModifiers(5).tankBurstCount).toBe(1);
+    expect(getWaveDifficultyModifiers(6).tankBurstCount).toBe(2);
+    expect(getWaveDifficultyModifiers(8).shipBroadsideCount).toBe(2);
+    expect(getWaveDifficultyModifiers(10).bossMissileVolleyCount).toBe(3);
   });
 });

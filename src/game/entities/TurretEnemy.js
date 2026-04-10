@@ -5,15 +5,16 @@ import { normalizeAngle, randomRange, segmentIntersectsCylinder, segmentIntersec
 import { EnemyBase } from './EnemyBase.js';
 
 export class TurretEnemy extends EnemyBase {
-  constructor(scene, position, rng) {
+  constructor(scene, position, rng, profile = CONFIG.enemies.turret) {
     super(scene, {
       type: 'turret',
       position,
-      health: CONFIG.enemies.turret.health,
-      radius: CONFIG.enemies.turret.radius,
-      scoreValue: CONFIG.enemies.turret.score,
+      health: profile.health,
+      radius: profile.radius,
+      scoreValue: profile.score,
     });
     this.rng = rng;
+    this.profile = profile;
     this.fireCooldown = randomRange(rng, 0.3, 1.1);
     this.heading = randomRange(rng, -Math.PI, Math.PI);
 
@@ -72,19 +73,32 @@ export class TurretEnemy extends EnemyBase {
 
     this.fireCooldown -= dt;
     if (horizDist < 132 && this.fireCooldown <= 0) {
-      const shot = this.buildShot(
-        new THREE.Vector3(playerPos.x, playerPos.y + 1.2, playerPos.z),
-        CONFIG.enemies.turret.projectileSpeed,
-        CONFIG.enemies.turret.projectileLife,
-        CONFIG.enemies.turret.damage,
-      );
-      shot.origin.y += 3.3;
-      if (!(context.terrain.hasLineOfSight?.(shot.origin, playerPos, shot.radius) ?? true)) {
+      const shotOrigin = this.group.position.clone();
+      shotOrigin.y += 3.3;
+      if (!(context.terrain.hasLineOfSight?.(shotOrigin, playerPos, 0.9) ?? true)) {
         this.fireCooldown = 0.35;
         return [];
       }
-      this.fireCooldown = CONFIG.enemies.turret.fireInterval + randomRange(this.rng, -0.15, 0.18);
-      return [{ type: 'spawnProjectile', spec: shot }];
+
+      const burstCount = this.profile.burstCount ?? 1;
+      const spreadOffsets = burstCount === 1
+        ? [0]
+        : burstCount === 2
+          ? [-0.06, 0.06]
+          : [-0.12, 0, 0.12];
+      const shots = [];
+      for (const offset of spreadOffsets) {
+        const shot = this.buildShot(
+          new THREE.Vector3(playerPos.x + offset * 14, playerPos.y + 1.2, playerPos.z + offset * 8),
+          this.profile.projectileSpeed,
+          this.profile.projectileLife,
+          this.profile.damage,
+        );
+        shot.origin.y += 3.3;
+        shots.push({ type: 'spawnProjectile', spec: shot });
+      }
+      this.fireCooldown = this.profile.fireInterval + randomRange(this.rng, -0.15, 0.18);
+      return shots;
     }
 
     return [];

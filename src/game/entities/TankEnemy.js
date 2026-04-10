@@ -5,15 +5,16 @@ import { normalizeAngle, randomRange, segmentIntersectsCylinder, segmentIntersec
 import { EnemyBase } from './EnemyBase.js';
 
 export class TankEnemy extends EnemyBase {
-  constructor(scene, position, rng) {
+  constructor(scene, position, rng, profile = CONFIG.enemies.tank) {
     super(scene, {
       type: 'tank',
       position,
-      health: CONFIG.enemies.tank.health,
-      radius: CONFIG.enemies.tank.radius,
-      scoreValue: CONFIG.enemies.tank.score,
+      health: profile.health,
+      radius: profile.radius,
+      scoreValue: profile.score,
     });
     this.rng = rng;
+    this.profile = profile;
     this.heading = randomRange(rng, -Math.PI, Math.PI);
     this.fireCooldown = randomRange(rng, 0.5, 1.4);
     this.turnTimer = randomRange(rng, 1.5, 3.2);
@@ -154,8 +155,8 @@ export class TankEnemy extends EnemyBase {
     const headingError = normalizeAngle(toPlayer - this.heading);
     this.heading += Math.sign(headingError) * Math.min(Math.abs(headingError), dt * 0.55);
 
-    const nextX = this.group.position.x + Math.sin(this.heading) * CONFIG.enemies.tank.moveSpeed * dt;
-    const nextZ = this.group.position.z + Math.cos(this.heading) * CONFIG.enemies.tank.moveSpeed * dt;
+    const nextX = this.group.position.x + Math.sin(this.heading) * this.profile.moveSpeed * dt;
+    const nextZ = this.group.position.z + Math.cos(this.heading) * this.profile.moveSpeed * dt;
     if (context.terrain.canOccupy('tank', nextX, nextZ)) {
       this.group.position.x = nextX;
       this.group.position.z = nextZ;
@@ -178,19 +179,32 @@ export class TankEnemy extends EnemyBase {
     this.fireCooldown -= dt;
     const horizontalDistance = Math.hypot(playerPos.x - this.group.position.x, playerPos.z - this.group.position.z);
     if (horizontalDistance < 118 && this.fireCooldown <= 0) {
-      const shot = this.buildShot(
-        new THREE.Vector3(playerPos.x, playerPos.y + 1.8, playerPos.z),
-        CONFIG.enemies.tank.projectileSpeed,
-        CONFIG.enemies.tank.projectileLife,
-        CONFIG.enemies.tank.damage,
-      );
-      shot.origin.y += 3.4;
-      if (!(context.terrain.hasLineOfSight?.(shot.origin, playerPos, shot.radius) ?? true)) {
+      const shotOrigin = this.group.position.clone();
+      shotOrigin.y += 3.4;
+      if (!(context.terrain.hasLineOfSight?.(shotOrigin, playerPos, 0.9) ?? true)) {
         this.fireCooldown = 0.35;
         return [];
       }
-      this.fireCooldown = CONFIG.enemies.tank.fireInterval + randomRange(this.rng, -0.35, 0.25);
-      return [{ type: 'spawnProjectile', spec: shot }];
+
+      const shots = [];
+      const burstCount = this.profile.burstCount ?? 1;
+      const spreadOffsets = burstCount === 1
+        ? [0]
+        : burstCount === 2
+          ? [-0.08, 0.08]
+          : [-0.14, 0, 0.14];
+      for (const offset of spreadOffsets) {
+        const shot = this.buildShot(
+          new THREE.Vector3(playerPos.x + offset * 18, playerPos.y + 1.8, playerPos.z + offset * 10),
+          this.profile.projectileSpeed,
+          this.profile.projectileLife,
+          this.profile.damage,
+        );
+        shot.origin.y += 3.4;
+        shots.push({ type: 'spawnProjectile', spec: shot });
+      }
+      this.fireCooldown = this.profile.fireInterval + randomRange(this.rng, -0.35, 0.25);
+      return shots;
     }
     return [];
   }

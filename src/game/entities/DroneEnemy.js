@@ -5,10 +5,10 @@ import { damp, randomRange, segmentIntersectsSphere, segmentIntersectsSphereAt }
 import { EnemyBase } from './EnemyBase.js';
 
 export class DroneEnemy extends EnemyBase {
-  constructor(scene, position, rng, variant = 'assault') {
+  constructor(scene, position, rng, variant = 'assault', profileOverride = null) {
     const baseConfig = CONFIG.enemies.drone;
     const variantConfig = baseConfig.variants?.[variant] ?? {};
-    const profile = { ...baseConfig, ...variantConfig };
+    const profile = profileOverride ?? { ...baseConfig, ...variantConfig };
     super(scene, {
       type: 'drone',
       position,

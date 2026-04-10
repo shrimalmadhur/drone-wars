@@ -55,3 +55,70 @@ export function getSpawnBaseType(type) {
   }
   return type;
 }
+
+export function getWaveDifficultyModifiers(wave) {
+  const tier = Math.max(0, wave - 1);
+  return {
+    healthMultiplier: Math.min(2.2, 1 + tier * 0.09),
+    damageMultiplier: Math.min(1.85, 1 + tier * 0.07),
+    speedMultiplier: Math.min(1.4, 1 + tier * 0.035),
+    projectileSpeedMultiplier: Math.min(1.35, 1 + tier * 0.025),
+    fireRateMultiplier: Math.min(1.55, 1 + tier * 0.04),
+    scoreMultiplier: Math.min(2.4, 1 + tier * 0.12),
+    tankBurstCount: wave >= 11 ? 3 : wave >= 6 ? 2 : 1,
+    turretBurstCount: wave >= 12 ? 3 : wave >= 7 ? 2 : 1,
+    shipBroadsideCount: wave >= 10 ? 3 : wave >= 8 ? 2 : 1,
+    bossSalvoCount: wave >= 10 ? 5 : 3,
+    bossMissileVolleyCount: wave >= 10 ? 3 : 2,
+  };
+}
+
+export function buildEnemySpawnProfile(type, wave) {
+  const modifiers = getWaveDifficultyModifiers(wave);
+  const configKey = type === 'droneSupport'
+    ? 'droneSupport'
+    : type === 'droneJammer'
+      ? 'droneJammer'
+      : type;
+  const config = getEnemyConfig(configKey);
+  const profile = {
+    ...config,
+    health: Math.round(config.health * modifiers.healthMultiplier),
+    damage: config.damage ? Math.round(config.damage * modifiers.damageMultiplier) : config.damage,
+    moveSpeed: config.moveSpeed ? config.moveSpeed * modifiers.speedMultiplier : config.moveSpeed,
+    projectileSpeed: config.projectileSpeed ? config.projectileSpeed * modifiers.projectileSpeedMultiplier : config.projectileSpeed,
+    fireInterval: config.fireInterval ? config.fireInterval / modifiers.fireRateMultiplier : config.fireInterval,
+    missileInterval: config.missileInterval ? config.missileInterval / Math.min(1.35, modifiers.fireRateMultiplier) : config.missileInterval,
+    turnRate: config.turnRate ? config.turnRate * Math.min(1.4, modifiers.speedMultiplier) : config.turnRate,
+    score: Math.round(config.score * modifiers.scoreMultiplier),
+  };
+
+  if (type === 'tank') {
+    profile.burstCount = modifiers.tankBurstCount;
+  } else if (type === 'turret') {
+    profile.burstCount = modifiers.turretBurstCount;
+  } else if (type === 'ship') {
+    profile.broadsideCount = modifiers.shipBroadsideCount;
+  } else if (type === 'boss') {
+    profile.salvoCount = modifiers.bossSalvoCount;
+    profile.missileVolleyCount = modifiers.bossMissileVolleyCount;
+  }
+
+  return profile;
+}
+
+function getEnemyConfig(type) {
+  if (type === 'droneSupport') {
+    return {
+      ...CONFIG.enemies.drone,
+      ...CONFIG.enemies.drone.variants.support,
+    };
+  }
+  if (type === 'droneJammer') {
+    return {
+      ...CONFIG.enemies.drone,
+      ...CONFIG.enemies.drone.variants.jammer,
+    };
+  }
+  return CONFIG.enemies[type];
+}

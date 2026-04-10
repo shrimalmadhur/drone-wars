@@ -14,7 +14,7 @@ import { ProjectilePool } from './entities/Projectile.js';
 import { ShipEnemy } from './entities/ShipEnemy.js';
 import { TankEnemy } from './entities/TankEnemy.js';
 import { TurretEnemy } from './entities/TurretEnemy.js';
-import { canSpawnType, createWaveQueue, getSpawnBaseType } from './systems/waves.js';
+import { buildEnemySpawnProfile, canSpawnType, createWaveQueue, getSpawnBaseType } from './systems/waves.js';
 import { createEnvironment } from './world/environment.js';
 import { createTerrain } from './world/terrain.js';
 
@@ -267,6 +267,7 @@ export class Simulation {
 
   spawnEnemy(type) {
     const baseType = getSpawnBaseType(type);
+    const profile = buildEnemySpawnProfile(type, this.state.wave);
     const terrainSpawnType = baseType === 'turret' ? 'tank' : baseType === 'boss' ? 'drone' : baseType;
     const allowDistantObjectiveSpawn = type === 'ship';
     const position = this.terrain.getSpawnPoint(
@@ -280,21 +281,21 @@ export class Simulation {
 
     let enemy = null;
     if (type === 'tank') {
-      enemy = new TankEnemy(this.scene, position, this.rng);
+      enemy = new TankEnemy(this.scene, position, this.rng, profile);
     } else if (type === 'drone') {
-      enemy = new DroneEnemy(this.scene, position, this.rng);
+      enemy = new DroneEnemy(this.scene, position, this.rng, 'assault', profile);
     } else if (type === 'droneSupport') {
-      enemy = new DroneEnemy(this.scene, position, this.rng, 'support');
+      enemy = new DroneEnemy(this.scene, position, this.rng, 'support', profile);
     } else if (type === 'droneJammer') {
-      enemy = new DroneEnemy(this.scene, position, this.rng, 'jammer');
+      enemy = new DroneEnemy(this.scene, position, this.rng, 'jammer', profile);
     } else if (type === 'missile') {
-      enemy = new MissileEnemy(this.scene, position);
+      enemy = new MissileEnemy(this.scene, position, profile);
     } else if (type === 'turret') {
-      enemy = new TurretEnemy(this.scene, position, this.rng);
+      enemy = new TurretEnemy(this.scene, position, this.rng, profile);
     } else if (type === 'ship') {
-      enemy = new ShipEnemy(this.scene, position);
+      enemy = new ShipEnemy(this.scene, position, profile);
     } else if (type === 'boss') {
-      enemy = new BossEnemy(this.scene, position, this.rng);
+      enemy = new BossEnemy(this.scene, position, this.rng, profile);
     }
     if (!enemy) {
       return false;
@@ -656,7 +657,7 @@ export class Simulation {
       } else if (event.type === 'effect') {
         this.spawnEffect(event.position.x, event.position.y, event.position.z, event.size);
       } else if (event.type === 'spawnEnemy' && event.enemyType === 'missile') {
-        this.enemies.push(new MissileEnemy(this.scene, event.position));
+        this.enemies.push(new MissileEnemy(this.scene, event.position, buildEnemySpawnProfile('missile', this.state.wave)));
       }
     }
   }

@@ -5,14 +5,15 @@ import { segmentIntersectsCylinder, segmentIntersectsCylinderAt } from '../math.
 import { EnemyBase } from './EnemyBase.js';
 
 export class ShipEnemy extends EnemyBase {
-  constructor(scene, position) {
+  constructor(scene, position, profile = CONFIG.enemies.ship) {
     super(scene, {
       type: 'ship',
       position,
-      health: CONFIG.enemies.ship.health,
-      radius: CONFIG.enemies.ship.radius,
-      scoreValue: CONFIG.enemies.ship.score,
+      health: profile.health,
+      radius: profile.radius,
+      scoreValue: profile.score,
     });
+    this.profile = profile;
     this.fireCooldown = 1.2;
     this.bob = Math.random() * Math.PI * 2;
 
@@ -169,19 +170,32 @@ export class ShipEnemy extends EnemyBase {
 
     this.fireCooldown -= dt;
     if (this.fireCooldown <= 0 && this.group.position.distanceTo(playerPos) < 150) {
-      const shot = this.buildShot(
-        new THREE.Vector3(playerPos.x, playerPos.y + 1.5, playerPos.z),
-        CONFIG.enemies.ship.projectileSpeed,
-        CONFIG.enemies.ship.projectileLife,
-        CONFIG.enemies.ship.damage,
-      );
-      shot.origin.y += 5;
-      if (!(context.terrain.hasLineOfSight?.(shot.origin, playerPos, shot.radius) ?? true)) {
+      const shotOrigin = this.group.position.clone();
+      shotOrigin.y += 5;
+      if (!(context.terrain.hasLineOfSight?.(shotOrigin, playerPos, 0.9) ?? true)) {
         this.fireCooldown = 0.35;
         return [];
       }
-      this.fireCooldown = CONFIG.enemies.ship.fireInterval;
-      return [{ type: 'spawnProjectile', spec: shot }];
+
+      const broadsideCount = this.profile.broadsideCount ?? 1;
+      const spreadOffsets = broadsideCount === 1
+        ? [0]
+        : broadsideCount === 2
+          ? [-0.12, 0.12]
+          : [-0.18, 0, 0.18];
+      const shots = [];
+      for (const offset of spreadOffsets) {
+        const shot = this.buildShot(
+          new THREE.Vector3(playerPos.x + offset * 24, playerPos.y + 1.5, playerPos.z + offset * 12),
+          this.profile.projectileSpeed,
+          this.profile.projectileLife,
+          this.profile.damage,
+        );
+        shot.origin.y += 5;
+        shots.push({ type: 'spawnProjectile', spec: shot });
+      }
+      this.fireCooldown = this.profile.fireInterval;
+      return shots;
     }
     return [];
   }

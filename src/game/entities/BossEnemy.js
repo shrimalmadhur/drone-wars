@@ -5,15 +5,16 @@ import { segmentIntersectsCylinder, segmentIntersectsCylinderAt } from '../math.
 import { EnemyBase } from './EnemyBase.js';
 
 export class BossEnemy extends EnemyBase {
-  constructor(scene, position, rng) {
+  constructor(scene, position, rng, profile = CONFIG.enemies.boss) {
     super(scene, {
       type: 'boss',
       position,
-      health: CONFIG.enemies.boss.health,
-      radius: CONFIG.enemies.boss.radius,
-      scoreValue: CONFIG.enemies.boss.score,
+      health: profile.health,
+      radius: profile.radius,
+      scoreValue: profile.score,
     });
     this.rng = rng;
+    this.profile = profile;
     this.fireCooldown = 1.8;
     this.missileCooldown = 4.4;
     this.hoverPhase = rng() * Math.PI * 2;
@@ -95,7 +96,9 @@ export class BossEnemy extends EnemyBase {
     this.missileCooldown -= dt;
 
     if (this.fireCooldown <= 0) {
-      const offsets = [-0.18, 0, 0.18];
+      const offsets = this.profile.salvoCount >= 5
+        ? [-0.28, -0.14, 0, 0.14, 0.28]
+        : [-0.18, 0, 0.18];
       for (const offset of offsets) {
         const shotTarget = new THREE.Vector3(
           playerPos.x + offset * 18,
@@ -104,22 +107,28 @@ export class BossEnemy extends EnemyBase {
         );
         const shot = this.buildShot(
           shotTarget,
-          CONFIG.enemies.boss.projectileSpeed,
-          CONFIG.enemies.boss.projectileLife,
-          CONFIG.enemies.boss.damage,
+          this.profile.projectileSpeed,
+          this.profile.projectileLife,
+          this.profile.damage,
         );
         shot.origin.y += 3.8;
         events.push({ type: 'spawnProjectile', spec: shot });
       }
-      this.fireCooldown = CONFIG.enemies.boss.fireInterval;
+      this.fireCooldown = this.profile.fireInterval;
     }
 
     if (this.missileCooldown <= 0) {
-      events.push(
-        { type: 'spawnEnemy', enemyType: 'missile', position: this.group.position.clone().add(new THREE.Vector3(-8, 1.5, 0)) },
-        { type: 'spawnEnemy', enemyType: 'missile', position: this.group.position.clone().add(new THREE.Vector3(8, 1.5, 0)) },
-      );
-      this.missileCooldown = CONFIG.enemies.boss.missileInterval;
+      const missileOffsets = (this.profile.missileVolleyCount ?? 2) >= 3
+        ? [-8, 0, 8]
+        : [-8, 8];
+      for (const x of missileOffsets) {
+        events.push({
+          type: 'spawnEnemy',
+          enemyType: 'missile',
+          position: this.group.position.clone().add(new THREE.Vector3(x, 1.5, 0)),
+        });
+      }
+      this.missileCooldown = this.profile.missileInterval;
     }
 
     return events;

@@ -5,15 +5,16 @@ import { segmentIntersectsSphere, segmentIntersectsSphereAt } from '../math.js';
 import { EnemyBase } from './EnemyBase.js';
 
 export class MissileEnemy extends EnemyBase {
-  constructor(scene, position) {
+  constructor(scene, position, profile = CONFIG.enemies.missile) {
     super(scene, {
       type: 'missile',
       position,
-      health: CONFIG.enemies.missile.health,
-      radius: CONFIG.enemies.missile.radius,
-      scoreValue: CONFIG.enemies.missile.score,
+      health: profile.health,
+      radius: profile.radius,
+      scoreValue: profile.score,
     });
-    this.velocity = new THREE.Vector3(0, 0, -CONFIG.enemies.missile.moveSpeed);
+    this.profile = profile;
+    this.velocity = new THREE.Vector3(0, 0, -profile.moveSpeed);
     this.life = 0;
 
     const bodyMat = new THREE.MeshStandardMaterial({
@@ -104,16 +105,16 @@ export class MissileEnemy extends EnemyBase {
       .copy(context.player.group.position)
       .sub(this.group.position)
       .normalize()
-      .multiplyScalar(CONFIG.enemies.missile.moveSpeed);
+      .multiplyScalar(this.profile.moveSpeed);
 
-    this.velocity.lerp(desired, Math.min(1, dt * CONFIG.enemies.missile.turnRate));
+    this.velocity.lerp(desired, Math.min(1, dt * this.profile.turnRate));
     this.group.position.addScaledVector(this.velocity, dt);
     this.group.lookAt(this.group.position.clone().add(this.velocity));
     // Flickering exhaust
     const flicker = 0.6 + Math.random() * 0.4;
     this.exhaust.scale.set(0.8 * flicker, 0.8 * flicker, 1.5 * flicker);
 
-    if (this.life > CONFIG.enemies.missile.life) {
+    if (this.life > this.profile.life) {
       this.alive = false;
       return [{ type: 'effect', position: this.group.position.clone(), size: 1.2 }];
     }
@@ -135,7 +136,7 @@ export class MissileEnemy extends EnemyBase {
         { type: 'effect', position: this.group.position.clone(), size: 1.6 },
         {
           type: 'impactPlayer',
-          damage: CONFIG.enemies.missile.damage,
+          damage: this.profile.damage,
           sourceX: this.group.position.x,
           sourceY: this.group.position.y,
           sourceZ: this.group.position.z,
