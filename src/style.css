@@ -311,6 +311,79 @@ canvas {
   text-transform: uppercase;
 }
 
+.run-summary__hero {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.run-summary__hero-block {
+  padding: 18px 20px;
+  border-radius: 22px;
+  border: 1px solid rgba(138, 244, 255, 0.14);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
+}
+
+.run-summary__hero-block--highlight {
+  border-color: rgba(255, 209, 102, 0.24);
+  background:
+    radial-gradient(circle at top right, rgba(255, 209, 102, 0.14), transparent 36%),
+    linear-gradient(180deg, rgba(255, 209, 102, 0.08), rgba(255, 255, 255, 0.02));
+}
+
+.run-summary__hero-label,
+.run-summary__record span {
+  display: block;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.7rem;
+}
+
+.run-summary__hero-value {
+  display: block;
+  margin-top: 8px;
+  font: 700 1.34rem/1.08 'Orbitron', sans-serif;
+  text-transform: uppercase;
+}
+
+.run-summary__hero-copy {
+  margin: 10px 0 0;
+  color: rgba(244, 248, 255, 0.84);
+  line-height: 1.45;
+  font-size: 0.95rem;
+}
+
+.run-summary__record-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.run-summary__record {
+  padding: 16px 18px;
+  border-radius: 20px;
+  border: 1px solid rgba(138, 244, 255, 0.14);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.018));
+}
+
+.run-summary__record strong {
+  display: block;
+  margin-top: 8px;
+  font: 700 1.3rem/1 'Orbitron', sans-serif;
+}
+
+.run-summary__record small,
+.run-summary__stat small {
+  display: block;
+  margin-top: 8px;
+  color: rgba(244, 248, 255, 0.68);
+  line-height: 1.4;
+  font-size: 0.84rem;
+}
+
 .run-summary__stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -356,19 +429,19 @@ canvas {
   transition: width 180ms ease;
 }
 
-.run-summary__stat:nth-child(1),
-.run-summary__stat:nth-child(6) {
+.run-summary__stat:nth-child(4),
+.run-summary__record:nth-child(3) {
   border-color: rgba(255, 209, 102, 0.22);
   background:
     linear-gradient(180deg, rgba(255, 209, 102, 0.08), rgba(255, 255, 255, 0.02));
 }
 
 .run-summary__headline {
-  margin: 20px 0 0;
+  margin: 12px 0 0;
   color: rgba(244, 248, 255, 0.9);
   line-height: 1.5;
   font-size: 1.02rem;
-  max-width: 52ch;
+  max-width: 44ch;
 }
 
 .run-summary__actions {
@@ -1032,6 +1105,12 @@ canvas {
 
   .pickup-banner {
     top: 18%;
+  }
+
+  .run-summary__hero,
+  .run-summary__record-strip,
+  .run-summary__stats {
+    grid-template-columns: 1fr;
   }
 }
 

@@ -142,44 +142,70 @@
       <div class="run-summary__panel">
         <p class="run-summary__eyebrow">Run complete</p>
         <h2 class="run-summary__title">Combat summary</h2>
-        <div class="run-summary__stats">
-          <div class="run-summary__stat">
-            <span>Score</span>
-            <strong id="summary-score">0</strong>
+        <div class="run-summary__hero">
+          <div class="run-summary__hero-block run-summary__hero-block--highlight">
+            <span class="run-summary__hero-label">Outcome</span>
+            <strong id="summary-outcome" class="run-summary__hero-value">Sector secured</strong>
+            <p id="summary-headline" class="run-summary__headline">Jump straight into another run or open the upgrade hangar to spend salvage first.</p>
           </div>
-          <div class="run-summary__stat">
-            <span>Wave</span>
-            <strong id="summary-wave">0</strong>
-          </div>
-          <div class="run-summary__stat">
-            <span>Kills</span>
-            <strong id="summary-kills">0</strong>
-          </div>
-          <div class="run-summary__stat">
-            <span>Pickups</span>
-            <strong id="summary-pickups">0</strong>
-          </div>
-          <div class="run-summary__stat">
-            <span>New awards</span>
-            <strong id="summary-achievements">0</strong>
-          </div>
-          <div class="run-summary__stat">
-            <span>Salvage earned</span>
-            <strong id="summary-currency">0</strong>
-          </div>
-          <div class="run-summary__stat">
-            <span>Mission</span>
-            <strong id="summary-mission">No objective</strong>
+          <div class="run-summary__hero-block">
+            <span class="run-summary__hero-label">Mission</span>
+            <strong id="summary-mission" class="run-summary__hero-value">No objective</strong>
+            <p id="summary-mission-copy" class="run-summary__hero-copy">No mission data recorded.</p>
             <div class="run-summary__progress" aria-hidden="true">
               <div id="summary-mission-fill" class="run-summary__progress-fill"></div>
             </div>
           </div>
+        </div>
+        <div class="run-summary__record-strip">
+          <div class="run-summary__record">
+            <span>Score</span>
+            <strong id="summary-score">0</strong>
+            <small id="summary-score-delta">No new record</small>
+          </div>
+          <div class="run-summary__record">
+            <span>Wave</span>
+            <strong id="summary-wave">0</strong>
+            <small id="summary-wave-delta">No new record</small>
+          </div>
+          <div class="run-summary__record">
+            <span>Salvage</span>
+            <strong id="summary-currency">0</strong>
+            <small id="summary-achievement-copy">0 new awards</small>
+          </div>
+        </div>
+        <div class="run-summary__stats">
+          <div class="run-summary__stat">
+            <span>Kills</span>
+            <strong id="summary-kills">0</strong>
+            <small>Confirmed hostile eliminations</small>
+          </div>
+          <div class="run-summary__stat">
+            <span>Pickups</span>
+            <strong id="summary-pickups">0</strong>
+            <small>Combat boosts collected mid-run</small>
+          </div>
+          <div class="run-summary__stat">
+            <span>Damage taken</span>
+            <strong id="summary-damage">0</strong>
+            <small>Hull damage absorbed this run</small>
+          </div>
+          <div class="run-summary__stat">
+            <span>EMP peak</span>
+            <strong id="summary-pulse">0</strong>
+            <small>Most targets hit by a single EMP</small>
+          </div>
           <div class="run-summary__stat">
             <span>Ability</span>
             <strong id="summary-ability">EMP Pulse</strong>
+            <small>Equipped active system</small>
+          </div>
+          <div class="run-summary__stat">
+            <span>New awards</span>
+            <strong id="summary-achievements">0</strong>
+            <small id="summary-awards-detail">No new awards unlocked</small>
           </div>
         </div>
-        <p id="summary-headline" class="run-summary__headline">Jump straight into another run or open the upgrade hangar to spend salvage first.</p>
         <div class="run-summary__actions">
           <button id="summary-rerun" class="run-summary__button" type="button">Replay mission</button>
           <button id="summary-hangar" class="run-summary__button run-summary__button--ghost" type="button">Upgrade drone</button>

@@ -41,10 +41,18 @@ const summaryScore = document.querySelector('#summary-score');
 const summaryWave = document.querySelector('#summary-wave');
 const summaryKills = document.querySelector('#summary-kills');
 const summaryPickups = document.querySelector('#summary-pickups');
+const summaryDamage = document.querySelector('#summary-damage');
+const summaryPulse = document.querySelector('#summary-pulse');
 const summaryAchievements = document.querySelector('#summary-achievements');
+const summaryAchievementCopy = document.querySelector('#summary-achievement-copy');
+const summaryAwardsDetail = document.querySelector('#summary-awards-detail');
 const summaryCurrency = document.querySelector('#summary-currency');
+const summaryOutcome = document.querySelector('#summary-outcome');
 const summaryMission = document.querySelector('#summary-mission');
+const summaryMissionCopy = document.querySelector('#summary-mission-copy');
 const summaryAbility = document.querySelector('#summary-ability');
+const summaryScoreDelta = document.querySelector('#summary-score-delta');
+const summaryWaveDelta = document.querySelector('#summary-wave-delta');
 const summaryMissionFill = document.querySelector('#summary-mission-fill');
 const summaryHeadline = document.querySelector('#summary-headline');
 const summaryRerunButton = document.querySelector('#summary-rerun');
@@ -121,24 +129,61 @@ function hideRunSummary() {
   runSummary.hidden = true;
 }
 
-function showRunSummary(result) {
+function formatRecordDelta(current, previous, noun) {
+  if (current > previous) {
+    return `New personal best: +${current - previous} ${noun}`;
+  }
+  return 'No new record this run';
+}
+
+function buildMissionSummary(mission) {
+  if (!mission) {
+    return {
+      title: 'No objective',
+      copy: 'No mission was active for this run.',
+      progressWidth: '0%',
+      outcome: 'Run complete',
+    };
+  }
+
+  const ratio = mission.target > 0 ? mission.progress / mission.target : 0;
+  return {
+    title: mission.label,
+    copy: mission.completed
+      ? `${mission.description} completed at ${mission.progress}/${mission.target}.`
+      : `${mission.description} finished at ${mission.progress}/${mission.target}.`,
+    progressWidth: `${Math.max(8, ratio * 100)}%`,
+    outcome: mission.completed ? 'Mission accomplished' : 'Run complete',
+  };
+}
+
+function showRunSummary(result, previousProgress) {
   const { runSummary: stats, newAchievements, currencyEarned } = result;
+  const missionSummary = buildMissionSummary(stats.mission);
   summaryScore.textContent = stats.score.toString();
   summaryWave.textContent = stats.highestWave.toString();
   summaryKills.textContent = stats.kills.toString();
   summaryPickups.textContent = stats.pickupsCollected.toString();
+  summaryDamage.textContent = Math.round(stats.damageTaken ?? 0).toString();
+  summaryPulse.textContent = (stats.maxPulseHits ?? 0).toString();
   summaryAchievements.textContent = newAchievements.length.toString();
+  summaryAchievementCopy.textContent = `${newAchievements.length} new award${newAchievements.length === 1 ? '' : 's'}`;
+  summaryAwardsDetail.textContent = newAchievements.length > 0
+    ? newAchievements.join(', ')
+    : 'No new awards unlocked';
   summaryCurrency.textContent = currencyEarned.toString();
+  summaryOutcome.textContent = missionSummary.outcome;
   summaryAbility.textContent = stats.ability?.label ?? ABILITY_DEFINITIONS.pulse.label;
-  summaryMission.textContent = stats.mission
-    ? `${stats.mission.label} ${stats.mission.progress}/${stats.mission.target}${stats.mission.completed ? ' complete' : ''}`
-    : 'No objective';
-  summaryMissionFill.style.width = stats.mission
-    ? `${Math.max(8, (stats.mission.progress / stats.mission.target) * 100)}%`
-    : '0%';
-  summaryHeadline.textContent = newAchievements.length > 0
-    ? `New awards unlocked: ${newAchievements.join(', ')}.`
-    : 'No new awards this time. Spend your salvage and relaunch.';
+  summaryMission.textContent = missionSummary.title;
+  summaryMissionCopy.textContent = missionSummary.copy;
+  summaryMissionFill.style.width = missionSummary.progressWidth;
+  summaryScoreDelta.textContent = formatRecordDelta(stats.score, previousProgress.bestScore, 'score');
+  summaryWaveDelta.textContent = formatRecordDelta(stats.highestWave, previousProgress.bestWave, 'waves');
+  summaryHeadline.textContent = stats.mission?.completed
+    ? 'Mission contract cleared. You can press the advantage with another run or pivot into upgrades.'
+    : newAchievements.length > 0
+      ? `New awards unlocked: ${newAchievements.join(', ')}.`
+      : 'Review the weak spots, spend salvage if needed, and relaunch with a stronger build.';
   runSummary.hidden = false;
 }
 
@@ -324,6 +369,7 @@ startForm.addEventListener('submit', (event) => {
         beginRun({ fromSummary: true });
       },
       onRunComplete(runStats) {
+        const previousProgress = playerProgress;
         const result = recordRunComplete(runStats);
         playerProgress = result.progress;
         updateProfileReadouts();
@@ -341,7 +387,7 @@ startForm.addEventListener('submit', (event) => {
           trackRunSummaryViewed(activeRunContext);
         }
 
-        showRunSummary(result);
+        showRunSummary(result, previousProgress);
         return result;
       },
     });
