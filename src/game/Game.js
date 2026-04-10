@@ -12,7 +12,8 @@ import { AudioEngine } from './audio/AudioEngine.js';
 import { applyAudioFrame, createAudioFrameState } from './audio/frameAudio.js';
 
 const RADAR_COLORS = Object.fromEntries(
-  ['tank', 'drone', 'missile', 'turret', 'ship', 'boss'].map(k => [k, '#' + CONFIG.palette[k].toString(16).padStart(6, '0')])
+  ['tank', 'drone', 'droneSupport', 'droneJammer', 'missile', 'turret', 'ship', 'boss']
+    .map(k => [k, '#' + CONFIG.palette[k].toString(16).padStart(6, '0')])
 );
 const PICKUP_COLORS = Object.fromEntries(
   Object.entries(CONFIG.palette.pickup).map(([k, v]) => [k, '#' + v.toString(16).padStart(6, '0')])
@@ -215,13 +216,16 @@ export class Game {
       this.camera.position,
       this.cameraDirection,
       candidates,
-      { minDot: 0.965, maxDistance: 240 },
+      {
+        minDot: 0.965 + snapshot.jammerStrength * 0.02,
+        maxDistance: 240 - snapshot.jammerStrength * 90,
+      },
     );
 
     if (lock) {
       this.aimPoint.copy(lock.position);
       this.aimState.locked = true;
-      this.aimState.label = `LOCK ${lock.type.toUpperCase()}`;
+      this.aimState.label = `LOCK ${lock.label}`;
       this.aimState.target = lock;
       this.playerOrigin.copy(snapshot.playerPosition);
       this.playerOrigin.y += 0.7;
@@ -437,18 +441,19 @@ export class Game {
     ctx.fill();
 
     // Enemy dots
-    const scale = this.radarDrawRadius / this.radarWorldRadius;
+    const effectiveRadarWorldRadius = snapshot.radarRange ?? this.radarWorldRadius;
+    const scale = this.radarDrawRadius / effectiveRadarWorldRadius;
 
     for (const enemy of candidates) {
       const contact = projectRadarContact(
         snapshot.playerPosition,
         snapshot.playerYaw,
         enemy.position,
-        this.radarWorldRadius,
+        effectiveRadarWorldRadius,
       );
       const px = cx + contact.lateral * scale;
       const py = cx - contact.forward * scale;
-      const color = RADAR_COLORS[enemy.type] || '#ffffff';
+      const color = RADAR_COLORS[enemy.radarType || enemy.type] || '#ffffff';
 
       if (contact.outOfRange) {
         const vx = px - cx;
@@ -462,8 +467,8 @@ export class Game {
         const markerY = cx + dirY * (r - markerInset);
         const falloff = Math.min(
           Math.max(
-            (contact.distance - this.radarWorldRadius)
-              / (CONFIG.world.enemyDespawnDistance - this.radarWorldRadius),
+            (contact.distance - effectiveRadarWorldRadius)
+              / (CONFIG.world.enemyDespawnDistance - effectiveRadarWorldRadius),
             0,
           ),
           1,
@@ -489,8 +494,8 @@ export class Game {
       }
 
       // Fade nearby dots at the edge of radar range
-      const alpha = contact.distance > this.radarWorldRadius * 0.85
-        ? 1 - (contact.distance - this.radarWorldRadius * 0.85) / (this.radarWorldRadius * 0.15)
+      const alpha = contact.distance > effectiveRadarWorldRadius * 0.85
+        ? 1 - (contact.distance - effectiveRadarWorldRadius * 0.85) / (effectiveRadarWorldRadius * 0.15)
         : 1;
 
       // Glow
@@ -548,6 +553,15 @@ export class Game {
     // Reset shadow and alpha
     ctx.shadowBlur = 0;
     ctx.globalAlpha = 1;
+
+    if (snapshot.jammerStrength > 0.05) {
+      ctx.strokeStyle = `rgba(255, 209, 102, ${0.2 + snapshot.jammerStrength * 0.3})`;
+      ctx.setLineDash([5, 4]);
+      ctx.beginPath();
+      ctx.arc(cx, cx, r * (0.9 - snapshot.jammerStrength * 0.18), 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
   }
 
   showHitIndicator(sourceX, sourceY, sourceZ, damage, snapshot) {

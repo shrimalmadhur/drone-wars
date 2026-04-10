@@ -2,14 +2,27 @@ import { CONFIG } from '../config.js';
 import { chooseFrom } from '../math.js';
 
 export function getWaveSpec(wave) {
-  return {
+  const spec = {
     tank: Math.min(CONFIG.waves.maxConcurrent.tank, 1 + wave),
     drone: Math.min(CONFIG.waves.maxConcurrent.drone, wave < 2 ? 1 : 1 + Math.floor(wave * 0.8)),
+    droneSupport: 0,
+    droneJammer: 0,
     missile: wave < 2 ? 0 : Math.min(CONFIG.waves.maxConcurrent.missile, Math.floor((wave - 1) / 2)),
     turret: wave < 3 ? 0 : Math.min(CONFIG.waves.maxConcurrent.turret, 1 + Math.floor((wave - 2) / 3)),
     ship: wave < 3 ? 0 : Math.min(CONFIG.waves.maxConcurrent.ship, 1 + Math.floor((wave - 3) / 3)),
     boss: wave > 0 && wave % 5 === 0 ? 1 : 0,
   };
+
+  if (wave >= CONFIG.waves.droneVariants.supportStartWave) {
+    spec.droneSupport = Math.min(2, 1 + Math.floor((wave - CONFIG.waves.droneVariants.supportStartWave) / 4));
+    spec.drone = Math.max(1, spec.drone - spec.droneSupport);
+  }
+  if (wave >= CONFIG.waves.droneVariants.jammerStartWave) {
+    spec.droneJammer = Math.min(2, 1 + Math.floor((wave - CONFIG.waves.droneVariants.jammerStartWave) / 5));
+    spec.drone = Math.max(1, spec.drone - spec.droneJammer);
+  }
+
+  return spec;
 }
 
 export function createWaveQueue(wave, rng) {
@@ -32,5 +45,13 @@ export function createWaveQueue(wave, rng) {
 }
 
 export function canSpawnType(type, activeCounts) {
-  return activeCounts[type] < CONFIG.waves.maxConcurrent[type];
+  const baseType = getSpawnBaseType(type);
+  return activeCounts[baseType] < CONFIG.waves.maxConcurrent[baseType];
+}
+
+export function getSpawnBaseType(type) {
+  if (type === 'droneSupport' || type === 'droneJammer') {
+    return 'drone';
+  }
+  return type;
 }

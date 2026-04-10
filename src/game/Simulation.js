@@ -14,7 +14,7 @@ import { ProjectilePool } from './entities/Projectile.js';
 import { ShipEnemy } from './entities/ShipEnemy.js';
 import { TankEnemy } from './entities/TankEnemy.js';
 import { TurretEnemy } from './entities/TurretEnemy.js';
-import { canSpawnType, createWaveQueue } from './systems/waves.js';
+import { canSpawnType, createWaveQueue, getSpawnBaseType } from './systems/waves.js';
 import { createEnvironment } from './world/environment.js';
 import { createTerrain } from './world/terrain.js';
 
@@ -147,6 +147,7 @@ export class Simulation {
     this.enemyAimOffset = new THREE.Vector3(0, 1.5, 0);
     this._waveDamageTaken = 0;
     this.emergencyRepairTimer = 0;
+    this.jammerStrength = 0;
   }
 
   setRunConfig({ playerProgress, runModifiers } = {}) {
@@ -198,6 +199,7 @@ export class Simulation {
     this.wasWaveCleared = false;
     this._waveDamageTaken = 0;
     this.emergencyRepairTimer = 0;
+    this.jammerStrength = 0;
     this.state.mission = createMissionForRun(this.rng);
     this.scheduleNextPickupSpawn(true);
     this.beginWave(1);
@@ -264,7 +266,8 @@ export class Simulation {
   }
 
   spawnEnemy(type) {
-    const terrainSpawnType = type === 'turret' ? 'tank' : type === 'boss' ? 'drone' : type;
+    const baseType = getSpawnBaseType(type);
+    const terrainSpawnType = baseType === 'turret' ? 'tank' : baseType === 'boss' ? 'drone' : baseType;
     const allowDistantObjectiveSpawn = type === 'ship';
     const position = this.terrain.getSpawnPoint(
       terrainSpawnType,
@@ -280,6 +283,10 @@ export class Simulation {
       enemy = new TankEnemy(this.scene, position, this.rng);
     } else if (type === 'drone') {
       enemy = new DroneEnemy(this.scene, position, this.rng);
+    } else if (type === 'droneSupport') {
+      enemy = new DroneEnemy(this.scene, position, this.rng, 'support');
+    } else if (type === 'droneJammer') {
+      enemy = new DroneEnemy(this.scene, position, this.rng, 'jammer');
     } else if (type === 'missile') {
       enemy = new MissileEnemy(this.scene, position);
     } else if (type === 'turret') {
@@ -302,7 +309,7 @@ export class Simulation {
     const counts = { tank: 0, drone: 0, missile: 0, turret: 0, ship: 0, boss: 0 };
     for (const enemy of this.enemies) {
       if (enemy.alive) {
-        counts[enemy.type] += 1;
+        counts[getSpawnBaseType(enemy.type)] += 1;
       }
     }
     return counts;
@@ -366,7 +373,7 @@ export class Simulation {
 
   registerEnemyHit(enemy) {
     this.lastHit = {
-      type: enemy.type,
+      type: enemy.getHudLabel?.() ?? enemy.type,
       health: Math.max(0, enemy.health),
       maxHealth: enemy.maxHealth,
       destroyed: !enemy.alive,
@@ -644,12 +651,50 @@ export class Simulation {
           );
         }
         this.state.health = this.player.health;
+      } else if (event.type === 'repairAllies') {
+        this.applyEnemyRepairPulse(enemy, event.radius, event.amount);
       } else if (event.type === 'effect') {
         this.spawnEffect(event.position.x, event.position.y, event.position.z, event.size);
       } else if (event.type === 'spawnEnemy' && event.enemyType === 'missile') {
         this.enemies.push(new MissileEnemy(this.scene, event.position));
       }
     }
+  }
+
+  applyEnemyRepairPulse(sourceEnemy, radius, amount) {
+    let repairedTargets = 0;
+    for (const enemy of this.enemies) {
+      if (!enemy.alive || enemy === sourceEnemy || enemy.health >= enemy.maxHealth) {
+        continue;
+      }
+      if (enemy.group.position.distanceTo(sourceEnemy.group.position) > radius) {
+        continue;
+      }
+      enemy.health = Math.min(enemy.maxHealth, enemy.health + amount);
+      repairedTargets += 1;
+      this.spawnEffect(enemy.group.position.x, enemy.group.position.y + 1.5, enemy.group.position.z, 0.7);
+    }
+    if (repairedTargets > 0) {
+      this.spawnEffect(sourceEnemy.group.position.x, sourceEnemy.group.position.y + 2, sourceEnemy.group.position.z, 1.1);
+    }
+  }
+
+  updateJammerStrength() {
+    const playerPosition = this.player.group.position;
+    let jamStrength = 0;
+    for (const enemy of this.enemies) {
+      if (!enemy.alive || enemy.type !== 'drone' || enemy.variant !== 'jammer') {
+        continue;
+      }
+      const jamRadius = enemy.profile?.jamRadius ?? CONFIG.enemies.drone.variants.jammer.jamRadius;
+      const maxStrength = enemy.profile?.jamStrength ?? CONFIG.enemies.drone.variants.jammer.jamStrength;
+      const distance = enemy.group.position.distanceTo(playerPosition);
+      if (distance >= jamRadius) {
+        continue;
+      }
+      jamStrength += maxStrength * (1 - distance / jamRadius);
+    }
+    this.jammerStrength = Math.min(0.9, jamStrength);
   }
 
   activatePulse() {
@@ -873,6 +918,7 @@ export class Simulation {
     });
 
     this.cleanupEnemies();
+    this.updateJammerStrength?.();
     this.syncMissilePositions();
     this.updatePickups?.(dt);
     this.updateHazards?.(dt);
@@ -947,6 +993,8 @@ export class Simulation {
       playerPosition: this.player.group.position,
       playerYaw: this.player.yaw,
       lastHit: this.lastHit,
+      jammerStrength: this.jammerStrength,
+      radarRange: CONFIG.world.arenaRadius * (1 - this.jammerStrength * 0.45),
       hitFlash: this.hitFlash,
       fireFlash: this.fireFlash,
       killEvents: this.killEvents.slice(),
@@ -971,6 +1019,7 @@ export class Simulation {
       .map((enemy) => ({
         id: enemy.group.uuid,
         type: enemy.type,
+        radarType: enemy.getRadarType?.() ?? enemy.type,
         label: enemy.getHudLabel(),
         position: enemy.group.position,
         health: enemy.health,

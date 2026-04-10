@@ -5,18 +5,42 @@ import { damp, randomRange, segmentIntersectsSphere, segmentIntersectsSphereAt }
 import { EnemyBase } from './EnemyBase.js';
 
 export class DroneEnemy extends EnemyBase {
-  constructor(scene, position, rng) {
+  constructor(scene, position, rng, variant = 'assault') {
+    const baseConfig = CONFIG.enemies.drone;
+    const variantConfig = baseConfig.variants?.[variant] ?? {};
+    const profile = { ...baseConfig, ...variantConfig };
     super(scene, {
       type: 'drone',
       position,
-      health: CONFIG.enemies.drone.health,
-      radius: CONFIG.enemies.drone.radius,
-      scoreValue: CONFIG.enemies.drone.score,
+      health: profile.health,
+      radius: profile.radius,
+      scoreValue: profile.score,
     });
     this.rng = rng;
+    this.variant = variant;
+    this.profile = profile;
     this.velocity = new THREE.Vector3();
     this.orbitPhase = randomRange(rng, -Math.PI, Math.PI);
     this.fireCooldown = randomRange(rng, 0.9, 1.5);
+    this.supportPulseCooldown = profile.repairInterval
+      ? randomRange(rng, profile.repairInterval * 0.35, profile.repairInterval)
+      : 0;
+
+    const accentColor = variant === 'support'
+      ? CONFIG.palette.droneSupport
+      : variant === 'jammer'
+        ? CONFIG.palette.droneJammer
+        : CONFIG.palette.drone;
+    const accentEmissive = variant === 'support'
+      ? 0x103b23
+      : variant === 'jammer'
+        ? 0x523500
+        : 0x5a0f0f;
+    const eyeColor = variant === 'support'
+      ? 0x6fe3a7
+      : variant === 'jammer'
+        ? 0xffd166
+        : 0xff2200;
 
     const bodyMat = new THREE.MeshStandardMaterial({
       color: 0x3a3a3a,
@@ -29,8 +53,8 @@ export class DroneEnemy extends EnemyBase {
       metalness: 0.4,
     });
     const accentMat = new THREE.MeshStandardMaterial({
-      color: CONFIG.palette.drone,
-      emissive: 0x5a0f0f,
+      color: accentColor,
+      emissive: accentEmissive,
       roughness: 0.3,
       metalness: 0.3,
     });
@@ -42,8 +66,8 @@ export class DroneEnemy extends EnemyBase {
       depthWrite: false,
     });
     const eyeMat = new THREE.MeshStandardMaterial({
-      color: 0xff2200,
-      emissive: 0xff2200,
+      color: eyeColor,
+      emissive: eyeColor,
       emissiveIntensity: 2,
     });
 
@@ -111,17 +135,20 @@ export class DroneEnemy extends EnemyBase {
   update(dt, context) {
     const playerPos = context.player.group.position;
     this.orbitPhase += dt * 0.7;
-    const orbitRadius = 26;
+    const orbitRadius = this.profile.orbitRadius ?? CONFIG.enemies.drone.orbitRadius;
+    const orbitHeight = this.profile.orbitHeight ?? CONFIG.enemies.drone.orbitHeight;
+    const orbitVerticalAmplitude = this.profile.orbitVerticalAmplitude ?? CONFIG.enemies.drone.orbitVerticalAmplitude;
+    const orbitVerticalFrequency = this.profile.orbitVerticalFrequency ?? CONFIG.enemies.drone.orbitVerticalFrequency;
     const target = new THREE.Vector3(
       playerPos.x + Math.cos(this.orbitPhase) * orbitRadius,
-      playerPos.y + 8 + Math.sin(this.orbitPhase * 1.7) * 4,
+      playerPos.y + orbitHeight + Math.sin(this.orbitPhase * orbitVerticalFrequency) * orbitVerticalAmplitude,
       playerPos.z + Math.sin(this.orbitPhase) * orbitRadius,
     );
 
     this.velocity.x = damp(this.velocity.x, (target.x - this.group.position.x) * 1.4, 2.6, dt);
     this.velocity.y = damp(this.velocity.y, (target.y - this.group.position.y) * 1.7, 3.6, dt);
     this.velocity.z = damp(this.velocity.z, (target.z - this.group.position.z) * 1.4, 2.6, dt);
-    this.velocity.clampLength(0, CONFIG.enemies.drone.moveSpeed);
+    this.velocity.clampLength(0, this.profile.moveSpeed);
     this.group.position.addScaledVector(this.velocity, dt);
     context.terrain.clampToArena(this.group.position);
     this.group.position.y = Math.max(this.group.position.y, context.terrain.getGroundHeight(this.group.position.x, this.group.position.z) + 10);
@@ -130,23 +157,56 @@ export class DroneEnemy extends EnemyBase {
     for (const rotor of this.rotors) {
       rotor.rotation.y += 30 * dt;
     }
+    const events = [];
+    if (this.variant === 'support' && this.profile.repairInterval) {
+      this.supportPulseCooldown -= dt;
+      if (this.supportPulseCooldown <= 0) {
+        events.push({
+          type: 'repairAllies',
+          radius: this.profile.repairRadius,
+          amount: this.profile.repairAmount,
+        });
+        this.supportPulseCooldown = this.profile.repairInterval + randomRange(this.rng, -0.35, 0.35);
+      }
+    }
+
     this.fireCooldown -= dt;
     if (this.group.position.distanceTo(playerPos) < 86 && this.fireCooldown <= 0) {
       const shot = this.buildShot(
         new THREE.Vector3(playerPos.x, playerPos.y, playerPos.z),
-        CONFIG.enemies.drone.projectileSpeed,
-        CONFIG.enemies.drone.projectileLife,
-        CONFIG.enemies.drone.damage,
+        this.profile.projectileSpeed,
+        this.profile.projectileLife,
+        this.profile.damage,
       );
       if (!(context.terrain.hasLineOfSight?.(shot.origin, playerPos, shot.radius) ?? true)) {
         this.fireCooldown = 0.25;
-        return [];
+        return events;
       }
-      this.fireCooldown = CONFIG.enemies.drone.fireInterval + randomRange(this.rng, -0.2, 0.2);
-      return [{ type: 'spawnProjectile', spec: shot }];
+      this.fireCooldown = this.profile.fireInterval + randomRange(this.rng, -0.2, 0.2);
+      events.push({ type: 'spawnProjectile', spec: shot });
     }
 
-    return [];
+    return events;
+  }
+
+  getHudLabel() {
+    if (this.variant === 'support') {
+      return 'SUPPORT DRONE';
+    }
+    if (this.variant === 'jammer') {
+      return 'JAMMER DRONE';
+    }
+    return super.getHudLabel();
+  }
+
+  getRadarType() {
+    if (this.variant === 'support') {
+      return 'droneSupport';
+    }
+    if (this.variant === 'jammer') {
+      return 'droneJammer';
+    }
+    return super.getRadarType();
   }
 
   intersectSegmentAt(start, end, radiusPadding) {

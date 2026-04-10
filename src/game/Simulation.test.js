@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { Simulation } from './Simulation.js';
 import { GAME_STATES } from './state.js';
 import { createMissionForRun, createMissionForWave } from './systems/missions.js';
+import { CONFIG } from './config.js';
 
 describe('Simulation spawning', () => {
   it('keeps unspawnable terrain-locked enemies queued', () => {
@@ -79,6 +80,70 @@ describe('Simulation spawning', () => {
     expect(Simulation.prototype.shouldPersistDistantSpawn.call(simulation, 'ship', distantPosition)).toBe(true);
     expect(Simulation.prototype.shouldPersistDistantSpawn.call(simulation, 'tank', distantPosition)).toBe(false);
     expect(Simulation.prototype.shouldPersistDistantSpawn.call(simulation, 'turret', distantPosition)).toBe(false);
+  });
+
+  it('tracks drone variants against the shared drone concurrency cap', () => {
+    const simulation = {
+      enemies: [
+        { alive: true, type: 'drone', variant: 'support' },
+        { alive: true, type: 'drone', variant: 'jammer' },
+      ],
+    };
+
+    expect(Simulation.prototype.getActiveCounts.call(simulation)).toEqual({
+      tank: 0,
+      drone: 2,
+      missile: 0,
+      turret: 0,
+      ship: 0,
+      boss: 0,
+    });
+  });
+
+  it('calculates jammer pressure from nearby jammer drones', () => {
+    const simulation = {
+      enemies: [
+        {
+          alive: true,
+          type: 'drone',
+          variant: 'jammer',
+          profile: CONFIG.enemies.drone.variants.jammer,
+          group: { position: { distanceTo() { return 0; } } },
+        },
+      ],
+      player: {
+        group: { position: {} },
+      },
+      jammerStrength: 0,
+    };
+
+    Simulation.prototype.updateJammerStrength.call(simulation);
+
+    expect(simulation.jammerStrength).toBeCloseTo(CONFIG.enemies.drone.variants.jammer.jamStrength, 5);
+  });
+
+  it('repairs nearby damaged enemies when a support pulse resolves', () => {
+    const target = {
+      alive: true,
+      health: 10,
+      maxHealth: 20,
+      group: { position: { distanceTo() { return 10; }, x: 1, y: 2, z: 3 } },
+    };
+    const source = {
+      alive: true,
+      type: 'drone',
+      variant: 'support',
+      group: { position: { x: 0, y: 0, z: 0 } },
+    };
+    const simulation = {
+      enemies: [source, target],
+      spawnEffect: vi.fn(),
+    };
+
+    Simulation.prototype.applyEnemyRepairPulse.call(simulation, source, 20, 6);
+
+    expect(target.health).toBe(16);
+    expect(simulation.spawnEffect).toHaveBeenCalledTimes(2);
   });
 });
 

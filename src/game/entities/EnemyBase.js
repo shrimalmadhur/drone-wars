@@ -28,6 +28,10 @@ export class EnemyBase {
     return this.type.toUpperCase();
   }
 
+  getRadarType() {
+    return this.type;
+  }
+
   buildShot(targetPosition, speed, maxLife, damage) {
     this.tempTarget.copy(targetPosition).sub(this.group.position).normalize().multiplyScalar(speed);
     this.tempOrigin.copy(this.group.position);
