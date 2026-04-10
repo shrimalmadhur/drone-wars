@@ -219,3 +219,15 @@ export function setPreRunSelection(selection, storage = globalThis?.localStorage
   }, storage);
   return next;
 }
+
+export function setEquippedAbility(ability, storage = globalThis?.localStorage) {
+  const previous = loadPlayerProgress(storage);
+  const next = savePlayerProgress({
+    ...previous,
+    loadout: {
+      ...previous.loadout,
+      ability,
+    },
+  }, storage);
+  return next;
+}

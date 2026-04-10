@@ -108,13 +108,13 @@ function disposeObject3D(scene, object) {
 }
 
 export class Simulation {
-  constructor(scene, { seed = 1337, mapTheme, playerProgress, runModifiers } = {}) {
+  constructor(scene, { seed = 1337, mapTheme, playerProgress, runModifiers, loadout } = {}) {
     this.scene = scene;
     this.seed = seed;
     this.rng = createRng(seed);
     this.environment = createEnvironment(scene, { mapTheme });
     this.terrain = createTerrain(scene, this.rng, { mapTheme });
-    this.player = new Player(scene, this.terrain, runModifiers);
+    this.player = new Player(scene, this.terrain, runModifiers, loadout);
     this.projectiles = new ProjectilePool(scene);
     this.state = createGameState();
     this.state.bestScore = playerProgress?.bestScore ?? 0;
@@ -150,7 +150,7 @@ export class Simulation {
     this.jammerStrength = 0;
   }
 
-  setRunConfig({ playerProgress, runModifiers } = {}) {
+  setRunConfig({ playerProgress, runModifiers, loadout } = {}) {
     if (playerProgress) {
       this.state.bestScore = playerProgress.bestScore ?? this.state.bestScore;
       this.state.bestWave = playerProgress.bestWave ?? this.state.bestWave;
@@ -158,6 +158,9 @@ export class Simulation {
     }
     if (runModifiers) {
       this.player.setRunModifiers(runModifiers);
+    }
+    if (loadout) {
+      this.player.setLoadout(loadout);
     }
   }
 
@@ -726,6 +729,29 @@ export class Simulation {
     return true;
   }
 
+  activateDash() {
+    if (!this.player.canUseAbility()) {
+      return false;
+    }
+
+    this.player.triggerDash();
+    this.spawnEffect(
+      this.player.group.position.x,
+      this.player.group.position.y,
+      this.player.group.position.z,
+      2.3,
+    );
+    this.state.status = 'Vector dash engaged. Evasion spike active.';
+    return true;
+  }
+
+  activateEquippedAbility() {
+    if (this.player.equippedAbility === 'dash') {
+      return Simulation.prototype.activateDash.call(this);
+    }
+    return Simulation.prototype.activatePulse.call(this);
+  }
+
   cleanupEnemies() {
     const survivors = [];
     const playerPosition = this.player.group.position;
@@ -887,7 +913,7 @@ export class Simulation {
     this.state.health = this.player.health;
 
     if (controls.abilityPressed) {
-      this.activatePulse();
+      this.activateEquippedAbility();
     }
 
     if (this.player.wantsToFire(controls)) {
@@ -1029,6 +1055,15 @@ export class Simulation {
   }
 
   getRunSummary() {
+    const fallbackCombatStatus = this.player?.getCombatStatus?.() ?? {
+      abilityLabel: this.player?.equippedAbility === 'dash' ? 'Vector Dash' : 'EMP Pulse',
+    };
+    const abilitySummary = this.player
+      ? {
+        id: this.player.equippedAbility ?? 'pulse',
+        label: fallbackCombatStatus.abilityLabel,
+      }
+      : null;
     if (!this.runStats) {
       return {
         score: this.state.score,
@@ -1039,6 +1074,7 @@ export class Simulation {
         maxPulseHits: 0,
         flawlessWaves: 0,
         damageTaken: 0,
+        ability: abilitySummary,
         mission: this.state.mission ? { ...this.state.mission } : null,
       };
     }
@@ -1047,6 +1083,7 @@ export class Simulation {
       score: this.state.score,
       highestWave: Math.max(this.runStats.highestWave, this.state.wave),
       timePlayed: this.state.time,
+      ability: abilitySummary,
       mission: this.state.mission ? { ...this.state.mission } : null,
     };
   }

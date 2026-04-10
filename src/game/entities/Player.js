@@ -2,9 +2,10 @@ import * as THREE from 'three';
 
 import { CONFIG } from '../config.js';
 import { clamp, damp } from '../math.js';
+import { getAbilityDefinition, sanitizeAbilityId } from '../meta/abilities.js';
 
 export class Player {
-  constructor(scene, terrain, runModifiers = {}) {
+  constructor(scene, terrain, runModifiers = {}, loadout = {}) {
     this.scene = scene;
     this.terrain = terrain;
     this.group = new THREE.Group();
@@ -15,12 +16,15 @@ export class Player {
     this.projectileDirection = new THREE.Vector3();
     this.fireOrigin = new THREE.Vector3();
     this.fireRight = new THREE.Vector3();
+    this.dashDirection = new THREE.Vector3();
     this.cooldown = 0;
     this.invulnerability = 0;
-    this.pulseCooldown = 0;
+    this.abilityCooldown = 0;
+    this.equippedAbility = sanitizeAbilityId(loadout?.ability);
     this.activePowerUp = null;
     this.activePowerUpTimer = 0;
     this.repairFlashTimer = 0;
+    this.dashFlashTimer = 0;
     this.yaw = 0;
     this.runModifiers = {
       maxHealth: CONFIG.player.maxHealth,
@@ -337,6 +341,20 @@ export class Player {
     this.repairPulse.visible = false;
     this.group.add(this.repairPulse);
 
+    const dashMaterial = new THREE.MeshBasicMaterial({
+      color: CONFIG.palette.playerAccent,
+      transparent: true,
+      opacity: 0,
+    });
+    this.dashRing = new THREE.Mesh(
+      new THREE.TorusGeometry(3.2, 0.1, 8, 36),
+      dashMaterial,
+    );
+    this.dashRing.rotation.y = Math.PI * 0.5;
+    this.dashRing.position.z = -0.2;
+    this.dashRing.visible = false;
+    this.group.add(this.dashRing);
+
     this.reset();
   }
 
@@ -351,16 +369,21 @@ export class Player {
     this.health = Math.min(this.health, this.runModifiers.maxHealth);
   }
 
+  setLoadout(loadout = {}) {
+    this.equippedAbility = sanitizeAbilityId(loadout?.ability);
+  }
+
   reset() {
     this.group.position.set(0, 18, 54);
     this.velocity.set(0, 0, 0);
     this.yaw = Math.PI;
     this.cooldown = 0;
     this.invulnerability = 0;
-    this.pulseCooldown = 0;
+    this.abilityCooldown = 0;
     this.activePowerUp = null;
     this.activePowerUpTimer = 0;
     this.repairFlashTimer = 0;
+    this.dashFlashTimer = 0;
     this.health = this.runModifiers.maxHealth;
     this.muzzleFlashTimer = 0;
     if (this.muzzleLight) {
@@ -379,9 +402,10 @@ export class Player {
   update(dt, controls) {
     this.cooldown = Math.max(0, this.cooldown - dt);
     this.invulnerability = Math.max(0, this.invulnerability - dt);
-    this.pulseCooldown = Math.max(0, this.pulseCooldown - dt);
+    this.abilityCooldown = Math.max(0, this.abilityCooldown - dt);
     this.activePowerUpTimer = Math.max(0, this.activePowerUpTimer - dt);
     this.repairFlashTimer = Math.max(0, this.repairFlashTimer - dt);
+    this.dashFlashTimer = Math.max(0, this.dashFlashTimer - dt);
     if (this.activePowerUpTimer <= 0) {
       this.activePowerUp = null;
     }
@@ -511,12 +535,29 @@ export class Player {
     return true;
   }
 
+  canUseAbility() {
+    return this.abilityCooldown <= 0;
+  }
+
   canUsePulse() {
-    return this.pulseCooldown <= 0;
+    return this.equippedAbility === 'pulse' && this.canUseAbility();
+  }
+
+  triggerAbilityCooldown(duration) {
+    this.abilityCooldown = duration;
   }
 
   triggerPulse() {
-    this.pulseCooldown = this.runModifiers.pulseCooldown;
+    this.triggerAbilityCooldown(this.runModifiers.pulseCooldown);
+  }
+
+  triggerDash() {
+    this.getHeading();
+    this.dashDirection.copy(this.forward).normalize();
+    this.velocity.addScaledVector(this.dashDirection, 115);
+    this.invulnerability = Math.max(this.invulnerability, 0.45);
+    this.dashFlashTimer = 0.45;
+    this.triggerAbilityCooldown(7.5);
   }
 
   applyPowerUp(type) {
@@ -539,6 +580,8 @@ export class Player {
     this.overdriveRing.material.opacity = 0;
     this.repairPulse.visible = false;
     this.repairPulse.material.opacity = 0;
+    this.dashRing.visible = false;
+    this.dashRing.material.opacity = 0;
     for (const ring of this.spreadRings) {
       ring.visible = false;
       ring.material.opacity = 0;
@@ -589,13 +632,27 @@ export class Player {
       this.repairPulse.material.opacity = 0;
       this.repairPulse.scale.setScalar(1);
     }
+
+    this.dashRing.visible = this.dashFlashTimer > 0;
+    if (this.dashRing.visible) {
+      const progress = 1 - this.dashFlashTimer / 0.45;
+      this.dashRing.material.opacity = (1 - progress) * 0.32;
+      this.dashRing.scale.setScalar(0.9 + progress * 1.3);
+    } else {
+      this.dashRing.material.opacity = 0;
+      this.dashRing.scale.setScalar(1);
+    }
   }
 
   getCombatStatus() {
+    const ability = getAbilityDefinition(this.equippedAbility);
     return {
       activePowerUp: this.activePowerUp,
       activePowerUpTimer: this.activePowerUpTimer,
-      pulseCooldown: this.pulseCooldown,
+      equippedAbility: ability.id,
+      abilityLabel: ability.label,
+      abilitySummary: ability.summary,
+      abilityCooldown: this.abilityCooldown,
       collectionRadius: this.runModifiers.collectionRadius,
     };
   }

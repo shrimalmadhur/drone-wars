@@ -8,6 +8,7 @@ import {
   purchaseUpgrade,
   recordRunStart,
   recordPlayerRun,
+  setEquippedAbility,
   sanitizePlayerName,
   saveMapTheme,
   savePlayerProgress,
@@ -154,6 +155,16 @@ describe('player profile', () => {
     });
     expect(result.progress.loadout.ability).toBe('pulse');
     expect(result.progress.currency).toBeGreaterThan(500);
+  });
+
+  it('persists equipped ability selection via storage', () => {
+    const storage = createStorage();
+
+    savePlayerProgress({ bestWave: 6 }, storage);
+    const updated = setEquippedAbility('dash', storage);
+
+    expect(updated.loadout.ability).toBe('dash');
+    expect(loadPlayerProgress(storage).loadout.ability).toBe('dash');
   });
 
   it('purchases upgrades when enough salvage is available', () => {

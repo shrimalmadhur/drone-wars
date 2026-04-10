@@ -151,6 +151,8 @@ describe('Simulation audio events', () => {
   it('describes pulse misses clearly when no enemies are in range', () => {
     const simulation = {
       player: {
+        equippedAbility: 'pulse',
+        canUseAbility() { return true; },
         canUsePulse() { return true; },
         triggerPulse: vi.fn(),
         group: { position: { clone() { return { x: 0, y: 0, z: 0 }; } } },
@@ -171,6 +173,26 @@ describe('Simulation audio events', () => {
 
     expect(result).toBe(true);
     expect(simulation.state.status).toContain('No enemies');
+  });
+
+  it('activates dash through the equipped ability path', () => {
+    const simulation = {
+      player: {
+        equippedAbility: 'dash',
+        canUseAbility() { return true; },
+        triggerDash: vi.fn(),
+        group: { position: { x: 4, y: 5, z: 6 } },
+      },
+      spawnEffect: vi.fn(),
+      state: { status: '' },
+    };
+
+    const result = Simulation.prototype.activateEquippedAbility.call(simulation);
+
+    expect(result).toBe(true);
+    expect(simulation.player.triggerDash).toHaveBeenCalled();
+    expect(simulation.spawnEffect).toHaveBeenCalledWith(4, 5, 6, 2.3);
+    expect(simulation.state.status).toContain('Vector dash');
   });
 
   it('spawns an emergency repair pickup when health is critically low', () => {

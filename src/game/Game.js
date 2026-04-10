@@ -20,7 +20,7 @@ const PICKUP_COLORS = Object.fromEntries(
 );
 
 export class Game {
-  constructor({ mount, hud, mapTheme, playerProgress, runModifiers, onRunComplete, onRestartRequested }) {
+  constructor({ mount, hud, mapTheme, playerProgress, runModifiers, loadout, onRunComplete, onRestartRequested }) {
     this.mount = mount;
     this.hud = hud;
     this.scene = new THREE.Scene();
@@ -35,10 +35,10 @@ export class Game {
     this.mount.appendChild(this.renderer.domElement);
 
     this.input = new InputController(window, document);
-    this.simulation = new Simulation(this.scene, { mapTheme, playerProgress, runModifiers });
+    this.simulation = new Simulation(this.scene, { mapTheme, playerProgress, runModifiers, loadout });
     this.onRunComplete = onRunComplete;
     this.onRestartRequested = onRestartRequested;
-    this.currentRunConfig = { playerProgress, runModifiers };
+    this.currentRunConfig = { playerProgress, runModifiers, loadout };
     this.didRecordRun = false;
     this.audio = new AudioEngine();
     this.cameraShake = new CameraShake();
@@ -106,10 +106,11 @@ export class Game {
     return this.audio.resume();
   }
 
-  restartRun({ playerProgress, runModifiers } = {}) {
+  restartRun({ playerProgress, runModifiers, loadout } = {}) {
     this.currentRunConfig = {
       playerProgress: playerProgress ?? this.currentRunConfig.playerProgress,
       runModifiers: runModifiers ?? this.currentRunConfig.runModifiers,
+      loadout: loadout ?? this.currentRunConfig.loadout,
     };
     this.simulation.setRunConfig(this.currentRunConfig);
     this.simulation.restart();
@@ -251,9 +252,15 @@ export class Game {
     this.hud.powerup.textContent = snapshot.activePowerUp
       ? `${snapshot.activePowerUp.toUpperCase()} ${snapshot.activePowerUpTimer.toFixed(1)}s`
       : 'No active power-up';
-    this.hud.pulse.textContent = snapshot.pulseCooldown > 0
-      ? `EMP recharging ${snapshot.pulseCooldown.toFixed(1)}s`
-      : `EMP ready (F) close range ${CONFIG.player.pulseRadius}m`;
+    if (snapshot.equippedAbility === 'dash') {
+      this.hud.pulse.textContent = snapshot.abilityCooldown > 0
+        ? `${snapshot.abilityLabel} recharging ${snapshot.abilityCooldown.toFixed(1)}s`
+        : `${snapshot.abilityLabel} ready (F) short evasive burst`;
+    } else {
+      this.hud.pulse.textContent = snapshot.abilityCooldown > 0
+        ? `${snapshot.abilityLabel} recharging ${snapshot.abilityCooldown.toFixed(1)}s`
+        : `${snapshot.abilityLabel} ready (F) close range ${CONFIG.player.pulseRadius}m`;
+    }
     if (snapshot.mission) {
       const missionRatio = snapshot.mission.target > 0
         ? snapshot.mission.progress / snapshot.mission.target

@@ -9,6 +9,7 @@ import {
   trackUpgradePurchased,
 } from './game/analytics.js';
 import { createRunModifiers } from './game/meta/runModifiers.js';
+import { ABILITY_DEFINITIONS, getUnlockedAbilities, isAbilityUnlocked } from './game/meta/abilities.js';
 import { getUpgradeCost, UPGRADE_DEFINITIONS } from './game/meta/upgrades.js';
 import { MAP_THEME_DETAILS } from './mapThemes.js';
 import {
@@ -18,6 +19,7 @@ import {
   purchaseUpgrade,
   recordRunComplete,
   recordRunStart,
+  setEquippedAbility,
   saveMapTheme,
   savePlayerName,
 } from './playerProfile.js';
@@ -27,6 +29,8 @@ const startScreen = document.querySelector('#start-screen');
 const startForm = document.querySelector('#start-form');
 const playerNameInput = document.querySelector('#player-name-input');
 const mapThemeInputs = Array.from(document.querySelectorAll('input[name="mapTheme"]'));
+const abilityInputs = Array.from(document.querySelectorAll('input[name="ability"]'));
+const abilityUnlockNote = document.querySelector('#ability-unlock-note');
 const startCurrency = document.querySelector('#start-currency');
 const hangarCurrency = document.querySelector('#hangar-currency');
 const upgradeShop = document.querySelector('#upgrade-shop');
@@ -40,6 +44,7 @@ const summaryPickups = document.querySelector('#summary-pickups');
 const summaryAchievements = document.querySelector('#summary-achievements');
 const summaryCurrency = document.querySelector('#summary-currency');
 const summaryMission = document.querySelector('#summary-mission');
+const summaryAbility = document.querySelector('#summary-ability');
 const summaryMissionFill = document.querySelector('#summary-mission-fill');
 const summaryHeadline = document.querySelector('#summary-headline');
 const summaryRerunButton = document.querySelector('#summary-rerun');
@@ -69,7 +74,7 @@ const hud = {
   bestWave: document.querySelector('#best-wave-value'),
   achievements: document.querySelector('#achievement-count-value'),
   powerup: document.querySelector('#powerup-value'),
-  pulse: document.querySelector('#pulse-value'),
+  pulse: document.querySelector('#ability-value'),
   missionName: document.querySelector('#mission-name'),
   missionProgress: document.querySelector('#mission-progress'),
   missionProgressFill: document.querySelector('#mission-progress-fill'),
@@ -124,6 +129,7 @@ function showRunSummary(result) {
   summaryPickups.textContent = stats.pickupsCollected.toString();
   summaryAchievements.textContent = newAchievements.length.toString();
   summaryCurrency.textContent = currencyEarned.toString();
+  summaryAbility.textContent = stats.ability?.label ?? ABILITY_DEFINITIONS.pulse.label;
   summaryMission.textContent = stats.mission
     ? `${stats.mission.label} ${stats.mission.progress}/${stats.mission.target}${stats.mission.completed ? ' complete' : ''}`
     : 'No objective';
@@ -163,6 +169,24 @@ function renderUpgradeShop() {
   }).join('');
 }
 
+function renderAbilityPicker() {
+  const equippedAbility = playerProgress.loadout?.ability ?? ABILITY_DEFINITIONS.pulse.id;
+  for (const input of abilityInputs) {
+    const unlocked = isAbilityUnlocked(input.value, playerProgress);
+    input.disabled = !unlocked;
+    input.checked = unlocked && input.value === equippedAbility;
+  }
+
+  const unlockedAbilities = getUnlockedAbilities(playerProgress);
+  const nextUnlock = Object.values(ABILITY_DEFINITIONS)
+    .filter((ability) => !isAbilityUnlocked(ability.id, playerProgress))
+    .sort((a, b) => a.unlockWave - b.unlockWave)[0];
+
+  abilityUnlockNote.textContent = nextUnlock
+    ? `Next ability unlocks at wave ${nextUnlock.unlockWave}: ${nextUnlock.label}.`
+    : `All abilities unlocked. Equipped: ${unlockedAbilities.find((ability) => ability.id === equippedAbility)?.label ?? ABILITY_DEFINITIONS.pulse.label}.`;
+}
+
 function applyIdentity(playerName, mapTheme) {
   playerNameInput.value = playerName;
   hud.playerName.textContent = playerName || 'Awaiting registration';
@@ -186,8 +210,10 @@ function beginRun({ fromSummary = false } = {}) {
   playerProgress = recordRunStart().progress;
   updateProfileReadouts();
   renderUpgradeShop();
+  renderAbilityPicker();
 
   const runModifiers = createRunModifiers(playerProgress);
+  const loadout = playerProgress.loadout;
   activeRunContext = {
     profileId: playerProgress.profileId,
     runId: createRunId(),
@@ -197,7 +223,7 @@ function beginRun({ fromSummary = false } = {}) {
 
   hideRunSummary();
   startScreen.classList.add('start-screen--hidden');
-  game.restartRun({ playerProgress, runModifiers });
+  game.restartRun({ playerProgress, runModifiers, loadout });
   void game.resumeAudio().catch(() => {});
 
   trackRunStarted(activeRunContext);
@@ -221,6 +247,7 @@ for (const input of mapThemeInputs) {
 applyIdentity(savedPlayerName, savedMapTheme);
 updateProfileReadouts();
 renderUpgradeShop();
+renderAbilityPicker();
 setMapThemeLock(false);
 playerNameInput.focus();
 
@@ -239,6 +266,7 @@ upgradeShop.addEventListener('click', (event) => {
   playerProgress = result.progress;
   updateProfileReadouts();
   renderUpgradeShop();
+  renderAbilityPicker();
 
   if (result.ok) {
     trackUpgradePurchased({
@@ -249,6 +277,16 @@ upgradeShop.addEventListener('click', (event) => {
     });
   }
 });
+
+for (const input of abilityInputs) {
+  input.addEventListener('change', () => {
+    if (!input.checked) {
+      return;
+    }
+    playerProgress = setEquippedAbility(input.value);
+    renderAbilityPicker();
+  });
+}
 
 summaryRerunButton.addEventListener('click', () => {
   beginRun({ fromSummary: true });
@@ -271,12 +309,14 @@ startForm.addEventListener('submit', (event) => {
   if (!game) {
     const initialMapTheme = saveMapTheme(new FormData(startForm).get('mapTheme'));
     const initialRunModifiers = createRunModifiers(playerProgress);
+    const initialLoadout = playerProgress.loadout;
     game = new Game({
       mount,
       hud,
       mapTheme: initialMapTheme,
       playerProgress,
       runModifiers: initialRunModifiers,
+      loadout: initialLoadout,
       onRestartRequested() {
         if (!startScreen.classList.contains('start-screen--hidden')) {
           return;
@@ -288,6 +328,7 @@ startForm.addEventListener('submit', (event) => {
         playerProgress = result.progress;
         updateProfileReadouts();
         renderUpgradeShop();
+        renderAbilityPicker();
 
         if (activeRunContext) {
           lastCompletedRunContext = activeRunContext;

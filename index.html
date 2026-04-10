@@ -87,6 +87,39 @@
               </label>
             </div>
           </fieldset>
+          <fieldset class="start-screen__map-picker">
+            <legend class="start-screen__label">Active ability</legend>
+            <div class="map-options">
+              <label class="map-option">
+                <input
+                  class="map-option__input"
+                  type="radio"
+                  name="ability"
+                  value="pulse"
+                  checked
+                />
+                <span class="map-option__card">
+                  <span class="map-option__eyebrow">Default</span>
+                  <strong class="map-option__title">EMP Pulse</strong>
+                  <span class="map-option__copy">Close-range blast that damages nearby enemies.</span>
+                </span>
+              </label>
+              <label class="map-option">
+                <input
+                  class="map-option__input"
+                  type="radio"
+                  name="ability"
+                  value="dash"
+                />
+                <span class="map-option__card">
+                  <span class="map-option__eyebrow">Unlockable</span>
+                  <strong class="map-option__title">Vector Dash</strong>
+                  <span class="map-option__copy">Burst forward with brief invulnerability to break pressure.</span>
+                </span>
+              </label>
+            </div>
+            <p id="ability-unlock-note" class="start-screen__copy">Reach later waves to unlock more abilities.</p>
+          </fieldset>
           <section class="hangar-panel">
             <div class="hangar-panel__header">
               <div>
@@ -140,6 +173,10 @@
             <div class="run-summary__progress" aria-hidden="true">
               <div id="summary-mission-fill" class="run-summary__progress-fill"></div>
             </div>
+          </div>
+          <div class="run-summary__stat">
+            <span>Ability</span>
+            <strong id="summary-ability">EMP Pulse</strong>
           </div>
         </div>
         <p id="summary-headline" class="run-summary__headline">Jump straight into another run or open the upgrade hangar to spend salvage first.</p>
@@ -219,10 +256,10 @@
           <div class="controls-card controls-card--compact" id="controls-panel">
             <p class="controls-card__title">Systems</p>
             <p class="controls-card__line">W/S thrust, A/D yaw, arrows strafe/pitch, Q/E altitude</p>
-            <p class="controls-card__line">Space fire, F EMP pulse (close range), R restart, P pause</p>
+            <p class="controls-card__line">Space fire, F active ability, R restart, P pause</p>
             <div class="controls-card__readout">
               <p id="powerup-value">No active power-up</p>
-              <p id="pulse-value">Pulse ready (F)</p>
+              <p id="ability-value">EMP Pulse ready (F)</p>
             </div>
           </div>
 
