@@ -25,6 +25,9 @@ export class Player {
     this.activePowerUpTimer = 0;
     this.repairFlashTimer = 0;
     this.dashFlashTimer = 0;
+    this.shieldImpactTimer = 0;
+    this.shieldExpiryTimer = 0;
+    this.shieldExpiredEventPending = false;
     this.yaw = 0;
     this.runModifiers = {
       maxHealth: CONFIG.player.maxHealth,
@@ -296,6 +299,19 @@ export class Player {
     this.shieldShell.visible = false;
     this.group.add(this.shieldShell);
 
+    const shieldGlowMaterial = new THREE.MeshBasicMaterial({
+      color: CONFIG.palette.pickup.shield,
+      transparent: true,
+      opacity: 0,
+      side: THREE.DoubleSide,
+    });
+    this.shieldGlow = new THREE.Mesh(
+      new THREE.SphereGeometry(4.35, 16, 12),
+      shieldGlowMaterial,
+    );
+    this.shieldGlow.visible = false;
+    this.group.add(this.shieldGlow);
+
     const overdriveMaterial = new THREE.MeshBasicMaterial({
       color: CONFIG.palette.pickup.overdrive,
       transparent: true,
@@ -384,6 +400,9 @@ export class Player {
     this.activePowerUpTimer = 0;
     this.repairFlashTimer = 0;
     this.dashFlashTimer = 0;
+    this.shieldImpactTimer = 0;
+    this.shieldExpiryTimer = 0;
+    this.shieldExpiredEventPending = false;
     this.health = this.runModifiers.maxHealth;
     this.muzzleFlashTimer = 0;
     if (this.muzzleLight) {
@@ -403,10 +422,16 @@ export class Player {
     this.cooldown = Math.max(0, this.cooldown - dt);
     this.invulnerability = Math.max(0, this.invulnerability - dt);
     this.abilityCooldown = Math.max(0, this.abilityCooldown - dt);
+    this.shieldImpactTimer = Math.max(0, this.shieldImpactTimer - dt);
+    this.shieldExpiryTimer = Math.max(0, this.shieldExpiryTimer - dt);
     this.activePowerUpTimer = Math.max(0, this.activePowerUpTimer - dt);
     this.repairFlashTimer = Math.max(0, this.repairFlashTimer - dt);
     this.dashFlashTimer = Math.max(0, this.dashFlashTimer - dt);
-    if (this.activePowerUpTimer <= 0) {
+    if (this.activePowerUp === 'shield' && this.activePowerUpTimer <= 0) {
+      this.activePowerUp = null;
+      this.shieldExpiryTimer = 1.15;
+      this.shieldExpiredEventPending = true;
+    } else if (this.activePowerUpTimer <= 0) {
       this.activePowerUp = null;
     }
     this.yaw -= controls.yaw * CONFIG.player.yawSpeed * dt;
@@ -528,6 +553,7 @@ export class Player {
     if (this.activePowerUp === 'shield') {
       // Shielded hits are fully absorbed while the pickup is active.
       this.invulnerability = 0.12;
+      this.shieldImpactTimer = 0.32;
       return false;
     }
     this.health = Math.max(0, this.health - amount);
@@ -560,6 +586,14 @@ export class Player {
     this.triggerAbilityCooldown(7.5);
   }
 
+  consumeShieldExpiredEvent() {
+    if (!this.shieldExpiredEventPending) {
+      return false;
+    }
+    this.shieldExpiredEventPending = false;
+    return true;
+  }
+
   applyPowerUp(type) {
     if (type === 'repair') {
       this.health = Math.min(this.runModifiers.maxHealth, this.health + CONFIG.powerUps.repairAmount);
@@ -576,6 +610,8 @@ export class Player {
   hidePowerVisuals() {
     this.shieldShell.visible = false;
     this.shieldShell.material.opacity = 0;
+    this.shieldGlow.visible = false;
+    this.shieldGlow.material.opacity = 0;
     this.overdriveRing.visible = false;
     this.overdriveRing.material.opacity = 0;
     this.repairPulse.visible = false;
@@ -591,14 +627,29 @@ export class Player {
   updatePowerVisuals(dt) {
     const pulse = Math.sin(performance.now() * 0.01);
 
-    this.shieldShell.visible = this.activePowerUp === 'shield';
-    if (this.shieldShell.visible) {
+    const shieldActive = this.activePowerUp === 'shield';
+    const shieldVisible = shieldActive || this.shieldImpactTimer > 0 || this.shieldExpiryTimer > 0;
+    this.shieldShell.visible = shieldVisible;
+    this.shieldGlow.visible = shieldVisible;
+    if (shieldVisible) {
+      const shieldPulse = pulse * 0.5 + 0.5;
+      const impactBoost = this.shieldImpactTimer > 0 ? this.shieldImpactTimer / 0.32 : 0;
+      const expiryBoost = this.shieldExpiryTimer > 0 ? this.shieldExpiryTimer / 1.15 : 0;
+      const lowTimeBoost = shieldActive ? Math.max(0, 1 - this.activePowerUpTimer / 3) : 0;
       this.shieldShell.rotation.y += dt * 0.7;
-      this.shieldShell.material.opacity = 0.14 + (pulse * 0.5 + 0.5) * 0.16;
-      const scale = 1 + (pulse * 0.5 + 0.5) * 0.04;
+      this.shieldGlow.rotation.y -= dt * 0.45;
+      this.shieldShell.material.opacity = shieldActive
+        ? 0.18 + shieldPulse * 0.18 + impactBoost * 0.42 + lowTimeBoost * 0.12
+        : expiryBoost * 0.28;
+      this.shieldGlow.material.opacity = shieldActive
+        ? 0.06 + shieldPulse * 0.09 + impactBoost * 0.22 + lowTimeBoost * 0.12
+        : expiryBoost * 0.16;
+      const scale = 1 + shieldPulse * 0.04 + impactBoost * 0.11 + expiryBoost * 0.16;
       this.shieldShell.scale.setScalar(scale);
+      this.shieldGlow.scale.setScalar(scale * (shieldActive ? 0.97 : 1.04));
     } else {
       this.shieldShell.material.opacity = 0;
+      this.shieldGlow.material.opacity = 0;
     }
 
     this.overdriveRing.visible = this.activePowerUp === 'overdrive';
@@ -653,6 +704,9 @@ export class Player {
       abilityLabel: ability.label,
       abilitySummary: ability.summary,
       abilityCooldown: this.abilityCooldown,
+      shieldActive: this.activePowerUp === 'shield',
+      shieldImpactFlash: this.shieldImpactTimer,
+      shieldExpiryFlash: this.shieldExpiryTimer,
       collectionRadius: this.runModifiers.collectionRadius,
     };
   }

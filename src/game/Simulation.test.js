@@ -372,10 +372,12 @@ describe('Simulation audio events', () => {
     const simulation = {
       fireEvents: [],
       damageEvents: [],
+      shieldEvents: [],
       player: { applyDamage, health: 100, activePowerUp: 'shield' },
       state: { health: 100, status: '' },
       projectiles: { spawn: vi.fn(() => true) },
       spawnEffect: vi.fn(),
+      recordShieldEvent: Simulation.prototype.recordShieldEvent,
       recordPlayerDamage: Simulation.prototype.recordPlayerDamage,
     };
 
@@ -387,8 +389,53 @@ describe('Simulation audio events', () => {
 
     expect(applyDamage).toHaveBeenCalledWith(20);
     expect(simulation.damageEvents).toEqual([]);
+    expect(simulation.shieldEvents).toEqual([{ type: 'absorbed' }]);
     expect(simulation.state.health).toBe(100);
     expect(simulation.state.status).toContain('Shield absorbed');
+  });
+
+  it('records shield expiry as a frame event', () => {
+    const simulation = {
+      state: { mode: GAME_STATES.RUNNING, time: 0, health: 100, wave: 1, status: '', enemyCount: 0, score: 0 },
+      wasWaveCleared: false,
+      waveElapsed: 0,
+      hitFlash: 0,
+      fireFlash: 0,
+      player: {
+        health: 100,
+        group: { position: {} },
+        update: vi.fn(),
+        consumeShieldExpiredEvent: vi.fn(() => true),
+        wantsToFire: vi.fn(() => false),
+      },
+      environment: { update: vi.fn() },
+      terrain: { update: vi.fn() },
+      trySpawnNext: vi.fn(),
+      enemies: [],
+      projectiles: { update: vi.fn() },
+      cleanupEnemies: vi.fn(),
+      updateJammerStrength: vi.fn(),
+      syncMissilePositions: vi.fn(),
+      updatePickups: vi.fn(),
+      updateHazards: vi.fn(),
+      updateEffects: vi.fn(),
+      spawnQueue: [],
+      interWaveDelay: 1,
+      shieldEvents: [],
+      killEvents: [],
+      damageEvents: [],
+      fireEvents: [],
+      impactEvents: [],
+      waveCompleteEvents: [],
+      pickupEvents: [],
+      missilePositions: [],
+      runStats: { highestWave: 1, score: 0 },
+      recordShieldEvent: Simulation.prototype.recordShieldEvent,
+    };
+
+    Simulation.prototype.update.call(simulation, 1 / 60, { abilityPressed: false, pausePressed: false });
+
+    expect(simulation.shieldEvents).toEqual([{ type: 'expired' }]);
   });
 
   it('only records enemy fire events when projectile spawn succeeds', () => {

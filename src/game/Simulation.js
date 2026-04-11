@@ -129,6 +129,7 @@ export class Simulation {
     this.impactEvents = [];
     this.waveCompleteEvents = [];
     this.pickupEvents = [];
+    this.shieldEvents = [];
     this.missilePositions = [];
     this.effects = [];
     this.runStats = createRunStats();
@@ -197,6 +198,7 @@ export class Simulation {
     this.impactEvents.length = 0;
     this.waveCompleteEvents.length = 0;
     this.pickupEvents.length = 0;
+    this.shieldEvents.length = 0;
     this.missilePositions = [];
     this.runStats = createRunStats();
     this.wasWaveCleared = false;
@@ -402,6 +404,10 @@ export class Simulation {
     if (typeof this._waveDamageTaken === 'number') {
       this._waveDamageTaken += damage;
     }
+  }
+
+  recordShieldEvent(type) {
+    this.shieldEvents.push({ type });
   }
 
   spawnPickup(position, type) {
@@ -616,6 +622,7 @@ export class Simulation {
       this.spawnEffect(this.player.group.position.x, this.player.group.position.y, this.player.group.position.z, 1.3);
     } else if (this.player.activePowerUp === 'shield') {
       this.state.status = 'Shield absorbed incoming fire.';
+      this.recordShieldEvent('absorbed');
       this.spawnEffect(this.player.group.position.x, this.player.group.position.y, this.player.group.position.z, 0.9);
     }
     if (this.player.health <= 0) {
@@ -647,6 +654,7 @@ export class Simulation {
           );
         } else if (this.player.activePowerUp === 'shield') {
           this.state.status = 'Shield absorbed incoming fire.';
+          this.recordShieldEvent('absorbed');
           this.spawnEffect(
             event.sourceX ?? enemy.group.position.x,
             event.sourceY ?? enemy.group.position.y,
@@ -908,6 +916,10 @@ export class Simulation {
     this.hitFlash = Math.max(0, this.hitFlash - dt);
     this.fireFlash = Math.max(0, this.fireFlash - dt);
     this.player.update(dt, controls);
+    if (this.player.consumeShieldExpiredEvent?.()) {
+      this.recordShieldEvent('expired');
+      this.state.status = 'Shield expired. Hull exposed.';
+    }
     this.environment.update(this.player.group.position, this.state.time);
     this.terrain.update(this.player.group.position, this.state.time);
     this.state.health = this.player.health;
@@ -1003,6 +1015,9 @@ export class Simulation {
     if (this.pickupEvents) {
       this.pickupEvents.length = 0;
     }
+    if (this.shieldEvents) {
+      this.shieldEvents.length = 0;
+    }
   }
 
   getSnapshot() {
@@ -1030,6 +1045,7 @@ export class Simulation {
       impactEvents: this.impactEvents.slice(),
       waveCompleteEvents: this.waveCompleteEvents.slice(),
       pickupEvents: this.pickupEvents.slice(),
+      shieldEvents: this.shieldEvents.slice(),
       missilePositions: this.missilePositions.slice(),
       pickups: this.pickups.map((pickup) => ({
         type: pickup.type,

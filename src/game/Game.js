@@ -45,11 +45,14 @@ export class Game {
     this.explosions = new ExplosionEffect(this.scene);
     this.scorePops = new ScorePop(this.scene);
     this.hitIndicators = [];
+    this._lastShieldImpact = 0;
+    this._lastShieldExpiry = 0;
     this._lastHitFlash = 0;
     this._lastFireFlash = 0;
     this._lastMode = this.simulation.state.mode;
     this._recoilDir = new THREE.Vector3();
     this.pickupBannerTimer = 0;
+    this.shieldVignetteTimer = 0;
     this.cameraPosition = new THREE.Vector3(0, 24, 78);
     this.lookTarget = new THREE.Vector3();
     this.cameraDirection = new THREE.Vector3();
@@ -168,6 +171,7 @@ export class Game {
         this.explosions.reset();
         this.scorePops.reset();
         this.hidePickupBanner();
+        this.hideShieldVignette();
       }
 
       snapshot = this.simulation.getSnapshot();
@@ -250,7 +254,9 @@ export class Game {
     this.hud.healthFill.style.width = `${Math.max(0, snapshot.health)}%`;
     this.hud.status.textContent = snapshot.status;
     this.hud.powerup.textContent = snapshot.activePowerUp
-      ? `${snapshot.activePowerUp.toUpperCase()} ${snapshot.activePowerUpTimer.toFixed(1)}s`
+      ? snapshot.activePowerUp === 'shield'
+        ? `${snapshot.activePowerUpTimer <= 3 ? 'SHIELD FADING' : 'SHIELD ACTIVE'} ${snapshot.activePowerUpTimer.toFixed(1)}s`
+        : `${snapshot.activePowerUp.toUpperCase()} ${snapshot.activePowerUpTimer.toFixed(1)}s`
       : 'No active power-up';
     if (snapshot.equippedAbility === 'dash') {
       this.hud.pulse.textContent = snapshot.abilityCooldown > 0
@@ -313,6 +319,21 @@ export class Game {
       this.showPickupBanner(pickupEvent.type);
     }
 
+    for (const shieldEvent of snapshot.shieldEvents ?? []) {
+      if (shieldEvent.type === 'expired') {
+        this.showPickupBanner('shield-expired');
+      }
+    }
+
+    if ((snapshot.shieldImpactFlash ?? 0) > this._lastShieldImpact) {
+      this.showShieldVignette('impact');
+      this.cameraShake.add(0.14, 0.12);
+    } else if ((snapshot.shieldExpiryFlash ?? 0) > this._lastShieldExpiry) {
+      this.showShieldVignette('expiry');
+    }
+    this._lastShieldImpact = snapshot.shieldImpactFlash ?? 0;
+    this._lastShieldExpiry = snapshot.shieldExpiryFlash ?? 0;
+
     if (!this.aimState.target && snapshot.pickups.length > 0) {
       const nearestPickup = snapshot.pickups.reduce((best, pickup) => {
         const dx = pickup.position.x - snapshot.playerPosition.x;
@@ -366,7 +387,11 @@ export class Game {
       },
       shield: {
         title: 'Shield activated',
-        copy: 'Incoming damage is reduced for a short time.',
+        copy: 'Incoming hits are fully absorbed until the shield expires.',
+      },
+      'shield-expired': {
+        title: 'Shield offline',
+        copy: 'The barrier collapsed. Hull damage will land again.',
       },
     };
     const content = copyByType[type] ?? {
@@ -396,6 +421,19 @@ export class Game {
     if (this.pickupBannerTimer === 0) {
       this.hidePickupBanner();
     }
+  }
+
+  showShieldVignette(mode = 'impact') {
+    this.shieldVignetteTimer = mode === 'expiry' ? 0.7 : 0.35;
+    this.hud.shieldVignette.dataset.mode = mode;
+    this.hud.shieldVignette.classList.add('shield-vignette--visible');
+  }
+
+  hideShieldVignette() {
+    this.hud.shieldVignette.classList.remove('shield-vignette--visible');
+    delete this.hud.shieldVignette.dataset.mode;
+    this.hud.shieldVignette.style.background = '';
+    this.shieldVignetteTimer = 0;
   }
 
   renderRadar(snapshot, candidates) {
@@ -650,6 +688,20 @@ export class Game {
     } else {
       this.hud.hitVignette.classList.remove('hit-vignette--active');
       this.hud.hitVignette.style.background = '';
+    }
+
+    if (this.shieldVignetteTimer > 0) {
+      this.shieldVignetteTimer = Math.max(0, this.shieldVignetteTimer - dt);
+      const mode = this.hud.shieldVignette.dataset.mode;
+      const intensity = mode === 'expiry'
+        ? 0.12 + this.shieldVignetteTimer * 0.22
+        : 0.2 + this.shieldVignetteTimer * 0.55;
+      this.hud.shieldVignette.style.background = mode === 'expiry'
+        ? `radial-gradient(circle at center, rgba(199, 138, 255, ${intensity * 0.18}) 0%, rgba(199, 138, 255, ${intensity * 0.35}) 48%, transparent 76%)`
+        : `radial-gradient(circle at center, rgba(138, 244, 255, ${intensity * 0.2}) 0%, rgba(199, 138, 255, ${intensity * 0.42}) 46%, transparent 74%)`;
+      if (this.shieldVignetteTimer === 0) {
+        this.hideShieldVignette();
+      }
     }
   }
 

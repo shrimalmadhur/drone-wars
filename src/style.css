@@ -1128,6 +1128,19 @@ canvas {
   opacity: 1;
 }
 
+.shield-vignette {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 79;
+  opacity: 0;
+  transition: opacity 0.08s linear;
+}
+
+.shield-vignette--visible {
+  opacity: 1;
+}
+
 .hit-chevrons {
   position: fixed;
   inset: 0;
