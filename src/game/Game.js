@@ -10,6 +10,7 @@ import { ExplosionEffect } from './effects/ExplosionEffect.js';
 import { ScorePop } from './effects/ScorePop.js';
 import { AudioEngine } from './audio/AudioEngine.js';
 import { applyAudioFrame, createAudioFrameState } from './audio/frameAudio.js';
+import { PortalSystem } from './portal.js';
 
 const RADAR_COLORS = Object.fromEntries(
   ['tank', 'drone', 'droneSupport', 'droneJammer', 'missile', 'turret', 'ship', 'boss']
@@ -18,11 +19,27 @@ const RADAR_COLORS = Object.fromEntries(
 const PICKUP_COLORS = Object.fromEntries(
   Object.entries(CONFIG.palette.pickup).map(([k, v]) => [k, '#' + v.toString(16).padStart(6, '0')])
 );
+const PORTAL_COLORS = {
+  exit: '#61ffd8',
+  return: '#ff6b6b',
+};
 
 export class Game {
-  constructor({ mount, hud, mapTheme, playerProgress, runModifiers, loadout, onRunComplete, onRestartRequested }) {
+  constructor({
+    mount,
+    hud,
+    mapTheme,
+    playerProgress,
+    runModifiers,
+    loadout,
+    portalContext,
+    playerName,
+    onRunComplete,
+    onRestartRequested,
+  }) {
     this.mount = mount;
     this.hud = hud;
+    this.playerName = playerName;
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(62, 1, 0.1, 500);
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -36,6 +53,12 @@ export class Game {
 
     this.input = new InputController(window, document);
     this.simulation = new Simulation(this.scene, { mapTheme, playerProgress, runModifiers, loadout });
+    this.portalSystem = new PortalSystem(
+      this.scene,
+      this.simulation.terrain,
+      () => this.getPortalPlayerState(),
+      portalContext,
+    );
     this.onRunComplete = onRunComplete;
     this.onRestartRequested = onRestartRequested;
     this.currentRunConfig = { playerProgress, runModifiers, loadout };
@@ -119,8 +142,43 @@ export class Game {
     };
     this.simulation.setRunConfig(this.currentRunConfig);
     this.simulation.restart();
+    this.applyPortalSpawnState();
     this.didRecordRun = false;
     this.input.reset();
+  }
+
+  applyPortalSpawnState() {
+    const spawnState = this.portalSystem?.getSpawnState?.();
+    if (!spawnState) {
+      return;
+    }
+    this.simulation.player.group.position.copy(spawnState.position);
+    this.simulation.player.velocity.copy(spawnState.velocity);
+    this.simulation.player.yaw = spawnState.yaw;
+    this.simulation.player.group.rotation.y = spawnState.yaw;
+    if (spawnState.health !== null && spawnState.health !== undefined) {
+      this.simulation.player.health = Math.min(
+        this.simulation.player.runModifiers.maxHealth,
+        Math.max(1, spawnState.health),
+      );
+      this.simulation.state.health = this.simulation.player.health;
+    }
+    this.simulation.state.status = 'Portal arrival registered. Continue the run.';
+  }
+
+  getPortalPlayerState() {
+    const velocity = this.simulation.player.velocity;
+    return {
+      username: this.playerName || 'Portal Pilot',
+      color: CONFIG.palette.player.toString(16).padStart(6, '0'),
+      hp: this.simulation.player.health,
+      speed: velocity.length(),
+      speedX: velocity.x,
+      speedY: velocity.y,
+      speedZ: velocity.z,
+      rotationY: this.simulation.player.yaw,
+      position: this.simulation.player.group.position,
+    };
   }
 
   finalizeCompletedRun(currentMode) {
@@ -148,6 +206,7 @@ export class Game {
       this.clock.accumulator += elapsed;
 
       let snapshot = this.simulation.getSnapshot();
+      snapshot.portals = this.portalSystem?.getRadarContacts?.() ?? [];
       let aimCandidates = this.simulation.getAimCandidates();
       this.updateCamera(snapshot);
       this.updateAimSolution(snapshot, aimCandidates);
@@ -178,6 +237,7 @@ export class Game {
       }
 
       snapshot = this.simulation.getSnapshot();
+      snapshot.portals = this.portalSystem?.getRadarContacts?.() ?? [];
       aimCandidates = this.simulation.getAimCandidates();
       this.updateCamera(snapshot);
       this.updateAimSolution(snapshot, aimCandidates);
@@ -198,6 +258,7 @@ export class Game {
       this.cameraShake.apply(this.camera);
       this.explosions.update(elapsed);
       this.scorePops.update(elapsed);
+      this.portalSystem?.update(snapshot.time);
       this.renderer.render(this.scene, this.camera);
       this._lastMode = currentMode;
       this.frame = requestAnimationFrame(tick);
@@ -639,6 +700,45 @@ export class Game {
       ctx.restore();
     }
 
+    for (const portal of snapshot.portals ?? []) {
+      const contact = projectRadarContact(
+        snapshot.playerPosition,
+        snapshot.playerYaw,
+        portal.position,
+        this.radarWorldRadius,
+      );
+      if (contact.outOfRange) {
+        continue;
+      }
+
+      const px = cx + contact.lateral * scale;
+      const py = cx - contact.forward * scale;
+      const color = PORTAL_COLORS[portal.kind] || '#ffffff';
+
+      ctx.save();
+      ctx.globalAlpha = 0.94;
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = 2;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 12;
+      ctx.beginPath();
+      ctx.arc(px, py, 6, 0, Math.PI * 2);
+      ctx.stroke();
+      if (portal.kind === 'return') {
+        ctx.beginPath();
+        ctx.moveTo(px - 3.5, py);
+        ctx.lineTo(px + 3.5, py);
+        ctx.moveTo(px, py - 3.5);
+        ctx.lineTo(px, py + 3.5);
+        ctx.stroke();
+      }
+      ctx.beginPath();
+      ctx.arc(px, py, 2.4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
     // Reset shadow and alpha
     ctx.shadowBlur = 0;
     ctx.globalAlpha = 1;
@@ -782,6 +882,7 @@ export class Game {
     this.explosions.dispose();
     this.scorePops.dispose();
     this.input.dispose();
+    this.portalSystem?.dispose?.();
     this.simulation.dispose();
     void this.audio.dispose().catch(() => {});
     this.renderer.dispose();

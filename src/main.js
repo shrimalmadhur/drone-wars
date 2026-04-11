@@ -12,7 +12,8 @@ import { createRunModifiers } from './game/meta/runModifiers.js';
 import { ABILITY_DEFINITIONS, getUnlockedAbilities, isAbilityUnlocked } from './game/meta/abilities.js';
 import { MUTATOR_DEFINITIONS } from './game/meta/mutators.js';
 import { getUpgradeCost, UPGRADE_DEFINITIONS } from './game/meta/upgrades.js';
-import { MAP_THEME_DETAILS } from './mapThemes.js';
+import { getPortalContext } from './game/portal.js';
+import { MAP_THEME_DETAILS, MAP_THEMES } from './mapThemes.js';
 import {
   loadMapTheme,
   loadPlayerName,
@@ -116,6 +117,17 @@ let drawerAutoCollapseTimer = null;
 
 const savedPlayerName = loadPlayerName();
 const savedMapTheme = loadMapTheme();
+const portalContext = getPortalContext();
+let currentMapTheme = savedMapTheme;
+
+if (portalContext.active) {
+  startScreen.classList.add('start-screen--hidden');
+}
+
+function chooseRandomMapTheme() {
+  const mapThemes = Object.values(MAP_THEMES);
+  return mapThemes[Math.floor(Math.random() * mapThemes.length)] ?? savedMapTheme;
+}
 
 function createRunId() {
   const cryptoApi = globalThis?.crypto;
@@ -309,12 +321,62 @@ function applyIdentity(playerName, mapTheme) {
 }
 
 function getCurrentMapTheme() {
-  return loadMapTheme();
+  return currentMapTheme;
 }
 
-function beginRun({ fromSummary = false } = {}) {
-  const playerName = savePlayerName(playerNameInput.value);
-  const mapTheme = game ? getCurrentMapTheme() : saveMapTheme(new FormData(startForm).get('mapTheme'));
+function createGameInstance(mapTheme, playerName) {
+  currentMapTheme = mapTheme;
+  const initialRunModifiers = createRunModifiers(playerProgress);
+  const initialLoadout = playerProgress.loadout;
+  game = new Game({
+    mount,
+    hud,
+    mapTheme,
+    playerProgress,
+    runModifiers: initialRunModifiers,
+    loadout: initialLoadout,
+    portalContext,
+    playerName,
+    onRestartRequested() {
+      if (!startScreen.classList.contains('start-screen--hidden')) {
+        return;
+      }
+      beginRun({ fromSummary: true });
+    },
+    onRunComplete(runStats) {
+      const previousProgress = playerProgress;
+      const result = recordRunComplete(runStats);
+      playerProgress = result.progress;
+      updateProfileReadouts();
+      renderUpgradeShop();
+      renderAbilityPicker();
+      renderMutatorPicker();
+
+      if (activeRunContext) {
+        lastCompletedRunContext = activeRunContext;
+        trackRunCompleted({
+          ...activeRunContext,
+          score: runStats.score,
+          wave: runStats.highestWave,
+          currencyEarned: result.currencyEarned,
+        });
+        trackRunSummaryViewed(activeRunContext);
+      }
+
+      showRunSummary(result, previousProgress);
+      return result;
+    },
+  });
+  game.start();
+  trackGameStart(playerName, mapTheme);
+  setMapThemeLock(true);
+}
+
+function beginRun({ fromSummary = false, forcedPlayerName, forcedMapTheme } = {}) {
+  const playerName = savePlayerName(forcedPlayerName ?? playerNameInput.value);
+  const selectedTheme = forcedMapTheme ?? (game ? getCurrentMapTheme() : new FormData(startForm).get('mapTheme'));
+  const mapTheme = game ? selectedTheme : saveMapTheme(selectedTheme);
+  currentMapTheme = mapTheme;
   if (!playerName) {
     playerNameInput.setCustomValidity('Enter a player name to launch.');
     startForm.reportValidity();
@@ -367,9 +429,12 @@ renderUpgradeShop();
 renderAbilityPicker();
 renderMutatorPicker();
 setMapThemeLock(false);
-playerNameInput.focus();
 wireDrawer(controlsDrawer, controlsDrawerToggle);
 wireDrawer(missionDrawer, missionDrawerToggle);
+
+if (!portalContext.active) {
+  playerNameInput.focus();
+}
 
 playerNameInput.addEventListener('input', () => {
   playerNameInput.setCustomValidity('');
@@ -440,49 +505,21 @@ startForm.addEventListener('submit', (event) => {
 
   if (!game) {
     const initialMapTheme = saveMapTheme(new FormData(startForm).get('mapTheme'));
-    const initialRunModifiers = createRunModifiers(playerProgress);
-    const initialLoadout = playerProgress.loadout;
-    game = new Game({
-      mount,
-      hud,
-      mapTheme: initialMapTheme,
-      playerProgress,
-      runModifiers: initialRunModifiers,
-      loadout: initialLoadout,
-      onRestartRequested() {
-        if (!startScreen.classList.contains('start-screen--hidden')) {
-          return;
-        }
-        beginRun({ fromSummary: true });
-      },
-      onRunComplete(runStats) {
-        const previousProgress = playerProgress;
-        const result = recordRunComplete(runStats);
-        playerProgress = result.progress;
-        updateProfileReadouts();
-        renderUpgradeShop();
-        renderAbilityPicker();
-        renderMutatorPicker();
-
-        if (activeRunContext) {
-          lastCompletedRunContext = activeRunContext;
-          trackRunCompleted({
-            ...activeRunContext,
-            score: runStats.score,
-            wave: runStats.highestWave,
-            currencyEarned: result.currencyEarned,
-          });
-          trackRunSummaryViewed(activeRunContext);
-        }
-
-        showRunSummary(result, previousProgress);
-        return result;
-      },
-    });
-    game.start();
-    trackGameStart(playerName, initialMapTheme);
-    setMapThemeLock(true);
+    createGameInstance(initialMapTheme, playerName);
   }
 
   beginRun();
 });
+
+if (portalContext.active) {
+  const autoPlayerName = portalContext.username || savedPlayerName || 'Portal Pilot';
+  const autoMapTheme = chooseRandomMapTheme();
+  playerNameInput.value = autoPlayerName;
+  applyIdentity(autoPlayerName, autoMapTheme);
+  startScreen.classList.add('start-screen--hidden');
+  createGameInstance(autoMapTheme, autoPlayerName);
+  beginRun({
+    forcedPlayerName: autoPlayerName,
+    forcedMapTheme: autoMapTheme,
+  });
+}
