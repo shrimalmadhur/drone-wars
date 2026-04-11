@@ -412,24 +412,24 @@ function buildFrontierDecorMeshes(group, maxCounts) {
   const bushCrown1Geo = new THREE.SphereGeometry(1.1, 6, 5);
 
   // --- Materials per species ---
-  const pineTrunkMat = new THREE.MeshStandardMaterial({ color: 0x3d2415, roughness: 1 });
-  const pineCrown0Mat = new THREE.MeshStandardMaterial({ color: 0x1a5428, roughness: 0.92 });
-  const pineCrown1Mat = new THREE.MeshStandardMaterial({ color: 0x226b35, roughness: 0.90 });
-  const pineCrown2Mat = new THREE.MeshStandardMaterial({ color: 0x2d8044, roughness: 0.88 });
+  const pineTrunkMat = new THREE.MeshStandardNodeMaterial({ color: 0x3d2415, roughness: 1 });
+  const pineCrown0Mat = new THREE.MeshStandardNodeMaterial({ color: 0x1a5428, roughness: 0.92 });
+  const pineCrown1Mat = new THREE.MeshStandardNodeMaterial({ color: 0x226b35, roughness: 0.90 });
+  const pineCrown2Mat = new THREE.MeshStandardNodeMaterial({ color: 0x2d8044, roughness: 0.88 });
 
-  const oakTrunkMat = new THREE.MeshStandardMaterial({ color: 0x4a3020, roughness: 1 });
-  const oakCrownMat = new THREE.MeshStandardMaterial({ color: 0x3a6e2e, roughness: 0.90 });
+  const oakTrunkMat = new THREE.MeshStandardNodeMaterial({ color: 0x4a3020, roughness: 1 });
+  const oakCrownMat = new THREE.MeshStandardNodeMaterial({ color: 0x3a6e2e, roughness: 0.90 });
 
-  const birchTrunkMat = new THREE.MeshStandardMaterial({ color: 0xd4cfc4, roughness: 1 });
-  const birchCrown0Mat = new THREE.MeshStandardMaterial({ color: 0x5a9e48, roughness: 0.90 });
-  const birchCrown1Mat = new THREE.MeshStandardMaterial({ color: 0x68ac55, roughness: 0.88 });
-  const birchCrown2Mat = new THREE.MeshStandardMaterial({ color: 0x76ba62, roughness: 0.86 });
+  const birchTrunkMat = new THREE.MeshStandardNodeMaterial({ color: 0xd4cfc4, roughness: 1 });
+  const birchCrown0Mat = new THREE.MeshStandardNodeMaterial({ color: 0x5a9e48, roughness: 0.90 });
+  const birchCrown1Mat = new THREE.MeshStandardNodeMaterial({ color: 0x68ac55, roughness: 0.88 });
+  const birchCrown2Mat = new THREE.MeshStandardNodeMaterial({ color: 0x76ba62, roughness: 0.86 });
 
-  const deadTrunkMat = new THREE.MeshStandardMaterial({ color: 0x4a3828, roughness: 1 });
-  const deadBranchMat = new THREE.MeshStandardMaterial({ color: 0x3d2e20, roughness: 1 });
+  const deadTrunkMat = new THREE.MeshStandardNodeMaterial({ color: 0x4a3828, roughness: 1 });
+  const deadBranchMat = new THREE.MeshStandardNodeMaterial({ color: 0x3d2e20, roughness: 1 });
 
-  const bushCrown0Mat = new THREE.MeshStandardMaterial({ color: 0x456b38, roughness: 0.92 });
-  const bushCrown1Mat = new THREE.MeshStandardMaterial({ color: 0x507a42, roughness: 0.90 });
+  const bushCrown0Mat = new THREE.MeshStandardNodeMaterial({ color: 0x456b38, roughness: 0.92 });
+  const bushCrown1Mat = new THREE.MeshStandardNodeMaterial({ color: 0x507a42, roughness: 0.90 });
 
   // --- InstancedMesh creation helper ---
   const treeCount = maxCounts.trees;
@@ -493,7 +493,7 @@ function buildFrontierDecorMeshes(group, maxCounts) {
     { geo: new THREE.DodecahedronGeometry(1.2, 2), color: 0x6b7560, weight: 0.25 },
   ];
   const rockVariantMaterials = rockVariantDefs.map(
-    (v) => new THREE.MeshStandardMaterial({ color: v.color, roughness: 1 }),
+    (v) => new THREE.MeshStandardNodeMaterial({ color: v.color, roughness: 1 }),
   );
   const rockVariants = rockVariantDefs.map((v, i) => {
     const mesh = new THREE.InstancedMesh(v.geo, rockVariantMaterials[i], maxCounts.rocks);
@@ -504,14 +504,14 @@ function buildFrontierDecorMeshes(group, maxCounts) {
 
   // Ground scatter: small stones
   const smallStoneGeo = new THREE.DodecahedronGeometry(0.4, 0);
-  const smallStoneMat = new THREE.MeshStandardMaterial({ color: 0x7a7568, roughness: 0.95 });
+  const smallStoneMat = new THREE.MeshStandardNodeMaterial({ color: 0x7a7568, roughness: 0.95 });
   const smallStones = new THREE.InstancedMesh(smallStoneGeo, smallStoneMat, maxCounts.smallStones);
   smallStones.castShadow = true;
   smallStones.receiveShadow = true;
 
   // Ground scatter: fallen logs
   const fallenLogGeo = new THREE.CylinderGeometry(0.2, 0.25, 3.5, 6);
-  const fallenLogMat = new THREE.MeshStandardMaterial({ color: 0x4a3420, roughness: 0.9 });
+  const fallenLogMat = new THREE.MeshStandardNodeMaterial({ color: 0x4a3420, roughness: 0.9 });
   const fallenLogs = new THREE.InstancedMesh(fallenLogGeo, fallenLogMat, maxCounts.fallenLogs);
   fallenLogs.castShadow = true;
   fallenLogs.receiveShadow = true;
@@ -519,12 +519,12 @@ function buildFrontierDecorMeshes(group, maxCounts) {
   const landmarkGeometry = new THREE.CylinderGeometry(0.9, 1.8, 14, 6);
   const cloudGeometry = new THREE.SphereGeometry(4.4, 10, 10);
 
-  const landmarkMaterial = new THREE.MeshStandardMaterial({
+  const landmarkMaterial = new THREE.MeshStandardNodeMaterial({
     color: '#8c6e56',
     roughness: 0.88,
     metalness: 0.08,
   });
-  const cloudBodyMaterial = new THREE.MeshStandardMaterial({
+  const cloudBodyMaterial = new THREE.MeshStandardNodeMaterial({
     color: '#f7fbff',
     transparent: true,
     opacity: 0.68,
@@ -532,7 +532,7 @@ function buildFrontierDecorMeshes(group, maxCounts) {
     metalness: 0.02,
     depthWrite: false,
   });
-  const cloudWispMaterial = new THREE.MeshStandardMaterial({
+  const cloudWispMaterial = new THREE.MeshStandardNodeMaterial({
     color: '#dce8f6',
     transparent: true,
     opacity: 0.2,
@@ -610,84 +610,84 @@ function buildCityDecorMeshes(group, maxCounts) {
   const helicopterRotorGeometry = new THREE.BoxGeometry(0.2, 0.08, 7.4);
   const helicopterTailRotorGeometry = new THREE.BoxGeometry(0.8, 0.06, 0.16);
 
-  const towerMaterial = new THREE.MeshStandardMaterial({
+  const towerMaterial = new THREE.MeshStandardNodeMaterial({
     color: '#848d9b',
     roughness: 0.58,
     metalness: 0.24,
     emissive: '#111826',
     emissiveIntensity: 0.18,
   });
-  const wingMaterial = new THREE.MeshStandardMaterial({
+  const wingMaterial = new THREE.MeshStandardNodeMaterial({
     color: '#666f7b',
     roughness: 0.68,
     metalness: 0.18,
   });
-  const crownMaterial = new THREE.MeshStandardMaterial({
+  const crownMaterial = new THREE.MeshStandardNodeMaterial({
     color: '#b1b9c4',
     roughness: 0.36,
     metalness: 0.34,
   });
-  const windowMaterial = new THREE.MeshStandardMaterial({
+  const windowMaterial = new THREE.MeshStandardNodeMaterial({
     color: '#d7f0ff',
     emissive: '#b4e0ff',
     emissiveIntensity: 1.55,
     roughness: 0.08,
     metalness: 0.82,
   });
-  const rooftopUnitMaterial = new THREE.MeshStandardMaterial({
+  const rooftopUnitMaterial = new THREE.MeshStandardNodeMaterial({
     color: '#4a5058',
     roughness: 0.82,
     metalness: 0.12,
   });
-  const crowdMaterial = new THREE.MeshStandardMaterial({
+  const crowdMaterial = new THREE.MeshStandardNodeMaterial({
     color: '#c9cfca',
     roughness: 0.98,
   });
-  const carBodyMaterial = new THREE.MeshStandardMaterial({
+  const carBodyMaterial = new THREE.MeshStandardNodeMaterial({
     color: '#f4f8ff',
     roughness: 0.34,
     metalness: 0.3,
   });
-  const carCabinMaterial = new THREE.MeshStandardMaterial({
+  const carCabinMaterial = new THREE.MeshStandardNodeMaterial({
     color: '#d8dde5',
     roughness: 0.28,
     metalness: 0.26,
   });
-  const carGlassMaterial = new THREE.MeshStandardMaterial({
+  const carGlassMaterial = new THREE.MeshStandardNodeMaterial({
     color: '#7fb3d0',
     roughness: 0.08,
     metalness: 0.82,
     transparent: true,
     opacity: 0.88,
   });
-  const wheelMaterial = new THREE.MeshStandardMaterial({
+  const wheelMaterial = new THREE.MeshStandardNodeMaterial({
     color: '#161a1f',
     roughness: 0.94,
     metalness: 0.04,
   });
-  const headlightMaterial = new THREE.MeshStandardMaterial({
+  const headlightMaterial = new THREE.MeshStandardNodeMaterial({
     color: '#fff3c1',
     emissive: '#fff3c1',
     emissiveIntensity: 0.85,
   });
-  const taillightMaterial = new THREE.MeshStandardMaterial({
+  const taillightMaterial = new THREE.MeshStandardNodeMaterial({
     color: '#ff6b57',
     emissive: '#ff6b57',
     emissiveIntensity: 0.75,
   });
-  const helicopterBodyMaterial = new THREE.MeshStandardMaterial({
+  const helicopterBodyMaterial = new THREE.MeshStandardNodeMaterial({
     color: '#c5ced8',
     roughness: 0.34,
     metalness: 0.4,
   });
-  const helicopterGlassMaterial = new THREE.MeshStandardMaterial({
+  const helicopterGlassMaterial = new THREE.MeshStandardNodeMaterial({
     color: '#8ec1d8',
     roughness: 0.08,
     metalness: 0.86,
     transparent: true,
     opacity: 0.84,
   });
-  const helicopterRotorMaterial = new THREE.MeshStandardMaterial({
+  const helicopterRotorMaterial = new THREE.MeshStandardNodeMaterial({
     color: '#1b212c',
     roughness: 0.7,
     metalness: 0.12,
@@ -963,7 +963,7 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
   }
   groundGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
-  const groundMaterial = new THREE.MeshStandardMaterial({
+  const groundMaterial = new THREE.MeshStandardNodeMaterial({
     color: '#ffffff',
     vertexColors: true,
     roughness: theme === MAP_THEMES.CITY ? 0.9 : 0.96,
