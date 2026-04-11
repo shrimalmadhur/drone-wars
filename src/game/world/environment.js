@@ -94,25 +94,91 @@ function createSkyMaterial(preset) {
       topColor: { value: new THREE.Color(preset.topColor) },
       horizonColor: { value: new THREE.Color(preset.horizonColor) },
       bottomColor: { value: new THREE.Color(preset.bottomColor) },
+      sunDirection: { value: new THREE.Vector3(preset.sunOffset.x, preset.sunOffset.y, preset.sunOffset.z).normalize() },
+      sunColor: { value: new THREE.Color(preset.sunGlow) },
+      time: { value: 0 },
     },
     vertexShader: `
       varying vec3 vWorldPosition;
+      varying vec2 vUv;
       void main() {
-        vec4 worldPosition = modelMatrix * vec4(position, 1.0);
-        vWorldPosition = worldPosition.xyz;
-        gl_Position = projectionMatrix * viewMatrix * worldPosition;
+        vec4 worldPos = modelMatrix * vec4(position, 1.0);
+        vWorldPosition = worldPos.xyz;
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
       }
     `,
     fragmentShader: `
       uniform vec3 topColor;
       uniform vec3 horizonColor;
       uniform vec3 bottomColor;
+      uniform vec3 sunDirection;
+      uniform vec3 sunColor;
+      uniform float time;
       varying vec3 vWorldPosition;
 
+      float hash(vec2 p) {
+        return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+      }
+
+      float noise(vec2 p) {
+        vec2 i = floor(p);
+        vec2 f = fract(p);
+        f = f * f * (3.0 - 2.0 * f);
+        float a = hash(i);
+        float b = hash(i + vec2(1.0, 0.0));
+        float c = hash(i + vec2(0.0, 1.0));
+        float d = hash(i + vec2(1.0, 1.0));
+        return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+      }
+
+      float fbm(vec2 p) {
+        float v = 0.0;
+        float a = 0.5;
+        vec2 shift = vec2(100.0);
+        for (int i = 0; i < 4; i++) {
+          v += a * noise(p);
+          p = p * 2.0 + shift;
+          a *= 0.5;
+        }
+        return v;
+      }
+
       void main() {
-        float h = normalize(vWorldPosition).y * 0.5 + 0.5;
-        vec3 color = mix(bottomColor, horizonColor, smoothstep(0.0, 0.45, h));
-        color = mix(color, topColor, smoothstep(0.48, 1.0, h));
+        vec3 dir = normalize(vWorldPosition);
+        float h = dir.y;
+
+        // Base sky gradient
+        vec3 color;
+        if (h > 0.0) {
+          color = mix(horizonColor, topColor, smoothstep(0.0, 0.45, h));
+        } else {
+          color = mix(horizonColor, bottomColor, smoothstep(0.0, -0.25, h));
+        }
+
+        // Sun disc with soft falloff
+        float sunDot = dot(dir, normalize(sunDirection));
+        float sunDisc = smoothstep(0.9965, 0.9985, sunDot);
+        float sunGlow = pow(max(sunDot, 0.0), 64.0) * 0.4;
+        float sunHalo = pow(max(sunDot, 0.0), 8.0) * 0.15;
+        color += sunColor * (sunDisc + sunGlow + sunHalo);
+
+        // Warm horizon tint near sun
+        float horizonBlend = 1.0 - abs(h);
+        float sunProximity = pow(max(sunDot, 0.0), 3.0);
+        color += vec3(0.3, 0.15, 0.05) * horizonBlend * sunProximity * 0.3;
+
+        // Procedural cloud layer at horizon
+        if (h > -0.05 && h < 0.35) {
+          vec2 cloudUV = dir.xz / (h + 0.1) * 0.3;
+          cloudUV += time * 0.002;
+          float clouds = fbm(cloudUV * 3.0);
+          clouds = smoothstep(0.35, 0.65, clouds);
+          float cloudFade = smoothstep(-0.05, 0.05, h) * smoothstep(0.35, 0.15, h);
+          vec3 cloudColor = mix(horizonColor, vec3(1.0), 0.6);
+          color = mix(color, cloudColor, clouds * cloudFade * 0.5);
+        }
+
         gl_FragColor = vec4(color, 1.0);
       }
     `,
@@ -127,7 +193,8 @@ export function createEnvironment(scene, { mapTheme } = {}) {
   scene.fog = new THREE.Fog(preset.fog, preset.fogNear, preset.fogFar);
 
   const skyGroup = new THREE.Group();
-  const sky = new THREE.Mesh(new THREE.SphereGeometry(420, 32, 32), createSkyMaterial(preset));
+  const skyMat = createSkyMaterial(preset);
+  const sky = new THREE.Mesh(new THREE.SphereGeometry(420, 32, 32), skyMat);
   const sunGlow = new THREE.Mesh(
     new THREE.SphereGeometry(9, 18, 18),
     new THREE.MeshBasicMaterial({
@@ -175,6 +242,9 @@ export function createEnvironment(scene, { mapTheme } = {}) {
   return {
     update(center, time = 0) {
       skyGroup.position.copy(center);
+      if (skyMat) {
+        skyMat.uniforms.time.value = time;
+      }
       sun.position.set(
         center.x + preset.sunOffset.x,
         preset.sunOffset.y,
