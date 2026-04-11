@@ -203,13 +203,16 @@ export class ProjectilePool {
     }
 
     stepProjectileStore(this.store, dt, (item) => {
-      const playerDx = item.x - context.playerPosition.x;
-      const playerDz = item.z - context.playerPosition.z;
-      const distanceFromPlayer = Math.hypot(playerDx, playerDz);
-      if (item.age >= item.maxLife || distanceFromPlayer > CONFIG.world.arenaRadius * 2 || item.y < -12 || item.y > 120) {
+      if (item.age >= item.maxLife || item.y < -12 || item.y > 120) {
         return true;
       }
-      if (item.y <= context.terrain.getGroundHeight(item.x, item.z) + 0.6) {
+      const playerDx = item.x - context.playerPosition.x;
+      const playerDz = item.z - context.playerPosition.z;
+      if (playerDx * playerDx + playerDz * playerDz > CONFIG.world.arenaRadius * CONFIG.world.arenaRadius * 4) {
+        return true;
+      }
+      // Only check ground collision when close to ground (skip expensive getGroundHeight)
+      if (item.y < 15 && item.y <= context.terrain.getGroundHeight(item.x, item.z) + 0.6) {
         context.recordImpact?.(item.x, item.y, item.z);
         context.spawnEffect(item.x, item.y, item.z, 0.8);
         return true;
