@@ -1,7 +1,6 @@
 import * as THREE from 'three/webgpu';
-import { pass, mrt, output, emissive } from 'three/tsl';
+import { pass } from 'three/tsl';
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
-import { ao } from 'three/addons/tsl/display/GTAONode.js';
 import { fxaa } from 'three/addons/tsl/display/FXAANode.js';
 
 import { CONFIG } from './config.js';
@@ -137,29 +136,16 @@ export class Game {
   _initPostProcessing() {
     this.postProcessing = new THREE.PostProcessing(this.renderer);
     const scenePass = pass(this.scene, this.camera);
-
-    // MRT for selective bloom — separate emissive channel
-    scenePass.setMRT(mrt({
-      output: output,
-      emissive: emissive,
-    }));
-
     const scenePassColor = scenePass.getTextureNode('output');
-    const emissiveTexture = scenePass.getTextureNode('emissive');
-    const depthNode = scenePass.getTextureNode('depth');
-    const normalNode = scenePass.getTextureNode('normal');
 
-    // Selective bloom on emissive only
-    const bloomPass = bloom(emissiveTexture);
-    bloomPass.threshold.value = 0.0;
-    bloomPass.strength.value = 0.4;
+    // Bloom with threshold (emissive surfaces glow)
+    const bloomPass = bloom(scenePassColor);
+    bloomPass.threshold.value = 0.75;
+    bloomPass.strength.value = 0.3;
     bloomPass.radius.value = 0.4;
 
-    // Ambient occlusion
-    const aoPass = ao(depthNode, normalNode, this.camera);
-
-    // Combine: color * AO + bloom, then FXAA
-    let outputNode = scenePassColor.mul(aoPass).add(bloomPass);
+    // Combine: scene + bloom, then FXAA
+    let outputNode = scenePassColor.add(bloomPass);
     outputNode = fxaa(outputNode);
 
     this.postProcessing.outputNode = outputNode;
