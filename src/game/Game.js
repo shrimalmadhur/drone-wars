@@ -1,4 +1,9 @@
 import * as THREE from 'three';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { SAOPass } from 'three/examples/jsm/postprocessing/SAOPass.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 
 import { CONFIG } from './config.js';
 import { InputController } from './input.js';
@@ -50,6 +55,36 @@ export class Game {
     this.renderer.toneMappingExposure = 1.08;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, CONFIG.render.maxPixelRatio));
     this.mount.appendChild(this.renderer.domElement);
+
+    // Post-processing pipeline
+    this.composer = new EffectComposer(this.renderer);
+    this.composer.setPixelRatio(Math.min(window.devicePixelRatio, CONFIG.render.maxPixelRatio));
+
+    const renderPass = new RenderPass(this.scene, this.camera);
+    this.composer.addPass(renderPass);
+
+    // SSAO — ambient occlusion for depth and grounding
+    this.saoPass = new SAOPass(this.scene, this.camera);
+    this.saoPass.params.saoBias = 0.5;
+    this.saoPass.params.saoIntensity = 0.04;
+    this.saoPass.params.saoScale = 5;
+    this.saoPass.params.saoKernelRadius = 30;
+    this.saoPass.params.saoBlurRadius = 8;
+    this.saoPass.params.saoBlurStdDev = 4;
+    this.saoPass.params.saoBlurDepthCutoff = 0.01;
+    this.composer.addPass(this.saoPass);
+
+    // Bloom — glow bleed from emissive surfaces
+    this.bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(window.innerWidth, window.innerHeight),
+      0.3,   // strength
+      0.4,   // radius
+      0.75   // threshold
+    );
+    this.composer.addPass(this.bloomPass);
+
+    const outputPass = new OutputPass();
+    this.composer.addPass(outputPass);
 
     this.input = new InputController(window, document);
     this.simulation = new Simulation(this.scene, { mapTheme, playerProgress, runModifiers, loadout });
@@ -259,7 +294,7 @@ export class Game {
       this.explosions.update(elapsed);
       this.scorePops.update(elapsed);
       this.portalSystem?.update(snapshot.time);
-      this.renderer.render(this.scene, this.camera);
+      this.composer.render();
       this._lastMode = currentMode;
       this.frame = requestAnimationFrame(tick);
     };
@@ -869,6 +904,7 @@ export class Game {
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, CONFIG.render.maxPixelRatio));
+    this.composer.setSize(width, height);
   }
 
   dispose() {
