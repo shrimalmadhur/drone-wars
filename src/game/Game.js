@@ -199,7 +199,17 @@ export class Game {
 
   start() {
     this.clock.last = performance.now();
+    this._fpsFrames = 0;
+    this._fpsLastTime = performance.now();
+    this._fpsEl = document.getElementById('fps-counter');
     const tick = (time) => {
+      this._fpsFrames++;
+      if (time - this._fpsLastTime >= 500) {
+        const fps = Math.round(this._fpsFrames * 1000 / (time - this._fpsLastTime));
+        if (this._fpsEl) this._fpsEl.textContent = fps + ' FPS';
+        this._fpsFrames = 0;
+        this._fpsLastTime = time;
+      }
       const elapsed = Math.min((time - this.clock.last) / 1000, CONFIG.simulation.maxFrameTime);
       this.clock.last = time;
       this.clock.accumulator += elapsed;
