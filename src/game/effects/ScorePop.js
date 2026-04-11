@@ -1,4 +1,4 @@
-import * as THREE from 'three/webgpu';
+import * as THREE from 'three';
 import { CONFIG } from '../config.js';
 
 function createTextTexture(text, color) {

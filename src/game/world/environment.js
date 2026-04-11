@@ -1,9 +1,4 @@
-import * as THREE from 'three/webgpu';
-import {
-  Fn, vec2, vec3, float, uniform,
-  positionWorld, normalize, dot, pow, max, abs,
-  smoothstep, mix, sin, floor, fract, select,
-} from 'three/tsl';
+import * as THREE from 'three';
 
 import { MAP_THEMES, sanitizeMapTheme } from '../../mapThemes.js';
 
@@ -92,71 +87,71 @@ function createClouds(count = 18) {
 }
 
 function createSkyMaterial(preset) {
-  const topColorU = uniform(new THREE.Color(preset.topColor));
-  const horizonColorU = uniform(new THREE.Color(preset.horizonColor));
-  const bottomColorU = uniform(new THREE.Color(preset.bottomColor));
-  const sunDirU = uniform(new THREE.Vector3(preset.sunOffset.x, preset.sunOffset.y, preset.sunOffset.z).normalize());
-  const sunColU = uniform(new THREE.Color(preset.sunGlow));
-  const timeU = uniform(0);
-
-  const hash2d = Fn(([p]) => {
-    return fract(sin(dot(p, vec2(127.1, 311.7))).mul(43758.5453123));
-  });
-
-  const noise2d = Fn(([p_immutable]) => {
-    const p = p_immutable.toVar();
-    const i = floor(p);
-    const f = fract(p).toVar();
-    f.assign(f.mul(f).mul(float(3.0).sub(f.mul(2.0))));
-    const a = hash2d(i);
-    const b = hash2d(i.add(vec2(1.0, 0.0)));
-    const c = hash2d(i.add(vec2(0.0, 1.0)));
-    const d = hash2d(i.add(vec2(1.0, 1.0)));
-    return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
-  });
-
-  // 2-octave FBM (lean)
-  const fbm = Fn(([p_immutable]) => {
-    const p = p_immutable.toVar();
-    return noise2d(p).mul(0.5).add(noise2d(p.mul(2.0).add(vec2(100.0))).mul(0.25));
-  });
-
-  const skyColor = Fn(() => {
-    const dir = normalize(positionWorld);
-    const h = dir.y;
-
-    const upperGrad = mix(horizonColorU, topColorU, smoothstep(0.0, 0.45, h));
-    const lowerGrad = mix(horizonColorU, bottomColorU, smoothstep(0.0, -0.25, h));
-    const color = select(h.greaterThan(0.0), upperGrad, lowerGrad).toVar();
-
-    const sunDot = dot(dir, sunDirU);
-    const sunDisc = smoothstep(0.9965, 0.9985, sunDot);
-    const sunGlow = pow(max(sunDot, 0.0), 64.0).mul(0.4);
-    const sunHalo = pow(max(sunDot, 0.0), 8.0).mul(0.15);
-    color.addAssign(sunColU.mul(sunDisc.add(sunGlow).add(sunHalo)));
-
-    const horizonBlend = float(1.0).sub(abs(h));
-    const sunProximity = pow(max(sunDot, 0.0), 3.0);
-    color.addAssign(vec3(0.3, 0.15, 0.05).mul(horizonBlend).mul(sunProximity).mul(0.3));
-
-    const inCloudBand = h.greaterThan(-0.05).and(h.lessThan(0.35));
-    const cloudUV = dir.xz.div(h.add(0.1)).mul(0.3).add(timeU.mul(0.002)).toVar();
-    const clouds = smoothstep(0.35, 0.65, fbm(cloudUV.mul(3.0)));
-    const cloudFade = smoothstep(-0.05, 0.05, h).mul(smoothstep(0.35, 0.15, h));
-    const cloudCol = mix(horizonColorU, vec3(1.0), 0.6);
-    const cloudBlended = mix(color, cloudCol, clouds.mul(cloudFade).mul(0.5));
-    color.assign(select(inCloudBand, cloudBlended, color));
-
-    return color;
-  });
-
-  const mat = new THREE.MeshBasicNodeMaterial({
+  return new THREE.ShaderMaterial({
     side: THREE.BackSide,
     depthWrite: false,
+    uniforms: {
+      topColor: { value: new THREE.Color(preset.topColor) },
+      horizonColor: { value: new THREE.Color(preset.horizonColor) },
+      bottomColor: { value: new THREE.Color(preset.bottomColor) },
+      sunDirection: { value: new THREE.Vector3(preset.sunOffset.x, preset.sunOffset.y, preset.sunOffset.z).normalize() },
+      sunColor: { value: new THREE.Color(preset.sunGlow) },
+      time: { value: 0 },
+    },
+    vertexShader: `
+      varying vec3 vWorldPosition;
+      void main() {
+        vec4 worldPos = modelMatrix * vec4(position, 1.0);
+        vWorldPosition = worldPos.xyz;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 topColor;
+      uniform vec3 horizonColor;
+      uniform vec3 bottomColor;
+      uniform vec3 sunDirection;
+      uniform vec3 sunColor;
+      uniform float time;
+      varying vec3 vWorldPosition;
+
+      float hash(vec2 p) {
+        return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+      }
+      float noise(vec2 p) {
+        vec2 i = floor(p);
+        vec2 f = fract(p);
+        f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(hash(i), hash(i + vec2(1,0)), f.x),
+                   mix(hash(i + vec2(0,1)), hash(i + vec2(1,1)), f.x), f.y);
+      }
+      float fbm(vec2 p) {
+        return noise(p) * 0.5 + noise(p * 2.0 + vec2(100.0)) * 0.25;
+      }
+
+      void main() {
+        vec3 dir = normalize(vWorldPosition);
+        float h = dir.y;
+        vec3 color = h > 0.0
+          ? mix(horizonColor, topColor, smoothstep(0.0, 0.45, h))
+          : mix(horizonColor, bottomColor, smoothstep(0.0, -0.25, h));
+
+        float sunDot = dot(dir, normalize(sunDirection));
+        color += sunColor * (smoothstep(0.9965, 0.9985, sunDot)
+          + pow(max(sunDot, 0.0), 64.0) * 0.4
+          + pow(max(sunDot, 0.0), 8.0) * 0.15);
+        color += vec3(0.3, 0.15, 0.05) * (1.0 - abs(h)) * pow(max(sunDot, 0.0), 3.0) * 0.3;
+
+        if (h > -0.05 && h < 0.35) {
+          vec2 cloudUV = dir.xz / (h + 0.1) * 0.3 + time * 0.002;
+          float clouds = smoothstep(0.35, 0.65, fbm(cloudUV * 3.0));
+          float cloudFade = smoothstep(-0.05, 0.05, h) * smoothstep(0.35, 0.15, h);
+          color = mix(color, mix(horizonColor, vec3(1.0), 0.6), clouds * cloudFade * 0.5);
+        }
+        gl_FragColor = vec4(color, 1.0);
+      }
+    `,
   });
-  mat.colorNode = skyColor();
-  mat.userData = { timeUniform: timeU };
-  return mat;
 }
 
 export function createEnvironment(scene, { mapTheme } = {}) {
@@ -220,8 +215,8 @@ export function createEnvironment(scene, { mapTheme } = {}) {
   return {
     update(center, time = 0) {
       skyGroup.position.copy(center);
-      if (skyMat && skyMat.userData.timeUniform) {
-        skyMat.userData.timeUniform.value = time;
+      if (skyMat && skyMat.uniforms) {
+        skyMat.uniforms.time.value = time;
       }
       sun.position.set(
         center.x + preset.sunOffset.x,
