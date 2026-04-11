@@ -84,6 +84,8 @@ export class Player {
       metalness: 0.82,
       transparent: true,
       opacity: 0.88,
+      emissive: 0x2a5a6a,
+      emissiveIntensity: 0.3,
     });
     const warningMaterial = new THREE.MeshStandardMaterial({
       color: 0xff8a3d,

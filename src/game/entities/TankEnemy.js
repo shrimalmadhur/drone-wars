@@ -136,7 +136,19 @@ export class TankEnemy extends EnemyBase {
     );
     hatch.position.set(-0.6, 0.9, -0.5);
 
-    this.turret.add(turretBase, turretDome, barrel, hatch);
+    const hatchLightGeo = new THREE.CircleGeometry(0.35, 6);
+    const hatchLightMat = new THREE.MeshStandardMaterial({
+      color: 0x443322,
+      emissive: 0x664422,
+      emissiveIntensity: 0.6,
+      roughness: 0.5,
+      metalness: 0.3,
+    });
+    const hatchLight = new THREE.Mesh(hatchLightGeo, hatchLightMat);
+    hatchLight.rotation.x = -Math.PI / 2;
+    hatchLight.position.set(-0.6, 0.88, -0.5);
+
+    this.turret.add(turretBase, turretDome, barrel, hatch, hatchLight);
     this.turret.position.set(0, 2.5, -0.5);
 
     // ERA (reactive armor) blocks on hull sides

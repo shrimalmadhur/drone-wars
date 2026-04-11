@@ -88,6 +88,8 @@ export class ShipEnemy extends EnemyBase {
       color: 0x112233,
       roughness: 0.1,
       metalness: 0.8,
+      emissive: 0xffcc66,
+      emissiveIntensity: 0.4,
     });
     const windowGeo = new THREE.BoxGeometry(5.5, 0.8, 0.1);
     const windowFront = new THREE.Mesh(windowGeo, windowMat);
