@@ -523,7 +523,7 @@ startForm.addEventListener('submit', async (event) => {
 
   if (!game) {
     const initialMapTheme = saveMapTheme(new FormData(startForm).get('mapTheme'));
-    await createGameInstance(initialMapTheme, playerName);
+    createGameInstance(initialMapTheme, playerName);
   }
 
   beginRun();
@@ -535,10 +535,9 @@ if (portalContext.active) {
   playerNameInput.value = autoPlayerName;
   applyIdentity(autoPlayerName, autoMapTheme);
   startScreen.classList.add('start-screen--hidden');
-  createGameInstance(autoMapTheme, autoPlayerName).then(() => {
-    beginRun({
-      forcedPlayerName: autoPlayerName,
-      forcedMapTheme: autoMapTheme,
-    });
+  createGameInstance(autoMapTheme, autoPlayerName);
+  beginRun({
+    forcedPlayerName: autoPlayerName,
+    forcedMapTheme: autoMapTheme,
   });
 }
