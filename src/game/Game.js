@@ -1,9 +1,8 @@
 import * as THREE from 'three/webgpu';
-import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
-import { SAOPass } from 'three/examples/jsm/postprocessing/SAOPass.js';
-import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import { pass, mrt, output, emissive } from 'three/tsl';
+import { bloom } from 'three/addons/tsl/display/BloomNode.js';
+import { ao } from 'three/addons/tsl/display/GTAONode.js';
+import { fxaa } from 'three/addons/tsl/display/FXAANode.js';
 
 import { CONFIG } from './config.js';
 import { InputController } from './input.js';
@@ -47,7 +46,7 @@ export class Game {
     this.playerName = playerName;
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(62, 1, 0.1, 500);
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    this.renderer = new THREE.WebGPURenderer({ antialias: true, powerPreference: 'high-performance' });
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -55,36 +54,6 @@ export class Game {
     this.renderer.toneMappingExposure = 1.08;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, CONFIG.render.maxPixelRatio));
     this.mount.appendChild(this.renderer.domElement);
-
-    // Post-processing pipeline
-    this.composer = new EffectComposer(this.renderer);
-    this.composer.setPixelRatio(Math.min(window.devicePixelRatio, CONFIG.render.maxPixelRatio));
-
-    const renderPass = new RenderPass(this.scene, this.camera);
-    this.composer.addPass(renderPass);
-
-    // SSAO — ambient occlusion for depth and grounding
-    this.saoPass = new SAOPass(this.scene, this.camera);
-    this.saoPass.params.saoBias = 0.5;
-    this.saoPass.params.saoIntensity = 0.04;
-    this.saoPass.params.saoScale = 5;
-    this.saoPass.params.saoKernelRadius = 30;
-    this.saoPass.params.saoBlurRadius = 8;
-    this.saoPass.params.saoBlurStdDev = 4;
-    this.saoPass.params.saoBlurDepthCutoff = 0.01;
-    this.composer.addPass(this.saoPass);
-
-    // Bloom — glow bleed from emissive surfaces
-    this.bloomPass = new UnrealBloomPass(
-      new THREE.Vector2(window.innerWidth, window.innerHeight),
-      0.3,   // strength
-      0.4,   // radius
-      0.75   // threshold
-    );
-    this.composer.addPass(this.bloomPass);
-
-    const outputPass = new OutputPass();
-    this.composer.addPass(outputPass);
 
     this.input = new InputController(window, document);
     this.simulation = new Simulation(this.scene, { mapTheme, playerProgress, runModifiers, loadout });
@@ -153,16 +122,47 @@ export class Game {
     this.onBlur = () => {
       this.handleImmediatePause('Auto-paused: focus lost.');
     };
-    this.onContextLost = (event) => {
-      event.preventDefault();
-      this.hud.status.textContent = 'Rendering context lost. Reload the page.';
-    };
 
     window.addEventListener('resize', this.onResize);
     window.addEventListener('blur', this.onBlur);
     document.addEventListener('visibilitychange', this.onVisibility);
-    this.renderer.domElement.addEventListener('webglcontextlost', this.onContextLost);
     this.resize();
+  }
+
+  async init() {
+    await this.renderer.init();
+    this._initPostProcessing();
+  }
+
+  _initPostProcessing() {
+    this.postProcessing = new THREE.PostProcessing(this.renderer);
+    const scenePass = pass(this.scene, this.camera);
+
+    // MRT for selective bloom — separate emissive channel
+    scenePass.setMRT(mrt({
+      output: output,
+      emissive: emissive,
+    }));
+
+    const scenePassColor = scenePass.getTextureNode('output');
+    const emissiveTexture = scenePass.getTextureNode('emissive');
+    const depthNode = scenePass.getTextureNode('depth');
+    const normalNode = scenePass.getTextureNode('normal');
+
+    // Selective bloom on emissive only
+    const bloomPass = bloom(emissiveTexture);
+    bloomPass.threshold.value = 0.0;
+    bloomPass.strength.value = 0.4;
+    bloomPass.radius.value = 0.4;
+
+    // Ambient occlusion
+    const aoPass = ao(depthNode, normalNode, this.camera);
+
+    // Combine: color * AO + bloom, then FXAA
+    let outputNode = scenePassColor.mul(aoPass).add(bloomPass);
+    outputNode = fxaa(outputNode);
+
+    this.postProcessing.outputNode = outputNode;
   }
 
   resumeAudio() {
@@ -294,7 +294,7 @@ export class Game {
       this.explosions.update(elapsed);
       this.scorePops.update(elapsed);
       this.portalSystem?.update(snapshot.time);
-      this.composer.render();
+      this.postProcessing.render();
       this._lastMode = currentMode;
       this.frame = requestAnimationFrame(tick);
     };
@@ -904,7 +904,6 @@ export class Game {
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, CONFIG.render.maxPixelRatio));
-    this.composer.setSize(width, height);
   }
 
   dispose() {
@@ -912,7 +911,6 @@ export class Game {
     window.removeEventListener('resize', this.onResize);
     window.removeEventListener('blur', this.onBlur);
     document.removeEventListener('visibilitychange', this.onVisibility);
-    this.renderer.domElement.removeEventListener('webglcontextlost', this.onContextLost);
     this.cameraShake.reset();
     this.clearHitIndicators();
     this.explosions.dispose();

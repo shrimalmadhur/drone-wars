@@ -335,7 +335,7 @@ function getCurrentMapTheme() {
   return currentMapTheme;
 }
 
-function createGameInstance(mapTheme, playerName) {
+async function createGameInstance(mapTheme, playerName) {
   currentMapTheme = mapTheme;
   const initialRunModifiers = createRunModifiers(playerProgress);
   const initialLoadout = playerProgress.loadout;
@@ -378,6 +378,7 @@ function createGameInstance(mapTheme, playerName) {
       return result;
     },
   });
+  await game.init();
   game.start();
   trackGameStart(playerName, mapTheme);
   setMapThemeLock(true);
@@ -510,7 +511,7 @@ startPlayButton?.addEventListener('click', () => {
   startForm.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
 });
 
-startForm.addEventListener('submit', (event) => {
+startForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const playerName = savePlayerName(playerNameInput.value);
   if (!playerName) {
@@ -523,7 +524,7 @@ startForm.addEventListener('submit', (event) => {
 
   if (!game) {
     const initialMapTheme = saveMapTheme(new FormData(startForm).get('mapTheme'));
-    createGameInstance(initialMapTheme, playerName);
+    await createGameInstance(initialMapTheme, playerName);
   }
 
   beginRun();
@@ -535,9 +536,10 @@ if (portalContext.active) {
   playerNameInput.value = autoPlayerName;
   applyIdentity(autoPlayerName, autoMapTheme);
   startScreen.classList.add('start-screen--hidden');
-  createGameInstance(autoMapTheme, autoPlayerName);
-  beginRun({
-    forcedPlayerName: autoPlayerName,
-    forcedMapTheme: autoMapTheme,
+  createGameInstance(autoMapTheme, autoPlayerName).then(() => {
+    beginRun({
+      forcedPlayerName: autoPlayerName,
+      forcedMapTheme: autoMapTheme,
+    });
   });
 }
