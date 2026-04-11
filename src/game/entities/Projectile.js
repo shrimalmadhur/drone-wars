@@ -82,48 +82,76 @@ export function stepProjectileStore(store, dt, expiryCheck) {
   }
 }
 
+// Scratch objects for instanced projectile transforms
+const _projMatrix = new THREE.Matrix4();
+const _projQuat = new THREE.Quaternion();
+const _projScale = new THREE.Vector3();
+const _projPos = new THREE.Vector3();
+const _projLookAt = new THREE.Vector3();
+const _projUp = new THREE.Vector3(0, 1, 0);
+const _hideMatrix = new THREE.Matrix4().compose(
+  new THREE.Vector3(0, -9999, 0),
+  new THREE.Quaternion(),
+  new THREE.Vector3(0.001, 0.001, 0.001),
+);
+
 export class ProjectilePool {
   constructor(scene) {
     this.scene = scene;
     this.store = createProjectileStore(CONFIG.projectiles.maxCount);
-    this.geometry = new THREE.SphereGeometry(0.8, 10, 10);
-    this.trailGeometry = new THREE.CylinderGeometry(0.18, 0.44, 4.8, 8);
-    this.trailGeometry.rotateX(Math.PI / 2);
-    this.materials = {
-      player: new THREE.MeshStandardMaterial({
-        color: CONFIG.palette.playerShot,
-        emissive: CONFIG.palette.playerShot,
-        emissiveIntensity: 1.8,
-      }),
-      enemy: new THREE.MeshStandardMaterial({
-        color: CONFIG.palette.hostileShot,
-        emissive: CONFIG.palette.hostileShot,
-        emissiveIntensity: 1.4,
-      }),
-    };
-    this.trailMaterials = {
-      player: new THREE.MeshBasicMaterial({
-        color: CONFIG.palette.playerShot,
-        transparent: true,
-        opacity: 0.58,
-      }),
-      enemy: new THREE.MeshBasicMaterial({
-        color: CONFIG.palette.hostileShot,
-        transparent: true,
-        opacity: 0.52,
-      }),
-    };
+    const maxCount = CONFIG.projectiles.maxCount;
 
-    for (const item of this.store.items) {
-      const mesh = new THREE.Mesh(this.geometry, this.materials.player);
-      const trail = new THREE.Mesh(this.trailGeometry, this.trailMaterials.player);
-      mesh.visible = false;
-      trail.visible = false;
-      item.mesh = mesh;
-      item.trail = trail;
-      item.light = null;
-      this.scene.add(mesh);
-      this.scene.add(trail);
+    // InstancedMesh for projectile spheres (player + enemy share, colored via instanceColor)
+    const sphereGeo = new THREE.SphereGeometry(0.8, 8, 6);
+    const sphereMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      emissive: 0xffffff,
+      emissiveIntensity: 1.6,
+    });
+    this.spheres = new THREE.InstancedMesh(sphereGeo, sphereMat, maxCount);
+    this.spheres.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.spheres.instanceColor = new THREE.InstancedBufferAttribute(
+      new Float32Array(maxCount * 3), 3,
+    );
+    this.spheres.count = maxCount;
+
+    // InstancedMesh for trails
+    const trailGeo = new THREE.CylinderGeometry(0.18, 0.44, 4.8, 6);
+    trailGeo.rotateX(Math.PI / 2);
+    const trailMat = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.55,
+    });
+    this.trails = new THREE.InstancedMesh(trailGeo, trailMat, maxCount);
+    this.trails.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.trails.instanceColor = new THREE.InstancedBufferAttribute(
+      new Float32Array(maxCount * 3), 3,
+    );
+    this.trails.count = maxCount;
+
+    // Cache colors
+    this._playerColor = new THREE.Color(CONFIG.palette.playerShot);
+    this._enemyColor = new THREE.Color(CONFIG.palette.hostileShot);
+
+    // Hide all instances initially
+    for (let i = 0; i < maxCount; i++) {
+      this.spheres.setMatrixAt(i, _hideMatrix);
+      this.trails.setMatrixAt(i, _hideMatrix);
+      this.spheres.setColorAt(i, this._playerColor);
+      this.trails.setColorAt(i, this._playerColor);
+    }
+    this.spheres.instanceMatrix.needsUpdate = true;
+    this.trails.instanceMatrix.needsUpdate = true;
+    this.spheres.instanceColor.needsUpdate = true;
+    this.trails.instanceColor.needsUpdate = true;
+
+    scene.add(this.spheres);
+    scene.add(this.trails);
+
+    // Assign index to each store item for instanced access
+    for (let i = 0; i < this.store.items.length; i++) {
+      this.store.items[i]._idx = i;
     }
   }
 
@@ -132,13 +160,21 @@ export class ProjectilePool {
     if (!item) {
       return false;
     }
-    item.mesh.visible = true;
-    item.trail.visible = true;
-    item.mesh.material = spec.team === 'player' ? this.materials.player : this.materials.enemy;
-    item.trail.material = spec.team === 'player' ? this.trailMaterials.player : this.trailMaterials.enemy;
-    item.mesh.scale.setScalar(spec.team === 'player' ? 1.2 : 1);
-    item.mesh.position.set(item.x, item.y, item.z);
-    item.trail.position.set(item.x, item.y, item.z);
+    const idx = item._idx;
+    const isPlayer = spec.team === 'player';
+    const color = isPlayer ? this._playerColor : this._enemyColor;
+    const scale = isPlayer ? 1.2 : 1.0;
+
+    this.spheres.setColorAt(idx, color);
+    this.trails.setColorAt(idx, color);
+
+    _projScale.set(scale, scale, scale);
+    _projPos.set(item.x, item.y, item.z);
+    _projQuat.identity();
+    _projMatrix.compose(_projPos, _projQuat, _projScale);
+    this.spheres.setMatrixAt(idx, _projMatrix);
+    this.trails.setMatrixAt(idx, _projMatrix);
+
     return true;
   }
 
@@ -184,11 +220,16 @@ export class ProjectilePool {
       return false;
     });
 
+    let matrixDirty = false;
+    let colorDirty = false;
+
     for (const item of this.store.items) {
+      const idx = item._idx;
+
       if (!item.active) {
-        item.mesh.visible = false;
-        item.trail.visible = false;
-        if (item.light) item.light.visible = false;
+        this.spheres.setMatrixAt(idx, _hideMatrix);
+        this.trails.setMatrixAt(idx, _hideMatrix);
+        matrixDirty = true;
         continue;
       }
 
@@ -204,59 +245,64 @@ export class ProjectilePool {
 
       if (hit) {
         item.active = false;
-        item.mesh.visible = false;
-        item.trail.visible = false;
-        if (item.light) item.light.visible = false;
+        this.spheres.setMatrixAt(idx, _hideMatrix);
+        this.trails.setMatrixAt(idx, _hideMatrix);
+        matrixDirty = true;
         continue;
       }
 
-      item.mesh.visible = true;
-      item.mesh.position.set(item.x, item.y, item.z);
-      item.trail.visible = true;
-      item.trail.position.set(
+      // Update sphere position
+      const scale = item.team === 'player' ? 1.2 : 1.0;
+      _projPos.set(item.x, item.y, item.z);
+      _projScale.set(scale, scale, scale);
+      _projQuat.identity();
+      _projMatrix.compose(_projPos, _projQuat, _projScale);
+      this.spheres.setMatrixAt(idx, _projMatrix);
+
+      // Update trail — position at midpoint, orient toward previous position
+      _projPos.set(
         (item.prevX + item.x) * 0.5,
         (item.prevY + item.y) * 0.5,
         (item.prevZ + item.z) * 0.5,
       );
-      item.trail.lookAt(item.prevX, item.prevY, item.prevZ);
+      _projLookAt.set(item.prevX, item.prevY, item.prevZ);
+      _projMatrix.lookAt(_projPos, _projLookAt, _projUp);
+      _projQuat.setFromRotationMatrix(_projMatrix);
       const dist = Math.hypot(item.x - item.prevX, item.y - item.prevY, item.z - item.prevZ);
-      item.trail.scale.z = Math.max(2.2, dist * 0.7);
+      const tw = item.targetId ? CONFIG.effects.trail.trackingWidthMultiplier : 1;
+      _projScale.set(tw, tw, Math.max(2.2, dist * 0.7));
+      _projMatrix.compose(_projPos, _projQuat, _projScale);
+      this.trails.setMatrixAt(idx, _projMatrix);
 
-      // Widen trail when tracking a target (don't mutate shared material opacity)
-      if (item.targetId) {
-        item.trail.scale.x = CONFIG.effects.trail.trackingWidthMultiplier;
-        item.trail.scale.y = CONFIG.effects.trail.trackingWidthMultiplier;
-      } else {
-        item.trail.scale.x = 1;
-        item.trail.scale.y = 1;
-      }
-      if (item.light) {
-        item.light.visible = true;
-        item.light.position.set(item.x, item.y, item.z);
-      }
+      matrixDirty = true;
+    }
+
+    if (matrixDirty) {
+      this.spheres.instanceMatrix.needsUpdate = true;
+      this.trails.instanceMatrix.needsUpdate = true;
+    }
+    if (colorDirty) {
+      this.spheres.instanceColor.needsUpdate = true;
+      this.trails.instanceColor.needsUpdate = true;
     }
   }
 
   reset() {
     resetProjectileStore(this.store);
-    for (const item of this.store.items) {
-      item.mesh.visible = false;
-      item.trail.visible = false;
-      item.light.visible = false;
+    for (let i = 0; i < this.store.items.length; i++) {
+      this.spheres.setMatrixAt(i, _hideMatrix);
+      this.trails.setMatrixAt(i, _hideMatrix);
     }
+    this.spheres.instanceMatrix.needsUpdate = true;
+    this.trails.instanceMatrix.needsUpdate = true;
   }
 
   dispose() {
-    for (const item of this.store.items) {
-      this.scene.remove(item.mesh);
-      this.scene.remove(item.trail);
-      if (item.light) this.scene.remove(item.light);
-    }
-    this.geometry.dispose();
-    this.trailGeometry.dispose();
-    this.materials.player.dispose();
-    this.materials.enemy.dispose();
-    this.trailMaterials.player.dispose();
-    this.trailMaterials.enemy.dispose();
+    this.scene.remove(this.spheres);
+    this.scene.remove(this.trails);
+    this.spheres.geometry.dispose();
+    this.spheres.material.dispose();
+    this.trails.geometry.dispose();
+    this.trails.material.dispose();
   }
 }
