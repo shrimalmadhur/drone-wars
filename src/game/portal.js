@@ -7,7 +7,7 @@ const EXIT_PORTAL_COLOR = 0x61ffd8;
 const PORTAL_RADIUS = 12;
 const PORTAL_INNER_RADIUS = 10;
 const PORTAL_TRIGGER_DISTANCE = 18;
-const PORTAL_SURFACE_TILT = -0.58;
+const PORTAL_SURFACE_TILT = -0.9;
 
 function clampHealth(value) {
   if (value === null || value === undefined) {
