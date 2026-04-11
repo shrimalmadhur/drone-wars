@@ -287,8 +287,6 @@ canvas {
 .run-summary__panel {
   width: min(720px, 100%);
   margin: auto 0;
-  max-height: calc(100vh - 48px);
-  overflow-y: auto;
   padding: 30px;
   border: 1px solid rgba(138, 244, 255, 0.2);
   border-radius: 28px;
