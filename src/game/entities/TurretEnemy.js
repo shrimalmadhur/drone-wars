@@ -18,18 +18,18 @@ export class TurretEnemy extends EnemyBase {
     this.fireCooldown = randomRange(rng, 0.3, 1.1);
     this.heading = randomRange(rng, -Math.PI, Math.PI);
 
-    const baseMat = new THREE.MeshStandardNodeMaterial({
+    const baseMat = new THREE.MeshStandardMaterial({
       color: 0x44515f,
       roughness: 0.86,
       metalness: 0.18,
     });
-    const accentMat = new THREE.MeshStandardNodeMaterial({
+    const accentMat = new THREE.MeshStandardMaterial({
       color: CONFIG.palette.turret,
       emissive: 0x3a2204,
       roughness: 0.42,
       metalness: 0.3,
     });
-    const metalMat = new THREE.MeshStandardNodeMaterial({
+    const metalMat = new THREE.MeshStandardMaterial({
       color: 0x737d88,
       roughness: 0.38,
       metalness: 0.62,

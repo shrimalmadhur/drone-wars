@@ -30,7 +30,7 @@ export class ExplosionEffect {
 
       for (let f = 0; f < 3; f++) {
         const geo = new THREE.SphereGeometry(1, 8, 6);
-        const mat = new THREE.MeshBasicNodeMaterial({
+        const mat = new THREE.MeshBasicMaterial({
           color: 0xffaa44,
           transparent: true,
           opacity: 0,
@@ -46,7 +46,7 @@ export class ExplosionEffect {
 
       for (let d = 0; d < cfg.debrisCount; d++) {
         const geo = _debrisGeos[d % _debrisGeos.length];
-        const mat = new THREE.MeshStandardNodeMaterial({
+        const mat = new THREE.MeshStandardMaterial({
           color: 0xffffff,
           transparent: true,
           opacity: 1,

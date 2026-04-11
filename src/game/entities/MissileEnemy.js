@@ -17,23 +17,23 @@ export class MissileEnemy extends EnemyBase {
     this.velocity = new THREE.Vector3(0, 0, -profile.moveSpeed);
     this.life = 0;
 
-    const bodyMat = new THREE.MeshStandardNodeMaterial({
+    const bodyMat = new THREE.MeshStandardMaterial({
       color: CONFIG.palette.missile,
       emissive: 0x6a1212,
       roughness: 0.35,
       metalness: 0.3,
     });
-    const noseMat = new THREE.MeshStandardNodeMaterial({
+    const noseMat = new THREE.MeshStandardMaterial({
       color: 0xcccccc,
       roughness: 0.2,
       metalness: 0.7,
     });
-    const finMat = new THREE.MeshStandardNodeMaterial({
+    const finMat = new THREE.MeshStandardMaterial({
       color: 0x881111,
       roughness: 0.5,
       metalness: 0.2,
     });
-    const exhaustMat = new THREE.MeshStandardNodeMaterial({
+    const exhaustMat = new THREE.MeshStandardMaterial({
       color: 0xff6600,
       emissive: 0xff4400,
       emissiveIntensity: 3,
@@ -61,7 +61,7 @@ export class MissileEnemy extends EnemyBase {
     // Seeker head band (ring near nose)
     const seekerBand = new THREE.Mesh(
       new THREE.TorusGeometry(0.42, 0.06, 6, 12),
-      new THREE.MeshStandardNodeMaterial({ color: 0x333333, roughness: 0.5, metalness: 0.6 }),
+      new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.5, metalness: 0.6 }),
     );
     seekerBand.rotation.x = Math.PI / 2;
     seekerBand.position.z = 2.0;
@@ -95,7 +95,7 @@ export class MissileEnemy extends EnemyBase {
     this.exhaust = exhaust;
 
     // Body panel line rings
-    const ringMat = new THREE.MeshStandardNodeMaterial({ color: 0x992222, roughness: 0.4, metalness: 0.4 });
+    const ringMat = new THREE.MeshStandardMaterial({ color: 0x992222, roughness: 0.4, metalness: 0.4 });
     const ringPositions = [-0.8, 0.4, 1.6];
     for (const rz of ringPositions) {
       const ring = new THREE.Mesh(
@@ -108,7 +108,7 @@ export class MissileEnemy extends EnemyBase {
 
     // Enhanced exhaust with inner glow
     const innerExhaustGeo = new THREE.SphereGeometry(0.2, 6, 6);
-    const innerExhaustMat = new THREE.MeshStandardNodeMaterial({
+    const innerExhaustMat = new THREE.MeshStandardMaterial({
       color: 0xffff00, emissive: 0xffaa00, emissiveIntensity: 4,
       transparent: true, opacity: 0.9,
     });

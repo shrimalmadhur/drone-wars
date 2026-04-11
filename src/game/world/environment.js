@@ -53,7 +53,7 @@ const SKY_PRESETS = {
 
 function createClouds(count = 18) {
   const group = new THREE.Group();
-  const material = new THREE.MeshBasicNodeMaterial({
+  const material = new THREE.MeshBasicMaterial({
     color: 0xffffff,
     transparent: true,
     opacity: 0.55,
@@ -184,7 +184,7 @@ export function createEnvironment(scene, { mapTheme } = {}) {
   const sky = new THREE.Mesh(new THREE.SphereGeometry(420, 32, 32), skyMat);
   const sunGlow = new THREE.Mesh(
     new THREE.SphereGeometry(9, 18, 18),
-    new THREE.MeshBasicNodeMaterial({
+    new THREE.MeshBasicMaterial({
       color: preset.sunGlow,
       transparent: true,
       opacity: 0.65,
@@ -192,7 +192,7 @@ export function createEnvironment(scene, { mapTheme } = {}) {
   );
   const haze = new THREE.Mesh(
     new THREE.SphereGeometry(280, 24, 24),
-    new THREE.MeshBasicNodeMaterial({
+    new THREE.MeshBasicMaterial({
       color: preset.haze,
       transparent: true,
       opacity: 0.03,

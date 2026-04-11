@@ -19,22 +19,22 @@ export class TankEnemy extends EnemyBase {
     this.fireCooldown = randomRange(rng, 0.5, 1.4);
     this.turnTimer = randomRange(rng, 1.5, 3.2);
 
-    const hullMat = new THREE.MeshStandardNodeMaterial({
+    const hullMat = new THREE.MeshStandardMaterial({
       color: CONFIG.palette.tank,
       roughness: 0.82,
       metalness: 0.15,
     });
-    const darkGreenMat = new THREE.MeshStandardNodeMaterial({
+    const darkGreenMat = new THREE.MeshStandardMaterial({
       color: 0x2e3d22,
       roughness: 0.9,
       metalness: 0.1,
     });
-    const trackMat = new THREE.MeshStandardNodeMaterial({
+    const trackMat = new THREE.MeshStandardMaterial({
       color: 0x1a1a1a,
       roughness: 1,
       metalness: 0.05,
     });
-    const metalMat = new THREE.MeshStandardNodeMaterial({
+    const metalMat = new THREE.MeshStandardMaterial({
       color: 0x555555,
       roughness: 0.5,
       metalness: 0.6,
@@ -137,7 +137,7 @@ export class TankEnemy extends EnemyBase {
     hatch.position.set(-0.6, 0.9, -0.5);
 
     const hatchLightGeo = new THREE.CircleGeometry(0.35, 6);
-    const hatchLightMat = new THREE.MeshStandardNodeMaterial({
+    const hatchLightMat = new THREE.MeshStandardMaterial({
       color: 0x443322,
       emissive: 0x664422,
       emissiveIntensity: 0.6,
@@ -153,7 +153,7 @@ export class TankEnemy extends EnemyBase {
 
     // ERA (reactive armor) blocks on hull sides
     const eraGeo = new THREE.BoxGeometry(0.5, 0.4, 0.15);
-    const eraMat = new THREE.MeshStandardNodeMaterial({ color: 0x6b7e5a, roughness: 0.85, metalness: 0.1 });
+    const eraMat = new THREE.MeshStandardMaterial({ color: 0x6b7e5a, roughness: 0.85, metalness: 0.1 });
     for (let row = 0; row < 2; row++) {
       for (let col = 0; col < 5; col++) {
         for (const side of [-1, 1]) {
@@ -167,7 +167,7 @@ export class TankEnemy extends EnemyBase {
 
     // Smoke grenade launchers on turret sides
     const launcherGeo = new THREE.CylinderGeometry(0.08, 0.08, 0.4, 6);
-    const launcherMat = new THREE.MeshStandardNodeMaterial({ color: 0x3a3a3a, roughness: 0.6, metalness: 0.5 });
+    const launcherMat = new THREE.MeshStandardMaterial({ color: 0x3a3a3a, roughness: 0.6, metalness: 0.5 });
     for (const side of [-1, 1]) {
       for (let i = 0; i < 4; i++) {
         const launcher = new THREE.Mesh(launcherGeo, launcherMat);
@@ -179,7 +179,7 @@ export class TankEnemy extends EnemyBase {
 
     // Antenna whip on turret
     const whipGeo = new THREE.CylinderGeometry(0.02, 0.03, 2.5, 4);
-    const whipMat = new THREE.MeshStandardNodeMaterial({ color: 0x555555, roughness: 0.3, metalness: 0.7 });
+    const whipMat = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.3, metalness: 0.7 });
     const whip = new THREE.Mesh(whipGeo, whipMat);
     whip.position.set(-1.2, 1.5, -0.5);
     whip.rotation.z = 0.15;

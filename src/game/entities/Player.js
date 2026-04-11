@@ -38,47 +38,47 @@ export class Player {
     };
     this.health = this.runModifiers.maxHealth;
 
-    const bodyMaterial = new THREE.MeshStandardNodeMaterial({
+    const bodyMaterial = new THREE.MeshStandardMaterial({
       color: CONFIG.palette.player,
       emissive: 0x0a0a0a,
       roughness: 0.3,
       metalness: 0.6,
     });
-    const darkMaterial = new THREE.MeshStandardNodeMaterial({
+    const darkMaterial = new THREE.MeshStandardMaterial({
       color: 0x1a1a1a,
       roughness: 0.4,
       metalness: 0.5,
     });
-    const panelMaterial = new THREE.MeshStandardNodeMaterial({
+    const panelMaterial = new THREE.MeshStandardMaterial({
       color: 0x303846,
       roughness: 0.5,
       metalness: 0.56,
     });
-    const accentMaterial = new THREE.MeshStandardNodeMaterial({
+    const accentMaterial = new THREE.MeshStandardMaterial({
       color: CONFIG.palette.playerAccent,
       emissive: 0x8f5b12,
       roughness: 0.2,
       metalness: 0.5,
     });
-    const ledMaterial = new THREE.MeshStandardNodeMaterial({
+    const ledMaterial = new THREE.MeshStandardMaterial({
       color: 0x00ff44,
       emissive: 0x00ff44,
       emissiveIntensity: 2,
     });
-    const rotorMaterial = new THREE.MeshStandardNodeMaterial({
+    const rotorMaterial = new THREE.MeshStandardMaterial({
       color: 0x888888,
       transparent: true,
       opacity: 0.35,
       side: THREE.DoubleSide,
       depthWrite: false,
     });
-    const lensMaterial = new THREE.MeshStandardNodeMaterial({
+    const lensMaterial = new THREE.MeshStandardMaterial({
       color: 0x111122,
       roughness: 0.05,
       metalness: 0.9,
     });
 
-    const glassMaterial = new THREE.MeshStandardNodeMaterial({
+    const glassMaterial = new THREE.MeshStandardMaterial({
       color: 0x7db1c9,
       roughness: 0.08,
       metalness: 0.82,
@@ -87,13 +87,13 @@ export class Player {
       emissive: 0x2a5a6a,
       emissiveIntensity: 0.3,
     });
-    const warningMaterial = new THREE.MeshStandardNodeMaterial({
+    const warningMaterial = new THREE.MeshStandardMaterial({
       color: 0xff8a3d,
       emissive: 0x7a3000,
       roughness: 0.28,
       metalness: 0.42,
     });
-    const rotorRingMaterial = new THREE.MeshStandardNodeMaterial({
+    const rotorRingMaterial = new THREE.MeshStandardMaterial({
       color: 0x262b34,
       roughness: 0.72,
       metalness: 0.22,
@@ -107,7 +107,7 @@ export class Player {
     fuselage.castShadow = true;
 
     // Panel lines on fuselage
-    const panelLineMat = new THREE.MeshStandardNodeMaterial({
+    const panelLineMat = new THREE.MeshStandardMaterial({
       color: 0x1a2030,
       roughness: 0.6,
       metalness: 0.4,
@@ -181,7 +181,7 @@ export class Player {
 
     // Landing light under nose
     const landingLightGeo = new THREE.CircleGeometry(0.15, 8);
-    const landingLightMat = new THREE.MeshStandardNodeMaterial({
+    const landingLightMat = new THREE.MeshStandardMaterial({
       color: 0xffffff,
       emissive: 0xffffcc,
       emissiveIntensity: 1.5,
@@ -221,7 +221,7 @@ export class Player {
 
     // Antenna on tail boom
     const antennaGeo = new THREE.CylinderGeometry(0.02, 0.04, 0.8, 4);
-    const antennaMat = new THREE.MeshStandardNodeMaterial({ color: 0x555555, roughness: 0.3, metalness: 0.7 });
+    const antennaMat = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.3, metalness: 0.7 });
     const antenna = new THREE.Mesh(antennaGeo, antennaMat);
     antenna.position.set(0, 0.6, -3.5);
     this.model.add(antenna);
@@ -247,7 +247,7 @@ export class Player {
       [-2.18, 0.14, -1.55],
     ];
     const ventGeo = new THREE.BoxGeometry(0.3, 0.03, 0.12);
-    const ventMat = new THREE.MeshStandardNodeMaterial({ color: 0x1a1a1a, roughness: 0.5, metalness: 0.6 });
+    const ventMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.5, metalness: 0.6 });
 
     this.rotors = [];
     for (const [x, y, z] of nacellePositions) {
@@ -350,7 +350,7 @@ export class Player {
     this.group.add(this.muzzleLight);
     this.muzzleFlashTimer = 0;
 
-    const shieldMaterial = new THREE.MeshBasicNodeMaterial({
+    const shieldMaterial = new THREE.MeshBasicMaterial({
       color: CONFIG.palette.pickup.shield,
       transparent: true,
       opacity: 0,
@@ -363,7 +363,7 @@ export class Player {
     this.shieldShell.visible = false;
     this.group.add(this.shieldShell);
 
-    const shieldGlowMaterial = new THREE.MeshBasicNodeMaterial({
+    const shieldGlowMaterial = new THREE.MeshBasicMaterial({
       color: CONFIG.palette.pickup.shield,
       transparent: true,
       opacity: 0,
@@ -376,7 +376,7 @@ export class Player {
     this.shieldGlow.visible = false;
     this.group.add(this.shieldGlow);
 
-    const overdriveMaterial = new THREE.MeshBasicNodeMaterial({
+    const overdriveMaterial = new THREE.MeshBasicMaterial({
       color: CONFIG.palette.pickup.overdrive,
       transparent: true,
       opacity: 0,
@@ -390,7 +390,7 @@ export class Player {
     this.overdriveRing.visible = false;
     this.group.add(this.overdriveRing);
 
-    const spreadMaterial = new THREE.MeshBasicNodeMaterial({
+    const spreadMaterial = new THREE.MeshBasicMaterial({
       color: CONFIG.palette.pickup.spread,
       transparent: true,
       opacity: 0,
@@ -407,7 +407,7 @@ export class Player {
       return ring;
     });
 
-    const repairMaterial = new THREE.MeshBasicNodeMaterial({
+    const repairMaterial = new THREE.MeshBasicMaterial({
       color: CONFIG.palette.pickup.repair,
       transparent: true,
       opacity: 0,
@@ -421,7 +421,7 @@ export class Player {
     this.repairPulse.visible = false;
     this.group.add(this.repairPulse);
 
-    const dashMaterial = new THREE.MeshBasicNodeMaterial({
+    const dashMaterial = new THREE.MeshBasicMaterial({
       color: CONFIG.palette.playerAccent,
       transparent: true,
       opacity: 0,

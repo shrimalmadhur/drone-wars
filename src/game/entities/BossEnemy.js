@@ -19,25 +19,25 @@ export class BossEnemy extends EnemyBase {
     this.missileCooldown = 4.4;
     this.hoverPhase = rng() * Math.PI * 2;
 
-    const hullMat = new THREE.MeshStandardNodeMaterial({
+    const hullMat = new THREE.MeshStandardMaterial({
       color: CONFIG.palette.boss,
       emissive: 0x162d35,
       roughness: 0.52,
       metalness: 0.34,
     });
-    const armorMat = new THREE.MeshStandardNodeMaterial({
+    const armorMat = new THREE.MeshStandardMaterial({
       color: 0x4d5f6b,
       roughness: 0.7,
       metalness: 0.18,
     });
-    const glassMat = new THREE.MeshStandardNodeMaterial({
+    const glassMat = new THREE.MeshStandardMaterial({
       color: 0x9feeff,
       roughness: 0.1,
       metalness: 0.82,
       transparent: true,
       opacity: 0.84,
     });
-    const engineMat = new THREE.MeshStandardNodeMaterial({
+    const engineMat = new THREE.MeshStandardMaterial({
       color: 0xffd68f,
       emissive: 0xd36f12,
       emissiveIntensity: 1.8,
