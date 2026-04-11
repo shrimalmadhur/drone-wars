@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+import * as THREE from 'three/webgpu';
 
 import { CONFIG } from './config.js';
 import { createRng, segmentIntersectsSphereAt } from './math.js';

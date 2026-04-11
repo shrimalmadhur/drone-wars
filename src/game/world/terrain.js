@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+import * as THREE from 'three/webgpu';
 
 import { DEFAULT_MAP_THEME, MAP_THEMES, sanitizeMapTheme } from '../../mapThemes.js';
 import { CONFIG } from '../config.js';
