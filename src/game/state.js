@@ -20,6 +20,7 @@ export function createGameState() {
     time: 0,
     status: 'Sweep the battlefield.',
     mission: null,
+    waveDirective: null,
   };
 }
 
@@ -35,5 +36,6 @@ export function resetGameState(state) {
   state.time = 0;
   state.status = 'Sweep the battlefield.';
   state.mission = null;
+  state.waveDirective = null;
   return state;
 }

@@ -1016,6 +1016,32 @@ canvas {
   font-size: 0.92rem;
 }
 
+.mission-bonus {
+  margin-top: 10px;
+  color: var(--accent);
+  font: 700 0.72rem/1.2 'Orbitron', sans-serif;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.mission-bonus__copy {
+  color: rgba(244, 248, 255, 0.76);
+  font-size: 0.84rem;
+}
+
+.mission-directive {
+  margin-top: 10px;
+  color: var(--accent-strong);
+  font: 700 0.74rem/1.2 'Orbitron', sans-serif;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.mission-directive__copy {
+  color: rgba(244, 248, 255, 0.72);
+  font-size: 0.84rem;
+}
+
 .controls-card--intel {
   min-height: 122px;
 }

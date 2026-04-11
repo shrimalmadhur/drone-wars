@@ -5,7 +5,10 @@ import {
   createMissionForRun,
   createMissionForWave,
   updateMissionOnEnemyDestroyed,
+  updateMissionOnPickupCollected,
+  updateMissionOnWaveCleared,
   updateMissionOnWaveStart,
+  updateMissionOnWaveStartWithRng,
 } from './missions.js';
 
 describe('missions', () => {
@@ -56,5 +59,33 @@ describe('missions', () => {
     expect(hunter.progress).toBe(1);
     expect(unchanged.progress).toBe(0);
     expect(demolition.progress).toBe(1);
+  });
+
+  it('assigns a rotating bonus objective when a new wave starts', () => {
+    const mission = updateMissionOnWaveStartWithRng(createMissionForWave(2), 2, () => 0);
+
+    expect(mission.bonusObjective).toMatchObject({
+      id: 'cleanSweep',
+      wave: 2,
+    });
+  });
+
+  it('updates pickup-based bonus objectives independently of the primary mission', () => {
+    const mission = updateMissionOnWaveStartWithRng(createMissionForWave(2), 3, () => 0.99);
+    const progressed = updateMissionOnPickupCollected(updateMissionOnPickupCollected(mission));
+
+    expect(progressed.bonusObjective).toMatchObject({
+      id: 'scavengeRun',
+      progress: 2,
+      completed: true,
+    });
+    expect(progressed.progress).toBe(0);
+  });
+
+  it('completes clean-sweep bonus objectives when a wave ends without damage', () => {
+    const mission = updateMissionOnWaveStartWithRng(createMissionForWave(1), 2, () => 0);
+    const completed = updateMissionOnWaveCleared(mission, 0);
+
+    expect(completed.bonusObjective?.completed).toBe(true);
   });
 });

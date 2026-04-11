@@ -280,10 +280,31 @@ export class Game {
         ? `${snapshot.mission.description} complete`
         : `${snapshot.mission.description} ${snapshot.mission.progress}/${snapshot.mission.target}`;
       this.hud.missionProgressFill.style.width = `${Math.max(8, missionRatio * 100)}%`;
+      if (snapshot.mission.bonusObjective) {
+        const bonus = snapshot.mission.bonusObjective;
+        this.hud.bonusObjectiveName.textContent = `Bonus: ${bonus.label}`;
+        this.hud.bonusObjectiveProgress.textContent = bonus.completed
+          ? `${bonus.description} complete`
+          : `${bonus.description} ${bonus.progress}/${bonus.target}`;
+      } else {
+        this.hud.bonusObjectiveName.textContent = 'Bonus: Stand by';
+        this.hud.bonusObjectiveProgress.textContent = 'No bonus objective assigned for this wave.';
+      }
     } else {
       this.hud.missionName.textContent = 'No active objective';
       this.hud.missionProgress.textContent = 'Complete the run to receive a combat objective.';
       this.hud.missionProgressFill.style.width = '0%';
+      this.hud.bonusObjectiveName.textContent = 'Bonus: Stand by';
+      this.hud.bonusObjectiveProgress.textContent = 'No bonus objective assigned for this wave.';
+    }
+    if (snapshot.waveDirective) {
+      this.hud.waveDirectiveName.textContent = `Directive: ${snapshot.waveDirective.label}`;
+      this.hud.waveDirectiveCopy.textContent = snapshot.waveDirective.description;
+      this.hud.waveDirectiveName.dataset.directive = snapshot.waveDirective.id;
+    } else {
+      this.hud.waveDirectiveName.textContent = 'Directive: Standard pressure';
+      this.hud.waveDirectiveCopy.textContent = 'Wave conditions normal. Expect baseline enemy composition.';
+      this.hud.waveDirectiveName.dataset.directive = 'standard';
     }
     this.hud.reticleLabel.textContent = this.aimState.label;
     this.hud.reticle.classList.toggle('reticle--locked', this.aimState.locked);

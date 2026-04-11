@@ -5,7 +5,13 @@ import { createRng, segmentIntersectsSphereAt } from './math.js';
 import { createRunStats } from './progression.js';
 import { createGameState, GAME_STATES, resetGameState } from './state.js';
 import { trackEnemyKilled, trackGameOver, trackGameRestart, trackWaveComplete, trackWaveStart } from './analytics.js';
-import { createMissionForRun, updateMissionOnEnemyDestroyed, updateMissionOnWaveStart } from './systems/missions.js';
+import {
+  createMissionForRun,
+  updateMissionOnEnemyDestroyed,
+  updateMissionOnPickupCollected,
+  updateMissionOnWaveCleared,
+  updateMissionOnWaveStartWithRng,
+} from './systems/missions.js';
 import { DroneEnemy } from './entities/DroneEnemy.js';
 import { BossEnemy } from './entities/BossEnemy.js';
 import { MissileEnemy } from './entities/MissileEnemy.js';
@@ -15,6 +21,7 @@ import { ShipEnemy } from './entities/ShipEnemy.js';
 import { TankEnemy } from './entities/TankEnemy.js';
 import { TurretEnemy } from './entities/TurretEnemy.js';
 import { buildEnemySpawnProfile, canSpawnType, createWaveQueue, getSpawnBaseType } from './systems/waves.js';
+import { selectWaveDirective } from './systems/waveDirectives.js';
 import { createEnvironment } from './world/environment.js';
 import { createTerrain } from './world/terrain.js';
 
@@ -259,18 +266,69 @@ export class Simulation {
     if (wave > 1) {
       trackWaveComplete(wave - 1, this.waveElapsed);
     }
+    const directive = selectWaveDirective(wave, this.rng);
     this.state.wave = wave;
     this.state.mission = this.state.mission ?? createMissionForRun(this.rng);
-    this.state.mission = updateMissionOnWaveStart(this.state.mission, wave);
-    this.spawnQueue = createWaveQueue(wave, this.rng);
-    this.spawnCooldown = 0.25;
+    Simulation.prototype.applyMissionUpdate.call(
+      this,
+      updateMissionOnWaveStartWithRng(this.state.mission, wave, this.rng),
+    );
+    this.state.waveDirective = directive;
+    this.spawnQueue = createWaveQueue(wave, this.rng, directive);
+    this.spawnCooldown = 0.25 * (directive?.spawnIntervalMultiplier ?? 1);
     this.waveElapsed = 0;
     this.interWaveDelay = CONFIG.waves.interWaveDelay;
     this.wasWaveCleared = false;
     this._waveDamageTaken = 0;
     this.spawnHazardsForWave(wave);
-    this.state.status = `Wave ${wave} incoming.`;
+    if (directive?.immediatePickupDrop) {
+      this.spawnAmbientPickup();
+    }
+    this.state.status = directive
+      ? `Wave ${wave} incoming. Directive: ${directive.label}.`
+      : `Wave ${wave} incoming.`;
     trackWaveStart(wave);
+  }
+
+  applyMissionUpdate(nextMission) {
+    const previousMission = this.state.mission;
+    this.state.mission = nextMission;
+
+    if (!previousMission || !nextMission) {
+      return;
+    }
+
+    if (!previousMission.completed && nextMission.completed) {
+      this.state.score += nextMission.rewardScore ?? 0;
+      if (this.runStats) {
+        this.runStats.score = this.state.score;
+        this.runStats.missionPrimaryCompleted = true;
+        this.runStats.missionScore += nextMission.rewardScore ?? 0;
+      }
+      this.state.status = `Primary contract complete. +${nextMission.rewardScore ?? 0} score.`;
+    }
+
+    const previousBonus = previousMission.bonusObjective;
+    const nextBonus = nextMission.bonusObjective;
+    if (
+      previousBonus
+      && nextBonus
+      && previousBonus.wave === nextBonus.wave
+      && !previousBonus.completed
+      && nextBonus.completed
+    ) {
+      this.state.score += nextBonus.rewardScore ?? 0;
+      this.state.mission = {
+        ...nextMission,
+        bonusCompletedCount: (nextMission.bonusCompletedCount ?? 0) + 1,
+      };
+      if (this.runStats) {
+        this.runStats.score = this.state.score;
+        this.runStats.bonusObjectivesCompleted += 1;
+        this.runStats.missionScore += nextBonus.rewardScore ?? 0;
+      }
+      this.state.status = `Bonus objective complete. +${nextBonus.rewardScore ?? 0} score.`;
+    }
   }
 
   pause(reason = 'Paused') {
@@ -289,7 +347,10 @@ export class Simulation {
 
   spawnEnemy(type) {
     const baseType = getSpawnBaseType(type);
-    const profile = buildEnemySpawnProfile(type, this.state.wave, this.player.runModifiers);
+    const profile = buildEnemySpawnProfile(type, this.state.wave, {
+      ...this.player.runModifiers,
+      waveDirective: this.state.waveDirective,
+    });
     const terrainSpawnType = baseType === 'turret' ? 'tank' : baseType === 'boss' ? 'drone' : baseType;
     const allowDistantObjectiveSpawn = type === 'ship';
     const position = this.terrain.getSpawnPoint(
@@ -344,6 +405,7 @@ export class Simulation {
   }
 
   trySpawnNext(dt) {
+    const directive = this.state?.waveDirective ?? null;
     this.spawnCooldown -= dt;
     if (this.spawnCooldown > 0 || this.spawnQueue.length === 0) {
       return;
@@ -360,11 +422,11 @@ export class Simulation {
       }
 
       this.spawnQueue.splice(index, 1);
-      this.spawnCooldown = CONFIG.waves.spawnInterval;
+      this.spawnCooldown = CONFIG.waves.spawnInterval * (directive?.spawnIntervalMultiplier ?? 1);
       return;
     }
 
-    this.spawnCooldown = 0.35;
+    this.spawnCooldown = 0.35 * (directive?.spawnIntervalMultiplier ?? 1);
   }
 
   spawnEffect(x, y, z, size) {
@@ -496,8 +558,10 @@ export class Simulation {
       return;
     }
     const { spawnIntervalMin, spawnIntervalMax } = CONFIG.powerUps;
+    const directivePickupMultiplier = this.state.waveDirective?.pickupSpawnIntervalMultiplier ?? 1;
     this.pickupSpawnTimer = (spawnIntervalMin + this.rng() * (spawnIntervalMax - spawnIntervalMin))
-      * (this.player.runModifiers.pickupSpawnIntervalMultiplier ?? 1);
+      * (this.player.runModifiers.pickupSpawnIntervalMultiplier ?? 1)
+      * directivePickupMultiplier;
   }
 
   spawnAmbientPickup() {
@@ -547,14 +611,16 @@ export class Simulation {
       return;
     }
 
-    const hazardCount = Math.min(2, 1 + Math.floor((wave - 4) / 4));
+    const directive = this.state.waveDirective;
+    const hazardCount = Math.min(3, 1 + Math.floor((wave - 4) / 4) + (directive?.extraHazards ?? 0));
+    const hazardRadius = CONFIG.hazards.radius * (directive?.hazardRadiusMultiplier ?? 1);
     for (let index = 0; index < hazardCount; index += 1) {
       const angle = this.rng() * Math.PI * 2;
       const radius = 32 + this.rng() * 92;
       const x = this.player.group.position.x + Math.cos(angle) * radius;
       const z = this.player.group.position.z + Math.sin(angle) * radius;
       const y = this.terrain.getGroundHeight(x, z) + 8;
-      const mesh = createHazardMesh(CONFIG.hazards.radius);
+      const mesh = createHazardMesh(hazardRadius);
       mesh.position.set(x, y, z);
       this.scene.add(mesh);
       this.hazards.push({
@@ -562,7 +628,7 @@ export class Simulation {
         age: 0,
         tick: 0,
         position: mesh.position.clone(),
-        radius: CONFIG.hazards.radius,
+        radius: hazardRadius,
       });
     }
   }
@@ -572,7 +638,7 @@ export class Simulation {
     const destroyed = enemy.takeDamage(damage);
     this.registerEnemyHit(enemy);
     if (destroyed) {
-      this.state.mission = updateMissionOnEnemyDestroyed(this.state.mission, enemy.type);
+      Simulation.prototype.applyMissionUpdate.call(this, updateMissionOnEnemyDestroyed(this.state.mission, enemy.type));
       this.state.score += enemy.scoreValue;
       if (this.runStats) {
         this.runStats.score = this.state.score;
@@ -883,6 +949,7 @@ export class Simulation {
 
       if (horizontalDistance <= this.player.runModifiers.collectionRadius + 2.2 && verticalDistance <= 8) {
         this.player.applyPowerUp(pickup.type);
+        Simulation.prototype.applyMissionUpdate.call(this, updateMissionOnPickupCollected(this.state.mission));
         if (this.runStats) {
           this.runStats.pickupsCollected += 1;
         }
@@ -1023,6 +1090,7 @@ export class Simulation {
     const playerDead = this.player.health <= 0;
     const waveCleared = this.spawnQueue.length === 0 && this.enemies.length === 0;
     if (!playerDead && this.state.wave > 0 && !wasWaveCleared && waveCleared) {
+      Simulation.prototype.applyMissionUpdate.call(this, updateMissionOnWaveCleared(this.state.mission, this._waveDamageTaken));
       if (this._waveDamageTaken === 0) {
         if (this.runStats) {
           this.runStats.flawlessWaves += 1;
@@ -1088,6 +1156,7 @@ export class Simulation {
       enemyCount: this.state.enemyCount,
       status: this.state.status,
       mission: this.state.mission ? { ...this.state.mission } : null,
+      waveDirective: this.state.waveDirective ? { ...this.state.waveDirective } : null,
       playerPosition: this.player.group.position,
       playerYaw: this.player.yaw,
       lastHit: this.lastHit,
@@ -1156,6 +1225,9 @@ export class Simulation {
         maxPulseHits: 0,
         flawlessWaves: 0,
         damageTaken: 0,
+        missionPrimaryCompleted: false,
+        bonusObjectivesCompleted: 0,
+        missionScore: 0,
         rewardMultiplier: this.player?.runModifiers.rewardMultiplier ?? 1,
         ability: abilitySummary,
         mutator: mutatorSummary,

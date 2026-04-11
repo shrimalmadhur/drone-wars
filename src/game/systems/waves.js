@@ -1,5 +1,6 @@
 import { CONFIG } from '../config.js';
 import { chooseFrom } from '../math.js';
+import { applyWaveDirectiveToProfile, applyWaveDirectiveToSpec } from './waveDirectives.js';
 
 export function getWaveSpec(wave) {
   const spec = {
@@ -25,8 +26,8 @@ export function getWaveSpec(wave) {
   return spec;
 }
 
-export function createWaveQueue(wave, rng) {
-  const spec = getWaveSpec(wave);
+export function createWaveQueue(wave, rng, directive = null) {
+  const spec = applyWaveDirectiveToSpec(getWaveSpec(wave), directive);
   const queue = [];
   for (const [type, count] of Object.entries(spec)) {
     for (let index = 0; index < count; index += 1) {
@@ -108,7 +109,7 @@ export function buildEnemySpawnProfile(type, wave, runModifiers = {}) {
     profile.missileVolleyCount = modifiers.bossMissileVolleyCount;
   }
 
-  return profile;
+  return applyWaveDirectiveToProfile(type, profile, runModifiers.waveDirective ?? null);
 }
 
 function getEnemyConfig(type) {

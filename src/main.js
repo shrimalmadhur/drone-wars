@@ -94,6 +94,10 @@ const hud = {
   missionName: document.querySelector('#mission-name'),
   missionProgress: document.querySelector('#mission-progress'),
   missionProgressFill: document.querySelector('#mission-progress-fill'),
+  bonusObjectiveName: document.querySelector('#bonus-objective-name'),
+  bonusObjectiveProgress: document.querySelector('#bonus-objective-progress'),
+  waveDirectiveName: document.querySelector('#directive-name'),
+  waveDirectiveCopy: document.querySelector('#directive-copy'),
   startBestScore: document.querySelector('#start-best-score'),
   startBestWave: document.querySelector('#start-best-wave'),
   startAchievements: document.querySelector('#start-achievement-count'),
@@ -158,8 +162,8 @@ function buildMissionSummary(mission) {
   return {
     title: mission.label,
     copy: mission.completed
-      ? `${mission.description} completed at ${mission.progress}/${mission.target}.`
-      : `${mission.description} finished at ${mission.progress}/${mission.target}.`,
+      ? `${mission.description} completed at ${mission.progress}/${mission.target}. Bonus contracts cleared: ${mission.bonusCompletedCount ?? 0}.`
+      : `${mission.description} finished at ${mission.progress}/${mission.target}. Bonus contracts cleared: ${mission.bonusCompletedCount ?? 0}.`,
     progressWidth: `${Math.max(8, ratio * 100)}%`,
     outcome: mission.completed ? 'Mission accomplished' : 'Run complete',
   };

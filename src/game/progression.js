@@ -35,6 +35,9 @@ export function createRunStats() {
     damageTaken: 0,
     score: 0,
     highestWave: 0,
+    missionPrimaryCompleted: false,
+    bonusObjectivesCompleted: 0,
+    missionScore: 0,
   };
 }
 
@@ -55,7 +58,9 @@ export function calculateRunCurrency(runStats) {
   const waveReward = Math.max(0, Number(runStats?.highestWave) || 0) * 10;
   const bossReward = Math.max(0, Number(runStats?.bossesDefeated) || 0) * 40;
   const flawlessReward = Math.max(0, Number(runStats?.flawlessWaves) || 0) * 18;
-  const total = scoreReward + waveReward + bossReward + flawlessReward;
+  const contractReward = (runStats?.missionPrimaryCompleted ? 28 : 0)
+    + Math.max(0, Number(runStats?.bonusObjectivesCompleted) || 0) * 10;
+  const total = scoreReward + waveReward + bossReward + flawlessReward + contractReward;
   return Math.floor(total * Math.max(1, Number(runStats?.rewardMultiplier) || 1));
 }
 

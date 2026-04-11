@@ -2,10 +2,29 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { Simulation } from './Simulation.js';
 import { GAME_STATES } from './state.js';
-import { createMissionForRun, createMissionForWave } from './systems/missions.js';
+import { createMissionForRun, createMissionForWave, updateMissionOnWaveStartWithRng } from './systems/missions.js';
 import { CONFIG } from './config.js';
 
 describe('Simulation spawning', () => {
+  it('stores the selected wave directive when a wave begins', () => {
+    const simulation = {
+      rng: () => 0,
+      state: { mission: null, status: '', waveDirective: null },
+      spawnHazardsForWave: vi.fn(),
+      spawnAmbientPickup: vi.fn(),
+      waveElapsed: 0,
+      interWaveDelay: 0,
+      wasWaveCleared: false,
+      _waveDamageTaken: 12,
+    };
+
+    Simulation.prototype.beginWave.call(simulation, 2);
+
+    expect(simulation.state.waveDirective?.id).toBe('reinforcements');
+    expect(simulation.state.status).toContain('Directive: Reinforcements');
+    expect(simulation.spawnHazardsForWave).toHaveBeenCalledWith(2);
+  });
+
   it('keeps unspawnable terrain-locked enemies queued', () => {
     const simulation = {
       spawnCooldown: 0,
@@ -144,6 +163,27 @@ describe('Simulation spawning', () => {
 
     expect(target.health).toBe(16);
     expect(simulation.spawnEffect).toHaveBeenCalledTimes(2);
+  });
+
+  it('applies directive pickup cadence on top of run modifiers', () => {
+    const simulation = {
+      rng: () => 0,
+      player: {
+        runModifiers: {
+          pickupSpawnIntervalMultiplier: 0.8,
+        },
+      },
+      state: {
+        waveDirective: {
+          pickupSpawnIntervalMultiplier: 0.5,
+        },
+      },
+      pickupSpawnTimer: 0,
+    };
+
+    Simulation.prototype.scheduleNextPickupSpawn.call(simulation);
+
+    expect(simulation.pickupSpawnTimer).toBeCloseTo(CONFIG.powerUps.spawnIntervalMin * 0.4, 5);
   });
 });
 
@@ -493,6 +533,36 @@ describe('Simulation audio events', () => {
 
     expect(simulation.state.mission.progress).toBe(1);
     expect(simulation.state.score).toBe(150);
+  });
+
+  it('awards score for completing a bonus mission objective', () => {
+    const simulation = {
+      state: {
+        mission: updateMissionOnWaveStartWithRng(createMissionForWave(2), 3, () => 0.99),
+        score: 0,
+      },
+      runStats: {
+        score: 0,
+        missionScore: 0,
+        bonusObjectivesCompleted: 0,
+      },
+    };
+
+    Simulation.prototype.applyMissionUpdate.call(
+      simulation,
+      {
+        ...simulation.state.mission,
+        bonusObjective: {
+          ...simulation.state.mission.bonusObjective,
+          progress: 2,
+          completed: true,
+        },
+      },
+    );
+
+    expect(simulation.state.score).toBe(120);
+    expect(simulation.runStats.bonusObjectivesCompleted).toBe(1);
+    expect(simulation.state.mission.bonusCompletedCount).toBe(1);
   });
 
   it('includes mission data in run summaries', () => {
