@@ -1,6 +1,7 @@
 import * as THREE from 'three/webgpu';
-import { pass } from 'three/tsl';
-import { bloom } from 'three/addons/tsl/display/BloomNode.js';
+// Post-processing disabled for performance
+// import { pass } from 'three/tsl';
+// import { bloom } from 'three/addons/tsl/display/BloomNode.js';
 
 import { CONFIG } from './config.js';
 import { InputController } from './input.js';
@@ -129,21 +130,6 @@ export class Game {
 
   async init() {
     await this.renderer.init();
-    this._initPostProcessing();
-  }
-
-  _initPostProcessing() {
-    this.postProcessing = new THREE.PostProcessing(this.renderer);
-    const scenePass = pass(this.scene, this.camera);
-    const scenePassColor = scenePass.getTextureNode('output');
-
-    // Lightweight bloom — only emissive surfaces glow
-    const bloomPass = bloom(scenePassColor);
-    bloomPass.threshold.value = 0.85;
-    bloomPass.strength.value = 0.2;
-    bloomPass.radius.value = 0.3;
-
-    this.postProcessing.outputNode = scenePassColor.add(bloomPass);
   }
 
   resumeAudio() {
@@ -275,7 +261,7 @@ export class Game {
       this.explosions.update(elapsed);
       this.scorePops.update(elapsed);
       this.portalSystem?.update(snapshot.time);
-      this.postProcessing.render();
+      this.renderer.render(this.scene, this.camera);
       this._lastMode = currentMode;
       this.frame = requestAnimationFrame(tick);
     };
