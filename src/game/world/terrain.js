@@ -20,6 +20,48 @@ const CLOUD_WISP_LOBES = [
   { x: 7.8, y: -0.8, z: -4.1, sx: 1.55, sy: 0.3, sz: 1.18 },
   { x: 0.8, y: -2.2, z: 0.4, sx: 2.15, sy: 0.28, sz: 1.55 },
 ];
+const CLOUD_TYPES = [
+  {
+    name: 'cumulus',
+    lobes: CLOUD_BODY_LOBES,
+    wisps: CLOUD_WISP_LOBES,
+    baseScale: 1.0,
+    scaleRange: [0.7, 1.5],
+    opacity: 0.55,
+    altitudeRange: [95, 140],
+    weight: 0.4,
+  },
+  {
+    name: 'small_puff',
+    lobes: CLOUD_BODY_LOBES.slice(0, 3),
+    wisps: [],
+    baseScale: 0.5,
+    scaleRange: [0.3, 0.7],
+    opacity: 0.45,
+    altitudeRange: [85, 120],
+    weight: 0.3,
+  },
+  {
+    name: 'high_cirrus',
+    lobes: [],
+    wisps: CLOUD_WISP_LOBES,
+    baseScale: 1.8,
+    scaleRange: [1.2, 2.5],
+    opacity: 0.2,
+    altitudeRange: [140, 180],
+    weight: 0.2,
+  },
+  {
+    name: 'low_haze',
+    lobes: CLOUD_BODY_LOBES.slice(0, 2),
+    wisps: CLOUD_WISP_LOBES.slice(0, 1),
+    baseScale: 1.4,
+    scaleRange: [1.0, 2.0],
+    opacity: 0.25,
+    altitudeRange: [70, 95],
+    weight: 0.1,
+  },
+];
 
 function fract(value) {
   return value - Math.floor(value);
@@ -960,8 +1002,8 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
       smallStones: maxChunkCount * 8 * 5,
       fallenLogs: maxChunkCount * 12,
       landmarks: maxChunkCount * 2,
-      cloudBody: maxChunkCount * CLOUD_BODY_LOBES.length,
-      cloudWisp: maxChunkCount * CLOUD_WISP_LOBES.length,
+      cloudBody: maxChunkCount * CLOUD_BODY_LOBES.length * 2,
+      cloudWisp: maxChunkCount * CLOUD_WISP_LOBES.length * 2,
     });
 
   scene.add(group);
@@ -1255,19 +1297,37 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
         }
 
         const cloudChance = hash2(worldChunkX * 0.17, worldChunkZ * 0.17);
-        if (cloudChance > 0.28) {
+        if (cloudChance > 0.18) {
           const worldX = worldChunkX + chunkSize * (0.12 + hash2(worldChunkX + 18, worldChunkZ - 7) * 0.76);
           const worldZ = worldChunkZ + chunkSize * (0.12 + hash2(worldChunkX - 11, worldChunkZ + 13) * 0.76);
-          const y = 50 + hash2(worldChunkX * 0.21, worldChunkZ * 0.19) * 20;
-          const bankWidth = 1.5 + cloudChance * 2.1;
-          const bankHeight = 1.1 + cloudChance * 0.85;
-          const bankDepth = 1.2 + hash2(worldChunkX * 0.09, worldChunkZ * 0.09) * 0.85;
+
+          // Select cloud type using hash against cumulative weights
+          const typeHash = hash2(worldChunkX * 0.53, worldChunkZ * 0.47);
+          let cloudType = CLOUD_TYPES[0];
+          if (typeHash > 0.4 && typeHash <= 0.7) cloudType = CLOUD_TYPES[1];
+          else if (typeHash > 0.7 && typeHash <= 0.9) cloudType = CLOUD_TYPES[2];
+          else if (typeHash > 0.9) cloudType = CLOUD_TYPES[3];
+
+          // Altitude from the type's range
+          const altHash = hash2(worldChunkX * 0.21, worldChunkZ * 0.19);
+          const y = cloudType.altitudeRange[0] + altHash * (cloudType.altitudeRange[1] - cloudType.altitudeRange[0]);
+
+          // Scale from the type's scaleRange
+          const scaleHash = hash2(worldChunkX * 0.33, worldChunkZ * 0.29);
+          const typeScale = cloudType.baseScale * (cloudType.scaleRange[0] + scaleHash * (cloudType.scaleRange[1] - cloudType.scaleRange[0]));
+
+          const bankWidth = (1.5 + cloudChance * 2.1) * typeScale;
+          const bankHeight = (1.1 + cloudChance * 0.85) * typeScale;
+          const bankDepth = (1.2 + hash2(worldChunkX * 0.09, worldChunkZ * 0.09) * 0.85) * typeScale;
           const bankRotation = (hash2(worldChunkX + 91, worldChunkZ - 37) - 0.5) * 0.42;
 
-          for (let i = 0; i < CLOUD_BODY_LOBES.length; i += 1) {
-            const lobe = CLOUD_BODY_LOBES[i];
+          // Grey tint variation via slight scale jitter per cloud instance
+          const tintJitter = 0.92 + hash2(worldChunkX * 0.61, worldChunkZ * 0.59) * 0.16;
+
+          for (let i = 0; i < cloudType.lobes.length; i += 1) {
+            const lobe = cloudType.lobes[i];
             const jitter = hash2(worldChunkX * (0.37 + i * 0.11), worldChunkZ * (0.31 + i * 0.07));
-            const puffScale = 0.86 + jitter * 0.42;
+            const puffScale = (0.86 + jitter * 0.42) * tintJitter;
             setInstanceTransform(
               decor.cloudsBody,
               cloudBodyIndex,
@@ -1289,10 +1349,10 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
             cloudBodyIndex += 1;
           }
 
-          for (let i = 0; i < CLOUD_WISP_LOBES.length; i += 1) {
-            const lobe = CLOUD_WISP_LOBES[i];
+          for (let i = 0; i < cloudType.wisps.length; i += 1) {
+            const lobe = cloudType.wisps[i];
             const jitter = hash2(worldChunkX * (0.43 + i * 0.09), worldChunkZ * (0.29 + i * 0.12));
-            const puffScale = 0.92 + jitter * 0.34;
+            const puffScale = (0.92 + jitter * 0.34) * tintJitter;
             setInstanceTransform(
               decor.cloudsWisp,
               cloudWispIndex,
