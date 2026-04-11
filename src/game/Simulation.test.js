@@ -150,6 +150,7 @@ describe('Simulation spawning', () => {
 describe('Simulation audio events', () => {
   it('describes pulse misses clearly when no enemies are in range', () => {
     const simulation = {
+      empEvents: [],
       player: {
         equippedAbility: 'pulse',
         canUseAbility() { return true; },
@@ -166,12 +167,17 @@ describe('Simulation audio events', () => {
       ],
       runStats: { maxPulseHits: 0 },
       spawnEffect: vi.fn(),
+      spawnPulseEffect: vi.fn(),
+      recordEmpEvent: Simulation.prototype.recordEmpEvent,
       state: { status: '' },
     };
 
     const result = Simulation.prototype.activatePulse.call(simulation);
 
     expect(result).toBe(true);
+    expect(simulation.empEvents).toHaveLength(1);
+    expect(simulation.empEvents[0].hits).toBe(0);
+    expect(simulation.spawnPulseEffect).toHaveBeenCalled();
     expect(simulation.state.status).toContain('No enemies');
   });
 

@@ -39,7 +39,7 @@ export const CONFIG = {
     collisionRadius: 2.8,
     invulnerabilityTime: 0.85,
     pulseCooldown: 10,
-    pulseRadius: 42,
+    pulseRadius: 50,
     pulseDamage: 30,
   },
   projectiles: {

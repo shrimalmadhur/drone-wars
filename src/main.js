@@ -80,6 +80,7 @@ const hud = {
   targetHealth: document.querySelector('#target-health'),
   radar: document.querySelector('#radar'),
   hitVignette: document.querySelector('#hit-vignette'),
+  empVignette: document.querySelector('#emp-vignette'),
   shieldVignette: document.querySelector('#shield-vignette'),
   hitChevrons: document.querySelector('#hit-chevrons'),
   playerName: document.querySelector('#player-name-value'),

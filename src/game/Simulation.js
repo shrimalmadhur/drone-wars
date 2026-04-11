@@ -31,6 +31,21 @@ function createEffectMesh(size) {
   return mesh;
 }
 
+function createPulseRingMesh(color) {
+  const mesh = new THREE.Mesh(
+    new THREE.TorusGeometry(1, 0.18, 12, 48),
+    new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity: 0.72,
+      side: THREE.DoubleSide,
+    }),
+  );
+  mesh.rotation.x = Math.PI * 0.5;
+  mesh.visible = false;
+  return mesh;
+}
+
 function createPickupMesh(type) {
   const color = CONFIG.palette.pickup[type] ?? CONFIG.palette.effect;
   const group = new THREE.Group();
@@ -130,6 +145,7 @@ export class Simulation {
     this.waveCompleteEvents = [];
     this.pickupEvents = [];
     this.shieldEvents = [];
+    this.empEvents = [];
     this.missilePositions = [];
     this.effects = [];
     this.runStats = createRunStats();
@@ -199,6 +215,7 @@ export class Simulation {
     this.waveCompleteEvents.length = 0;
     this.pickupEvents.length = 0;
     this.shieldEvents.length = 0;
+    this.empEvents.length = 0;
     this.missilePositions = [];
     this.runStats = createRunStats();
     this.wasWaveCleared = false;
@@ -363,6 +380,23 @@ export class Simulation {
     });
   }
 
+  spawnPulseEffect(position, radius, hit) {
+    const color = hit ? CONFIG.palette.playerShot : CONFIG.palette.pickup.repair;
+    const mesh = createPulseRingMesh(color);
+    mesh.position.copy(position);
+    mesh.position.y += 0.8;
+    mesh.visible = true;
+    this.scene.add(mesh);
+    this.effects.push({
+      mesh,
+      age: 0,
+      life: 0.48,
+      pulseRadius: radius,
+      hit,
+      kind: 'pulse',
+    });
+  }
+
   updateEffects(dt) {
     this.effects = this.effects.filter((effect) => {
       effect.age += dt;
@@ -371,8 +405,16 @@ export class Simulation {
         disposeObject3D(this.scene, effect.mesh);
         return false;
       }
-      effect.mesh.scale.setScalar(1 + progress * 2.2);
-      effect.mesh.material.opacity = 0.8 - progress * 0.8;
+      if (effect.kind === 'pulse') {
+        const radiusScale = 1 + progress * effect.pulseRadius;
+        effect.mesh.scale.set(radiusScale, radiusScale, 0.8 + progress * 0.4);
+        effect.mesh.material.opacity = effect.hit
+          ? 0.72 - progress * 0.62
+          : 0.58 - progress * 0.5;
+      } else {
+        effect.mesh.scale.setScalar(1 + progress * 2.2);
+        effect.mesh.material.opacity = 0.8 - progress * 0.8;
+      }
       return true;
     });
   }
@@ -408,6 +450,14 @@ export class Simulation {
 
   recordShieldEvent(type) {
     this.shieldEvents.push({ type });
+  }
+
+  recordEmpEvent(position, radius, hits) {
+    this.empEvents.push({
+      position: position.clone ? position.clone() : { x: position.x, y: position.y, z: position.z },
+      radius,
+      hits,
+    });
   }
 
   spawnPickup(position, type) {
@@ -731,7 +781,9 @@ export class Simulation {
     if (this.runStats) {
       this.runStats.maxPulseHits = Math.max(this.runStats.maxPulseHits, hits);
     }
-    this.spawnEffect(pulseOrigin.x, pulseOrigin.y, pulseOrigin.z, 5.2);
+    this.recordEmpEvent(pulseOrigin, CONFIG.player.pulseRadius, hits);
+    this.spawnPulseEffect(pulseOrigin, CONFIG.player.pulseRadius, hits > 0);
+    this.spawnEffect(pulseOrigin.x, pulseOrigin.y, pulseOrigin.z, hits > 0 ? 5.2 : 3.6);
     this.state.status = hits > 0
       ? `EMP pulse hit ${hits} target${hits === 1 ? '' : 's'} within close range.`
       : `EMP pulse missed. No enemies were inside ${CONFIG.player.pulseRadius}m.`;
@@ -1019,6 +1071,9 @@ export class Simulation {
     if (this.shieldEvents) {
       this.shieldEvents.length = 0;
     }
+    if (this.empEvents) {
+      this.empEvents.length = 0;
+    }
   }
 
   getSnapshot() {
@@ -1047,6 +1102,7 @@ export class Simulation {
       waveCompleteEvents: this.waveCompleteEvents.slice(),
       pickupEvents: this.pickupEvents.slice(),
       shieldEvents: this.shieldEvents.slice(),
+      empEvents: this.empEvents.slice(),
       missilePositions: this.missilePositions.slice(),
       pickups: this.pickups.map((pickup) => ({
         type: pickup.type,

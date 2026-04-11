@@ -45,6 +45,8 @@ export class Game {
     this.explosions = new ExplosionEffect(this.scene);
     this.scorePops = new ScorePop(this.scene);
     this.hitIndicators = [];
+    this.empVignetteTimer = 0;
+    this.empVignetteMode = 'hit';
     this._lastShieldImpact = 0;
     this._lastShieldExpiry = 0;
     this._lastHitFlash = 0;
@@ -172,6 +174,7 @@ export class Game {
         this.scorePops.reset();
         this.hidePickupBanner();
         this.hideShieldVignette();
+        this.hideEmpVignette();
       }
 
       snapshot = this.simulation.getSnapshot();
@@ -320,6 +323,11 @@ export class Game {
       this.showPickupBanner(pickupEvent.type);
     }
 
+    for (const empEvent of snapshot.empEvents ?? []) {
+      this.showEmpVignette(empEvent.hits > 0 ? 'hit' : 'miss');
+      this.cameraShake.add(empEvent.hits > 0 ? 0.26 : 0.1, empEvent.hits > 0 ? 0.16 : 0.08);
+    }
+
     for (const shieldEvent of snapshot.shieldEvents ?? []) {
       if (shieldEvent.type === 'expired') {
         this.showPickupBanner('shield-expired');
@@ -411,6 +419,20 @@ export class Game {
     this.hud.pickupBanner.classList.remove('pickup-banner--visible');
     delete this.hud.pickupBanner.dataset.type;
     this.pickupBannerTimer = 0;
+  }
+
+  showEmpVignette(mode = 'hit') {
+    this.empVignetteMode = mode;
+    this.empVignetteTimer = mode === 'hit' ? 0.42 : 0.28;
+    this.hud.empVignette.dataset.mode = mode;
+    this.hud.empVignette.classList.add('emp-vignette--visible');
+  }
+
+  hideEmpVignette() {
+    this.hud.empVignette.classList.remove('emp-vignette--visible');
+    delete this.hud.empVignette.dataset.mode;
+    this.hud.empVignette.style.background = '';
+    this.empVignetteTimer = 0;
   }
 
   updatePickupBanner(dt) {
@@ -702,6 +724,19 @@ export class Game {
         : `radial-gradient(circle at center, rgba(138, 244, 255, ${intensity * 0.2}) 0%, rgba(199, 138, 255, ${intensity * 0.42}) 46%, transparent 74%)`;
       if (this.shieldVignetteTimer === 0) {
         this.hideShieldVignette();
+      }
+    }
+
+    if (this.empVignetteTimer > 0) {
+      this.empVignetteTimer = Math.max(0, this.empVignetteTimer - dt);
+      const intensity = this.empVignetteMode === 'hit'
+        ? 0.16 + this.empVignetteTimer * 0.8
+        : 0.08 + this.empVignetteTimer * 0.44;
+      this.hud.empVignette.style.background = this.empVignetteMode === 'hit'
+        ? `radial-gradient(circle at center, rgba(138, 244, 255, ${intensity * 0.24}) 0%, rgba(138, 244, 255, ${intensity * 0.42}) 36%, transparent 72%)`
+        : `radial-gradient(circle at center, rgba(255, 95, 109, ${intensity * 0.18}) 0%, rgba(255, 209, 102, ${intensity * 0.28}) 34%, transparent 70%)`;
+      if (this.empVignetteTimer === 0) {
+        this.hideEmpVignette();
       }
     }
   }

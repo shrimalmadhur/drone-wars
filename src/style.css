@@ -1141,6 +1141,19 @@ canvas {
   opacity: 1;
 }
 
+.emp-vignette {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 78;
+  opacity: 0;
+  transition: opacity 0.08s linear;
+}
+
+.emp-vignette--visible {
+  opacity: 1;
+}
+
 .hit-chevrons {
   position: fixed;
   inset: 0;
