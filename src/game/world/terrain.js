@@ -293,6 +293,15 @@ function setInstanceTransform(mesh, index, position, rotationY, scale) {
   mesh.setMatrixAt(index, matrix);
 }
 
+function setInstanceTransformWithLean(mesh, index, position, rotationY, leanX, leanZ, scale) {
+  const matrix = new THREE.Matrix4();
+  const qY = new THREE.Quaternion().setFromAxisAngle(UP, rotationY);
+  const qLean = new THREE.Quaternion().setFromEuler(new THREE.Euler(leanX, 0, leanZ, 'XYZ'));
+  qY.multiply(qLean);
+  matrix.compose(position, qY, scale);
+  mesh.setMatrixAt(index, matrix);
+}
+
 function hideRemainingInstances(mesh, startIndex, scratchPosition) {
   for (let index = startIndex; index < mesh.count; index += 1) {
     setInstanceTransform(mesh, index, scratchPosition, 0, new THREE.Vector3(0.0001, 0.0001, 0.0001));
@@ -323,30 +332,111 @@ function setLocalInstanceTransform(mesh, index, anchorX, anchorZ, base, rotation
 }
 
 function buildFrontierDecorMeshes(group, maxCounts) {
-  const trunkGeometry = new THREE.CylinderGeometry(0.25, 0.55, 6, 8);
-  const crownBottomGeometry = new THREE.ConeGeometry(3.4, 4.5, 8);
-  const crownMiddleGeometry = new THREE.ConeGeometry(2.6, 4.0, 8);
-  const crownTopGeometry = new THREE.ConeGeometry(1.8, 3.5, 8);
+  // --- Geometry per species ---
+  // Pine (3-tier cone)
+  const pineTrunkGeo = new THREE.CylinderGeometry(0.2, 0.5, 7, 6);
+  const pineCrown0Geo = new THREE.ConeGeometry(2.8, 5.5, 7);
+  const pineCrown1Geo = new THREE.ConeGeometry(2.1, 4.5, 7);
+  const pineCrown2Geo = new THREE.ConeGeometry(1.4, 3.5, 7);
+
+  // Oak (round canopy)
+  const oakTrunkGeo = new THREE.CylinderGeometry(0.35, 0.65, 5, 6);
+  const oakCrownGeo = new THREE.SphereGeometry(3.2, 8, 6);
+
+  // Birch (thin trunk, clustered small spheres)
+  const birchTrunkGeo = new THREE.CylinderGeometry(0.12, 0.22, 8, 5);
+  const birchCrown0Geo = new THREE.SphereGeometry(1.6, 7, 5);
+  const birchCrown1Geo = new THREE.SphereGeometry(1.3, 7, 5);
+  const birchCrown2Geo = new THREE.SphereGeometry(1.0, 7, 5);
+
+  // Dead tree (bare trunk + angled branches)
+  const deadTrunkGeo = new THREE.CylinderGeometry(0.18, 0.45, 6, 5);
+  const deadBranch0Geo = new THREE.CylinderGeometry(0.06, 0.12, 3.5, 4);
+  const deadBranch1Geo = new THREE.CylinderGeometry(0.05, 0.10, 2.8, 4);
+  const deadBranch2Geo = new THREE.CylinderGeometry(0.04, 0.09, 2.2, 4);
+
+  // Bush (low ground cover, no trunk)
+  const bushCrown0Geo = new THREE.SphereGeometry(1.5, 6, 5);
+  const bushCrown1Geo = new THREE.SphereGeometry(1.1, 6, 5);
+
+  // --- Materials per species ---
+  const pineTrunkMat = new THREE.MeshStandardMaterial({ color: 0x3d2415, roughness: 1 });
+  const pineCrown0Mat = new THREE.MeshStandardMaterial({ color: 0x1a5428, roughness: 0.92 });
+  const pineCrown1Mat = new THREE.MeshStandardMaterial({ color: 0x226b35, roughness: 0.90 });
+  const pineCrown2Mat = new THREE.MeshStandardMaterial({ color: 0x2d8044, roughness: 0.88 });
+
+  const oakTrunkMat = new THREE.MeshStandardMaterial({ color: 0x4a3020, roughness: 1 });
+  const oakCrownMat = new THREE.MeshStandardMaterial({ color: 0x3a6e2e, roughness: 0.90 });
+
+  const birchTrunkMat = new THREE.MeshStandardMaterial({ color: 0xd4cfc4, roughness: 1 });
+  const birchCrown0Mat = new THREE.MeshStandardMaterial({ color: 0x5a9e48, roughness: 0.90 });
+  const birchCrown1Mat = new THREE.MeshStandardMaterial({ color: 0x68ac55, roughness: 0.88 });
+  const birchCrown2Mat = new THREE.MeshStandardMaterial({ color: 0x76ba62, roughness: 0.86 });
+
+  const deadTrunkMat = new THREE.MeshStandardMaterial({ color: 0x4a3828, roughness: 1 });
+  const deadBranchMat = new THREE.MeshStandardMaterial({ color: 0x3d2e20, roughness: 1 });
+
+  const bushCrown0Mat = new THREE.MeshStandardMaterial({ color: 0x456b38, roughness: 0.92 });
+  const bushCrown1Mat = new THREE.MeshStandardMaterial({ color: 0x507a42, roughness: 0.90 });
+
+  // --- InstancedMesh creation helper ---
+  const treeCount = maxCounts.trees;
+  function makeTreeMesh(geo, mat) {
+    const mesh = new THREE.InstancedMesh(geo, mat, treeCount);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    return mesh;
+  }
+
+  const treeSpecies = {
+    pine: {
+      trunk: makeTreeMesh(pineTrunkGeo, pineTrunkMat),
+      crowns: [
+        makeTreeMesh(pineCrown0Geo, pineCrown0Mat),
+        makeTreeMesh(pineCrown1Geo, pineCrown1Mat),
+        makeTreeMesh(pineCrown2Geo, pineCrown2Mat),
+      ],
+    },
+    oak: {
+      trunk: makeTreeMesh(oakTrunkGeo, oakTrunkMat),
+      crowns: [makeTreeMesh(oakCrownGeo, oakCrownMat)],
+    },
+    birch: {
+      trunk: makeTreeMesh(birchTrunkGeo, birchTrunkMat),
+      crowns: [
+        makeTreeMesh(birchCrown0Geo, birchCrown0Mat),
+        makeTreeMesh(birchCrown1Geo, birchCrown1Mat),
+        makeTreeMesh(birchCrown2Geo, birchCrown2Mat),
+      ],
+    },
+    deadTree: {
+      trunk: makeTreeMesh(deadTrunkGeo, deadTrunkMat),
+      crowns: [
+        makeTreeMesh(deadBranch0Geo, deadBranchMat),
+        makeTreeMesh(deadBranch1Geo, deadBranchMat),
+        makeTreeMesh(deadBranch2Geo, deadBranchMat),
+      ],
+    },
+    bush: {
+      crowns: [
+        makeTreeMesh(bushCrown0Geo, bushCrown0Mat),
+        makeTreeMesh(bushCrown1Geo, bushCrown1Mat),
+      ],
+    },
+  };
+
+  // Add all tree meshes to the group
+  for (const speciesKey of Object.keys(treeSpecies)) {
+    const species = treeSpecies[speciesKey];
+    if (species.trunk) group.add(species.trunk);
+    for (const crown of species.crowns) group.add(crown);
+  }
+
+  // --- Non-tree decor (unchanged) ---
   const rockGeometry = new THREE.DodecahedronGeometry(2.4, 0);
   const landmarkGeometry = new THREE.CylinderGeometry(0.9, 1.8, 14, 6);
   const cloudGeometry = new THREE.SphereGeometry(4.4, 10, 10);
 
-  const trunkMaterial = new THREE.MeshStandardMaterial({
-    color: '#4a2d1a',
-    roughness: 1,
-  });
-  const crownBottomMaterial = new THREE.MeshStandardMaterial({
-    color: '#1e5e2e',
-    roughness: 0.92,
-  });
-  const crownMiddleMaterial = new THREE.MeshStandardMaterial({
-    color: '#2b6b3e',
-    roughness: 0.9,
-  });
-  const crownTopMaterial = new THREE.MeshStandardMaterial({
-    color: '#358748',
-    roughness: 0.88,
-  });
   const rockMaterial = new THREE.MeshStandardMaterial({
     color: '#889077',
     roughness: 1,
@@ -372,55 +462,45 @@ function buildFrontierDecorMeshes(group, maxCounts) {
     depthWrite: false,
   });
 
-  const treesTrunk = new THREE.InstancedMesh(trunkGeometry, trunkMaterial, maxCounts.trees);
-  const treesCrownBottom = new THREE.InstancedMesh(crownBottomGeometry, crownBottomMaterial, maxCounts.trees);
-  const treesCrownMiddle = new THREE.InstancedMesh(crownMiddleGeometry, crownMiddleMaterial, maxCounts.trees);
-  const treesCrownTop = new THREE.InstancedMesh(crownTopGeometry, crownTopMaterial, maxCounts.trees);
   const rocks = new THREE.InstancedMesh(rockGeometry, rockMaterial, maxCounts.rocks);
   const landmarks = new THREE.InstancedMesh(landmarkGeometry, landmarkMaterial, maxCounts.landmarks);
   const cloudsBody = new THREE.InstancedMesh(cloudGeometry, cloudBodyMaterial, maxCounts.cloudBody);
   const cloudsWisp = new THREE.InstancedMesh(cloudGeometry, cloudWispMaterial, maxCounts.cloudWisp);
 
-  treesTrunk.castShadow = true;
-  treesTrunk.receiveShadow = true;
-  treesCrownBottom.castShadow = true;
-  treesCrownBottom.receiveShadow = true;
-  treesCrownMiddle.castShadow = true;
-  treesCrownMiddle.receiveShadow = true;
-  treesCrownTop.castShadow = true;
-  treesCrownTop.receiveShadow = true;
   rocks.castShadow = true;
   rocks.receiveShadow = true;
   landmarks.castShadow = true;
   landmarks.receiveShadow = true;
 
-  group.add(treesTrunk, treesCrownBottom, treesCrownMiddle, treesCrownTop, rocks, landmarks, cloudsBody, cloudsWisp);
+  group.add(rocks, landmarks, cloudsBody, cloudsWisp);
+
+  // Collect all geometries and materials for disposal
+  const allGeometries = [
+    pineTrunkGeo, pineCrown0Geo, pineCrown1Geo, pineCrown2Geo,
+    oakTrunkGeo, oakCrownGeo,
+    birchTrunkGeo, birchCrown0Geo, birchCrown1Geo, birchCrown2Geo,
+    deadTrunkGeo, deadBranch0Geo, deadBranch1Geo, deadBranch2Geo,
+    bushCrown0Geo, bushCrown1Geo,
+    rockGeometry, landmarkGeometry, cloudGeometry,
+  ];
+  const allMaterials = [
+    pineTrunkMat, pineCrown0Mat, pineCrown1Mat, pineCrown2Mat,
+    oakTrunkMat, oakCrownMat,
+    birchTrunkMat, birchCrown0Mat, birchCrown1Mat, birchCrown2Mat,
+    deadTrunkMat, deadBranchMat,
+    bushCrown0Mat, bushCrown1Mat,
+    rockMaterial, landmarkMaterial, cloudBodyMaterial, cloudWispMaterial,
+  ];
 
   return {
-    treesTrunk,
-    treesCrownBottom,
-    treesCrownMiddle,
-    treesCrownTop,
+    treeSpecies,
     rocks,
     landmarks,
     cloudsBody,
     cloudsWisp,
     dispose() {
-      trunkGeometry.dispose();
-      crownBottomGeometry.dispose();
-      crownMiddleGeometry.dispose();
-      crownTopGeometry.dispose();
-      rockGeometry.dispose();
-      landmarkGeometry.dispose();
-      cloudGeometry.dispose();
-      trunkMaterial.dispose();
-      crownBottomMaterial.dispose();
-      crownMiddleMaterial.dispose();
-      crownTopMaterial.dispose();
-      rockMaterial.dispose();
-      landmarkMaterial.dispose();
-      cloudBodyMaterial.dispose();
-      cloudWispMaterial.dispose();
+      for (const geo of allGeometries) geo.dispose();
+      for (const mat of allMaterials) mat.dispose();
     },
   };
 }
@@ -872,11 +952,13 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
   };
 
   const rebuildFrontierDecor = (anchorX, anchorZ) => {
-    let treeIndex = 0;
+    const speciesCounters = { pine: 0, oak: 0, birch: 0, deadTree: 0, bush: 0 };
     let rockIndex = 0;
     let landmarkIndex = 0;
     let cloudBodyIndex = 0;
     let cloudWispIndex = 0;
+
+    const sp = decor.treeSpecies;
 
     for (let chunkZ = -radius; chunkZ <= radius; chunkZ += 1) {
       for (let chunkX = -radius; chunkX <= radius; chunkX += 1) {
@@ -892,40 +974,128 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
           }
 
           const height = getGroundHeightAt(worldX, worldZ, theme);
-          const treeHeight = 0.9 + hash2(worldX, worldZ) * 1.2;
           const rotY = hash2(worldX + 7, worldZ - 5) * Math.PI * 2;
-          const s = 0.85 + treeHeight * 0.25;
 
-          setInstanceTransform(
-            decor.treesTrunk,
-            treeIndex,
-            worldToLocal(worldX, height + 3 * treeHeight, worldZ, anchorX, anchorZ, scratchPosition),
-            rotY,
-            scratchScale.set(1, treeHeight, 1),
-          );
-          setInstanceTransform(
-            decor.treesCrownBottom,
-            treeIndex,
-            worldToLocal(worldX, height + 5.2 * treeHeight, worldZ, anchorX, anchorZ, scratchPosition),
-            rotY,
-            scratchScale.set(s, s, s),
-          );
-          setInstanceTransform(
-            decor.treesCrownMiddle,
-            treeIndex,
-            worldToLocal(worldX, height + 7.4 * treeHeight, worldZ, anchorX, anchorZ, scratchPosition),
-            rotY,
-            scratchScale.set(s * 0.9, s * 0.95, s * 0.9),
-          );
-          setInstanceTransform(
-            decor.treesCrownTop,
-            treeIndex,
-            worldToLocal(worldX, height + 9.2 * treeHeight, worldZ, anchorX, anchorZ, scratchPosition),
-            rotY,
-            scratchScale.set(s * 0.75, s * 0.85, s * 0.75),
-          );
+          // Select species based on cumulative weights
+          const speciesRoll = hash2(worldX * 0.73, worldZ * 0.91);
+          let speciesKey;
+          if (speciesRoll < 0.35) speciesKey = 'pine';
+          else if (speciesRoll < 0.60) speciesKey = 'oak';
+          else if (speciesRoll < 0.80) speciesKey = 'birch';
+          else if (speciesRoll < 0.90) speciesKey = 'deadTree';
+          else speciesKey = 'bush';
 
-          treeIndex += 1;
+          const idx = speciesCounters[speciesKey];
+
+          // Per-instance variation
+          const leanAngle = (hash2(worldX + 23, worldZ - 17) - 0.5) * 0.174; // +-5 degrees
+          const leanDir = hash2(worldX - 31, worldZ + 41) * Math.PI * 2;
+          const leanX = Math.sin(leanDir) * leanAngle;
+          const leanZ = Math.cos(leanDir) * leanAngle;
+
+          if (speciesKey === 'pine') {
+            const s = 0.7 + hash2(worldX, worldZ) * 0.8; // 0.7-1.5
+            setInstanceTransformWithLean(
+              sp.pine.trunk, idx,
+              worldToLocal(worldX, height + 3.5 * s, worldZ, anchorX, anchorZ, scratchPosition),
+              rotY, leanX, leanZ, scratchScale.set(s, s, s),
+            );
+            setInstanceTransformWithLean(
+              sp.pine.crowns[0], idx,
+              worldToLocal(worldX, height + 3.5 * s, worldZ, anchorX, anchorZ, scratchPosition),
+              rotY, leanX, leanZ, scratchScale.set(s, s, s),
+            );
+            setInstanceTransformWithLean(
+              sp.pine.crowns[1], idx,
+              worldToLocal(worldX, height + 6.0 * s, worldZ, anchorX, anchorZ, scratchPosition),
+              rotY, leanX, leanZ, scratchScale.set(s, s, s),
+            );
+            setInstanceTransformWithLean(
+              sp.pine.crowns[2], idx,
+              worldToLocal(worldX, height + 8.0 * s, worldZ, anchorX, anchorZ, scratchPosition),
+              rotY, leanX, leanZ, scratchScale.set(s, s, s),
+            );
+          } else if (speciesKey === 'oak') {
+            const s = 0.8 + hash2(worldX, worldZ) * 0.5; // 0.8-1.3
+            setInstanceTransformWithLean(
+              sp.oak.trunk, idx,
+              worldToLocal(worldX, height + 2.5 * s, worldZ, anchorX, anchorZ, scratchPosition),
+              rotY, leanX, leanZ, scratchScale.set(s, s, s),
+            );
+            setInstanceTransformWithLean(
+              sp.oak.crowns[0], idx,
+              worldToLocal(worldX, height + 5.5 * s, worldZ, anchorX, anchorZ, scratchPosition),
+              rotY, leanX, leanZ, scratchScale.set(s, 0.65 * s, s),
+            );
+          } else if (speciesKey === 'birch') {
+            const s = 0.75 + hash2(worldX, worldZ) * 0.55; // 0.75-1.3
+            setInstanceTransformWithLean(
+              sp.birch.trunk, idx,
+              worldToLocal(worldX, height + 4.0 * s, worldZ, anchorX, anchorZ, scratchPosition),
+              rotY, leanX, leanZ, scratchScale.set(s, s, s),
+            );
+            // Spread crowns horizontally
+            const spreadX = Math.cos(rotY) * 0.8 * s;
+            const spreadZ = Math.sin(rotY) * 0.8 * s;
+            setInstanceTransformWithLean(
+              sp.birch.crowns[0], idx,
+              worldToLocal(worldX - spreadX, height + 5.0 * s, worldZ - spreadZ, anchorX, anchorZ, scratchPosition),
+              rotY, leanX, leanZ, scratchScale.set(s, s, s),
+            );
+            setInstanceTransformWithLean(
+              sp.birch.crowns[1], idx,
+              worldToLocal(worldX + spreadX * 0.5, height + 6.8 * s, worldZ + spreadZ * 0.5, anchorX, anchorZ, scratchPosition),
+              rotY, leanX, leanZ, scratchScale.set(s, s, s),
+            );
+            setInstanceTransformWithLean(
+              sp.birch.crowns[2], idx,
+              worldToLocal(worldX + spreadX, height + 8.2 * s, worldZ + spreadZ, anchorX, anchorZ, scratchPosition),
+              rotY, leanX, leanZ, scratchScale.set(s * 0.9, s * 0.9, s * 0.9),
+            );
+          } else if (speciesKey === 'deadTree') {
+            const s = 0.7 + hash2(worldX, worldZ) * 0.6; // 0.7-1.3
+            setInstanceTransformWithLean(
+              sp.deadTree.trunk, idx,
+              worldToLocal(worldX, height + 3.0 * s, worldZ, anchorX, anchorZ, scratchPosition),
+              rotY, leanX, leanZ, scratchScale.set(s, s, s),
+            );
+            // Branches at different angles
+            const branchAngle0 = rotY + 0.6;
+            const branchAngle1 = rotY + 2.4;
+            const branchAngle2 = rotY + 4.2;
+            setInstanceTransformWithLean(
+              sp.deadTree.crowns[0], idx,
+              worldToLocal(worldX, height + 3.5 * s, worldZ, anchorX, anchorZ, scratchPosition),
+              branchAngle0, 0.5, leanZ, scratchScale.set(s, s, s),
+            );
+            setInstanceTransformWithLean(
+              sp.deadTree.crowns[1], idx,
+              worldToLocal(worldX, height + 4.5 * s, worldZ, anchorX, anchorZ, scratchPosition),
+              branchAngle1, -0.4, leanZ, scratchScale.set(s, s, s),
+            );
+            setInstanceTransformWithLean(
+              sp.deadTree.crowns[2], idx,
+              worldToLocal(worldX, height + 5.0 * s, worldZ, anchorX, anchorZ, scratchPosition),
+              branchAngle2, 0.3, leanZ, scratchScale.set(s, s, s),
+            );
+          } else {
+            // bush
+            const s = 0.7 + hash2(worldX, worldZ) * 0.6; // 0.7-1.3
+            const bSpreadX = Math.cos(rotY) * 1.2 * s;
+            const bSpreadZ = Math.sin(rotY) * 1.2 * s;
+            setInstanceTransform(
+              sp.bush.crowns[0], idx,
+              worldToLocal(worldX - bSpreadX * 0.5, height + 0.8 * s, worldZ - bSpreadZ * 0.5, anchorX, anchorZ, scratchPosition),
+              rotY, scratchScale.set(s, s * 0.8, s),
+            );
+            setInstanceTransform(
+              sp.bush.crowns[1], idx,
+              worldToLocal(worldX + bSpreadX * 0.5, height + 0.6 * s, worldZ + bSpreadZ * 0.5, anchorX, anchorZ, scratchPosition),
+              rotY, scratchScale.set(s * 0.9, s * 0.7, s * 0.9),
+            );
+          }
+
+          speciesCounters[speciesKey] += 1;
         }
 
         for (let i = 0; i < 8; i += 1) {
@@ -1029,10 +1199,17 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
       }
     }
 
-    hideRemainingInstances(decor.treesTrunk, treeIndex, scratchPosition);
-    hideRemainingInstances(decor.treesCrownBottom, treeIndex, scratchPosition);
-    hideRemainingInstances(decor.treesCrownMiddle, treeIndex, scratchPosition);
-    hideRemainingInstances(decor.treesCrownTop, treeIndex, scratchPosition);
+    // Hide remaining instances for all tree species
+    const sp2 = decor.treeSpecies;
+    hideRemainingInstances(sp2.pine.trunk, speciesCounters.pine, scratchPosition);
+    for (const c of sp2.pine.crowns) hideRemainingInstances(c, speciesCounters.pine, scratchPosition);
+    hideRemainingInstances(sp2.oak.trunk, speciesCounters.oak, scratchPosition);
+    for (const c of sp2.oak.crowns) hideRemainingInstances(c, speciesCounters.oak, scratchPosition);
+    hideRemainingInstances(sp2.birch.trunk, speciesCounters.birch, scratchPosition);
+    for (const c of sp2.birch.crowns) hideRemainingInstances(c, speciesCounters.birch, scratchPosition);
+    hideRemainingInstances(sp2.deadTree.trunk, speciesCounters.deadTree, scratchPosition);
+    for (const c of sp2.deadTree.crowns) hideRemainingInstances(c, speciesCounters.deadTree, scratchPosition);
+    for (const c of sp2.bush.crowns) hideRemainingInstances(c, speciesCounters.bush, scratchPosition);
     hideRemainingInstances(decor.rocks, rockIndex, scratchPosition);
     hideRemainingInstances(decor.landmarks, landmarkIndex, scratchPosition);
     hideRemainingInstances(decor.cloudsBody, cloudBodyIndex, scratchPosition);
