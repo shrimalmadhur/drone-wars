@@ -101,12 +101,10 @@ export class ProjectilePool {
     this.store = createProjectileStore(CONFIG.projectiles.maxCount);
     const maxCount = CONFIG.projectiles.maxCount;
 
-    // InstancedMesh for projectile spheres (player + enemy share, colored via instanceColor)
-    const sphereGeo = new THREE.SphereGeometry(0.8, 8, 6);
-    const sphereMat = new THREE.MeshStandardMaterial({
+    // Simple box projectiles — minimal geometry, maximum performance
+    const sphereGeo = new THREE.BoxGeometry(0.6, 0.6, 0.6);
+    const sphereMat = new THREE.MeshBasicMaterial({
       color: 0xffffff,
-      emissive: 0xffffff,
-      emissiveIntensity: 1.6,
     });
     this.spheres = new THREE.InstancedMesh(sphereGeo, sphereMat, maxCount);
     this.spheres.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -115,13 +113,12 @@ export class ProjectilePool {
     );
     this.spheres.count = maxCount;
 
-    // InstancedMesh for trails
-    const trailGeo = new THREE.CylinderGeometry(0.18, 0.44, 4.8, 6);
-    trailGeo.rotateX(Math.PI / 2);
+    // Simple box trails
+    const trailGeo = new THREE.BoxGeometry(0.15, 0.15, 3.5);
     const trailMat = new THREE.MeshBasicMaterial({
       color: 0xffffff,
       transparent: true,
-      opacity: 0.55,
+      opacity: 0.45,
     });
     this.trails = new THREE.InstancedMesh(trailGeo, trailMat, maxCount);
     this.trails.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
