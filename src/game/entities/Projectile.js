@@ -117,17 +117,14 @@ export class ProjectilePool {
     for (const item of this.store.items) {
       const mesh = new THREE.Mesh(this.geometry, this.materials.player);
       const trail = new THREE.Mesh(this.trailGeometry, this.trailMaterials.player);
-      const light = new THREE.PointLight(CONFIG.palette.playerShot, CONFIG.effects.trail.lightIntensity, CONFIG.effects.trail.lightRange, 2);
       mesh.visible = false;
       trail.visible = false;
-      light.visible = false;
       mesh.castShadow = true;
       item.mesh = mesh;
       item.trail = trail;
-      item.light = light;
+      item.light = null;
       this.scene.add(mesh);
       this.scene.add(trail);
-      this.scene.add(light);
     }
   }
 
@@ -138,14 +135,11 @@ export class ProjectilePool {
     }
     item.mesh.visible = true;
     item.trail.visible = true;
-    item.light.visible = true;
     item.mesh.material = spec.team === 'player' ? this.materials.player : this.materials.enemy;
     item.trail.material = spec.team === 'player' ? this.trailMaterials.player : this.trailMaterials.enemy;
     item.mesh.scale.setScalar(spec.team === 'player' ? 1.2 : 1);
     item.mesh.position.set(item.x, item.y, item.z);
     item.trail.position.set(item.x, item.y, item.z);
-    item.light.position.set(item.x, item.y, item.z);
-    item.light.color.setHex(spec.team === 'player' ? CONFIG.palette.playerShot : CONFIG.palette.hostileShot);
     return true;
   }
 
@@ -195,7 +189,7 @@ export class ProjectilePool {
       if (!item.active) {
         item.mesh.visible = false;
         item.trail.visible = false;
-        item.light.visible = false;
+        if (item.light) item.light.visible = false;
         continue;
       }
 
@@ -213,7 +207,7 @@ export class ProjectilePool {
         item.active = false;
         item.mesh.visible = false;
         item.trail.visible = false;
-        item.light.visible = false;
+        if (item.light) item.light.visible = false;
         continue;
       }
 
@@ -237,8 +231,10 @@ export class ProjectilePool {
         item.trail.scale.x = 1;
         item.trail.scale.y = 1;
       }
-      item.light.visible = true;
-      item.light.position.set(item.x, item.y, item.z);
+      if (item.light) {
+        item.light.visible = true;
+        item.light.position.set(item.x, item.y, item.z);
+      }
     }
   }
 
@@ -255,7 +251,7 @@ export class ProjectilePool {
     for (const item of this.store.items) {
       this.scene.remove(item.mesh);
       this.scene.remove(item.trail);
-      this.scene.remove(item.light);
+      if (item.light) this.scene.remove(item.light);
     }
     this.geometry.dispose();
     this.trailGeometry.dispose();
