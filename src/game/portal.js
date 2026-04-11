@@ -7,6 +7,7 @@ const EXIT_PORTAL_COLOR = 0x61ffd8;
 const PORTAL_RADIUS = 12;
 const PORTAL_INNER_RADIUS = 10;
 const PORTAL_TRIGGER_DISTANCE = 18;
+const PORTAL_SURFACE_TILT = -0.58;
 
 function clampHealth(value) {
   if (value === null || value === undefined) {
@@ -80,6 +81,10 @@ function createLabelSprite(text, color) {
 function createPortalGroup({ color, label, position }) {
   const group = new THREE.Group();
   group.position.copy(position);
+  group.rotation.y = Math.atan2(-position.x, -position.z);
+
+  const surfaceGroup = new THREE.Group();
+  surfaceGroup.rotation.x = PORTAL_SURFACE_TILT;
 
   const outerRing = new THREE.Mesh(
     new THREE.TorusGeometry(PORTAL_RADIUS, 1.4, 18, 56),
@@ -124,10 +129,12 @@ function createPortalGroup({ color, label, position }) {
   const light = new THREE.PointLight(color, 2.1, 56, 2);
   light.position.set(0, 10, 0);
 
-  group.add(outerRing, innerDisc, shimmer, labelSprite, light);
+  surfaceGroup.add(outerRing, innerDisc, shimmer);
+  group.add(surfaceGroup, labelSprite, light);
 
   return {
     group,
+    surfaceGroup,
     outerRing,
     innerDisc,
     shimmer,
