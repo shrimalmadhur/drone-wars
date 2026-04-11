@@ -314,6 +314,28 @@
     <div id="shield-vignette" class="shield-vignette"></div>
     <div id="hit-chevrons" class="hit-chevrons"></div>
     <div id="fps-counter">-- FPS</div>
+    <div id="mobile-controls" class="mobile-controls" hidden aria-hidden="true">
+      <div class="mobile-controls__left">
+        <div id="mobile-move-stick" class="mobile-stick" aria-label="Movement stick">
+          <div class="mobile-stick__ring"></div>
+          <div id="mobile-move-thumb" class="mobile-stick__thumb"></div>
+        </div>
+      </div>
+      <div class="mobile-controls__right">
+        <div id="mobile-aim-stick" class="mobile-stick mobile-stick--secondary" aria-label="Aim stick">
+          <div class="mobile-stick__ring"></div>
+          <div id="mobile-aim-thumb" class="mobile-stick__thumb"></div>
+        </div>
+        <div class="mobile-buttons">
+          <button id="mobile-motion-toggle" class="mobile-button mobile-button--ghost" type="button" hidden>Enable Motion</button>
+          <button id="mobile-pause-button" class="mobile-button mobile-button--ghost" type="button">Pause</button>
+          <button id="mobile-ascend-button" class="mobile-button mobile-button--ghost" type="button">Up</button>
+          <button id="mobile-descend-button" class="mobile-button mobile-button--ghost" type="button">Down</button>
+          <button id="mobile-ability-button" class="mobile-button" type="button">Ability</button>
+          <button id="mobile-fire-button" class="mobile-button mobile-button--fire" type="button">Fire</button>
+        </div>
+      </div>
+    </div>
     <aside class="hud">
       <div class="hud__topbar">
         <div class="hud__identity hud__identity--compact">

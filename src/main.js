@@ -1,5 +1,6 @@
 import './style.css';
 import { Game } from './game/Game.js';
+import { InputController, KeyboardInputController, MobileInputController } from './game/input.js';
 import {
   trackGameStart,
   trackRunCompleted,
@@ -48,6 +49,17 @@ const controlsDrawerToggle = document.querySelector('#controls-drawer-toggle');
 const missionDrawer = document.querySelector('#mission-drawer');
 const missionDrawerToggle = document.querySelector('#mission-drawer-toggle');
 const HUD_DRAWER_AUTO_COLLAPSE_MS = 5000;
+const mobileControlsRoot = document.querySelector('#mobile-controls');
+const mobileMoveStick = document.querySelector('#mobile-move-stick');
+const mobileMoveThumb = document.querySelector('#mobile-move-thumb');
+const mobileAimStick = document.querySelector('#mobile-aim-stick');
+const mobileAimThumb = document.querySelector('#mobile-aim-thumb');
+const mobileFireButton = document.querySelector('#mobile-fire-button');
+const mobileAbilityButton = document.querySelector('#mobile-ability-button');
+const mobileAscendButton = document.querySelector('#mobile-ascend-button');
+const mobileDescendButton = document.querySelector('#mobile-descend-button');
+const mobilePauseButton = document.querySelector('#mobile-pause-button');
+const mobileMotionToggle = document.querySelector('#mobile-motion-toggle');
 
 const runSummary = document.querySelector('#run-summary');
 const summaryScore = document.querySelector('#summary-score');
@@ -118,6 +130,27 @@ let playerProgress = loadPlayerProgress();
 let activeRunContext = null;
 let lastCompletedRunContext = null;
 let drawerAutoCollapseTimer = null;
+const isTouchDevice = window.matchMedia('(pointer: coarse)').matches;
+const inputController = new InputController({
+  keyboard: new KeyboardInputController(window, document),
+  mobile: isTouchDevice && mobileControlsRoot
+    ? new MobileInputController({
+      root: mobileControlsRoot,
+      moveStick: mobileMoveStick,
+      moveThumb: mobileMoveThumb,
+      aimStick: mobileAimStick,
+      aimThumb: mobileAimThumb,
+      fireButton: mobileFireButton,
+      abilityButton: mobileAbilityButton,
+      ascendButton: mobileAscendButton,
+      descendButton: mobileDescendButton,
+      pauseButton: mobilePauseButton,
+      motionButton: mobileMotionToggle,
+      target: window,
+      documentTarget: document,
+    })
+    : null,
+});
 
 const savedPlayerName = loadPlayerName();
 const initialPlayerName = savedPlayerName || createDefaultPlayerName();
@@ -127,6 +160,12 @@ let currentMapTheme = savedMapTheme;
 
 if (portalContext.active) {
   startScreen.classList.add('start-screen--hidden');
+}
+
+if (isTouchDevice && mobileControlsRoot) {
+  document.body.classList.add('mobile-device');
+  mobileControlsRoot.hidden = false;
+  mobileControlsRoot.setAttribute('aria-hidden', 'false');
 }
 
 function chooseRandomMapTheme() {
@@ -270,6 +309,7 @@ function showRunSummary(result, previousProgress) {
       ? `New awards unlocked: ${newAchievements.join(', ')}.`
       : 'Review the weak spots, spend salvage if needed, and relaunch with a stronger build.';
   runSummary.hidden = false;
+  document.body.classList.remove('run-active');
 }
 
 function renderUpgradeShop() {
@@ -349,6 +389,7 @@ function createGameInstance(mapTheme, playerName) {
     loadout: initialLoadout,
     portalContext,
     playerName,
+    inputController,
     onRestartRequested() {
       if (!startScreen.classList.contains('start-screen--hidden')) {
         return;
@@ -413,6 +454,7 @@ function beginRun({ fromSummary = false, forcedPlayerName, forcedMapTheme } = {}
 
   hideRunSummary();
   startScreen.classList.add('start-screen--hidden');
+  document.body.classList.add('run-active');
   game.restartRun({ playerProgress, runModifiers, loadout });
   primeHudDrawersForRun();
   void game.resumeAudio().catch(() => {});
@@ -427,6 +469,7 @@ function openHangar() {
   hideRunSummary();
   renderUpgradeShop();
   startScreen.classList.remove('start-screen--hidden');
+  document.body.classList.remove('run-active');
   focusSetupSection();
 }
 

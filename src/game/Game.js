@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
 import { CONFIG } from './config.js';
-import { InputController } from './input.js';
+import { InputController, KeyboardInputController } from './input.js';
 import { findAimAssistTarget, projectRadarContact } from './math.js';
 import { Simulation } from './Simulation.js';
 import { GAME_STATES } from './state.js';
@@ -34,6 +34,7 @@ export class Game {
     loadout,
     portalContext,
     playerName,
+    inputController,
     onRunComplete,
     onRestartRequested,
   }) {
@@ -51,7 +52,9 @@ export class Game {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, CONFIG.render.maxPixelRatio));
     this.mount.appendChild(this.renderer.domElement);
 
-    this.input = new InputController(window, document);
+    this.input = inputController ?? new InputController({
+      keyboard: new KeyboardInputController(window, document),
+    });
     this.simulation = new Simulation(this.scene, { mapTheme, playerProgress, runModifiers, loadout });
     this.portalSystem = new PortalSystem(
       this.scene,
