@@ -108,27 +108,32 @@ function getFrontierGroundHeightAt(x, z) {
   return rolling + ridges + mesas + shoreLift;
 }
 
+// Cached colors for frontier surface — avoids allocations per vertex
+const _seaColor = new THREE.Color('#195f93');
+const _shoreSand = new THREE.Color('#c9b17e');
+const _shoreGrass = new THREE.Color('#5f8154');
+const _shoreResult = new THREE.Color();
+const _landHigh = new THREE.Color('#708564');
+const _landMid = new THREE.Color('#5b774f');
+const _landLow = new THREE.Color('#48663f');
+
 function getFrontierSurfaceColor(x, z, height) {
   const biome = getFrontierBiomeAt(x, z);
   if (biome === 'sea') {
-    return new THREE.Color('#195f93');
+    return _seaColor;
   }
   if (biome === 'shore') {
     const t = THREE.MathUtils.clamp((height - CONFIG.world.seaLevel) / 12, 0, 1);
-    return new THREE.Color().lerpColors(
-      new THREE.Color('#c9b17e'),
-      new THREE.Color('#5f8154'),
-      t,
-    );
+    return _shoreResult.lerpColors(_shoreSand, _shoreGrass, t);
   }
 
   if (height > 18) {
-    return new THREE.Color('#708564');
+    return _landHigh;
   }
   if (height > 10) {
-    return new THREE.Color('#5b774f');
+    return _landMid;
   }
-  return new THREE.Color('#48663f');
+  return _landLow;
 }
 
 function getCityRiverOffset(x) {
@@ -183,21 +188,28 @@ function getCityGroundHeightAt(x, z) {
   return base + embankment + parkLift;
 }
 
+// Cached colors for city surface
+const _citySeaColor = new THREE.Color('#214f78');
+const _cityShoreColor = new THREE.Color('#66717a');
+const _cityParkColor = new THREE.Color('#526b48');
+const _cityRoadColor = new THREE.Color('#2d333b');
+const _cityBuildingColor = new THREE.Color('#43484f');
+
 function getCitySurfaceColor(x, z) {
   const biome = getCityBiomeAt(x, z);
   if (biome === 'sea') {
-    return new THREE.Color('#214f78');
+    return _citySeaColor;
   }
   if (biome === 'shore') {
-    return new THREE.Color('#66717a');
+    return _cityShoreColor;
   }
   if (sampleCityParkField(x, z) > 0.72 && !isCityRoad(x, z)) {
-    return new THREE.Color('#526b48');
+    return _cityParkColor;
   }
   if (isCityRoad(x, z)) {
-    return new THREE.Color('#2d333b');
+    return _cityRoadColor;
   }
-  return new THREE.Color('#43484f');
+  return _cityBuildingColor;
 }
 
 export function getBiomeAt(x, z, mapTheme = DEFAULT_MAP_THEME) {
@@ -331,32 +343,39 @@ function resolveSpawnPosition(type, playerPosition, rng, mapTheme, options = {})
   return fallback;
 }
 
+// Scratch objects for instance transforms — avoids per-call allocation
+const _instMatrix = new THREE.Matrix4();
+const _instQuat = new THREE.Quaternion();
+const _instQuat2 = new THREE.Quaternion();
+const _instEuler = new THREE.Euler();
+
 function setInstanceTransform(mesh, index, position, rotationY, scale) {
-  const matrix = new THREE.Matrix4();
-  const quaternion = new THREE.Quaternion().setFromAxisAngle(UP, rotationY);
-  matrix.compose(position, quaternion, scale);
-  mesh.setMatrixAt(index, matrix);
+  _instQuat.setFromAxisAngle(UP, rotationY);
+  _instMatrix.compose(position, _instQuat, scale);
+  mesh.setMatrixAt(index, _instMatrix);
 }
 
 function setInstanceTransformEuler(mesh, index, position, rx, ry, rz, scale) {
-  const matrix = new THREE.Matrix4();
-  const quaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz, 'XYZ'));
-  matrix.compose(position, quaternion, scale);
-  mesh.setMatrixAt(index, matrix);
+  _instEuler.set(rx, ry, rz, 'XYZ');
+  _instQuat.setFromEuler(_instEuler);
+  _instMatrix.compose(position, _instQuat, scale);
+  mesh.setMatrixAt(index, _instMatrix);
 }
 
 function setInstanceTransformWithLean(mesh, index, position, rotationY, leanX, leanZ, scale) {
-  const matrix = new THREE.Matrix4();
-  const qY = new THREE.Quaternion().setFromAxisAngle(UP, rotationY);
-  const qLean = new THREE.Quaternion().setFromEuler(new THREE.Euler(leanX, 0, leanZ, 'XYZ'));
-  qY.multiply(qLean);
-  matrix.compose(position, qY, scale);
-  mesh.setMatrixAt(index, matrix);
+  _instQuat.setFromAxisAngle(UP, rotationY);
+  _instEuler.set(leanX, 0, leanZ, 'XYZ');
+  _instQuat2.setFromEuler(_instEuler);
+  _instQuat.multiply(_instQuat2);
+  _instMatrix.compose(position, _instQuat, scale);
+  mesh.setMatrixAt(index, _instMatrix);
 }
+
+const _hideScale = new THREE.Vector3(0.0001, 0.0001, 0.0001);
 
 function hideRemainingInstances(mesh, startIndex, scratchPosition) {
   for (let index = startIndex; index < mesh.count; index += 1) {
-    setInstanceTransform(mesh, index, scratchPosition, 0, new THREE.Vector3(0.0001, 0.0001, 0.0001));
+    setInstanceTransform(mesh, index, scratchPosition, 0, _hideScale);
   }
   mesh.instanceMatrix.needsUpdate = true;
 }
@@ -2124,28 +2143,30 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
     if (snappedX !== chunkAnchor.x || snappedZ !== chunkAnchor.z) {
       chunkAnchor.x = snappedX;
       chunkAnchor.z = snappedZ;
+
+      // Rebuild ground mesh — only when chunk anchor changes
+      group.position.set(snappedX, 0, snappedZ);
+      const colorAttribute = groundGeometry.getAttribute('color');
+      for (let i = 0; i < positions.count; i += 1) {
+        const local = basePositions[i];
+        const worldX = snappedX + local.x;
+        const worldZ = snappedZ + local.z;
+        const height = getGroundHeightAt(worldX, worldZ, theme);
+        positions.setY(i, height);
+        tempColor.copy(getSurfaceColor(worldX, worldZ, height, theme));
+        colorAttribute.setXYZ(i, tempColor.r, tempColor.g, tempColor.b);
+        groundSeaFlags[i] = getBiomeAt(worldX, worldZ, theme) === 'sea' ? 1 : 0;
+      }
+      positions.needsUpdate = true;
+      colorAttribute.needsUpdate = true;
+      groundGeometry.computeVertexNormals();
+
       if (theme === MAP_THEMES.CITY) {
         rebuildCityDecor(snappedX, snappedZ);
       } else {
         rebuildFrontierDecor(snappedX, snappedZ);
       }
     }
-
-    group.position.set(snappedX, 0, snappedZ);
-    const colorAttribute = groundGeometry.getAttribute('color');
-    for (let i = 0; i < positions.count; i += 1) {
-      const local = basePositions[i];
-      const worldX = snappedX + local.x;
-      const worldZ = snappedZ + local.z;
-      const height = getGroundHeightAt(worldX, worldZ, theme);
-      positions.setY(i, height);
-      tempColor.copy(getSurfaceColor(worldX, worldZ, height, theme));
-      colorAttribute.setXYZ(i, tempColor.r, tempColor.g, tempColor.b);
-      groundSeaFlags[i] = getBiomeAt(worldX, worldZ, theme) === 'sea' ? 1 : 0;
-    }
-    positions.needsUpdate = true;
-    colorAttribute.needsUpdate = true;
-    groundGeometry.computeVertexNormals();
 
     if (theme === MAP_THEMES.CITY) {
       updateCityAnimations(snappedX, snappedZ, time);
