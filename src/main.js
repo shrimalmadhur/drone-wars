@@ -39,6 +39,11 @@ const startCurrency = document.querySelector('#start-currency');
 const hangarCurrency = document.querySelector('#hangar-currency');
 const upgradeShop = document.querySelector('#upgrade-shop');
 const mapThemeNote = document.querySelector('#map-theme-note');
+const controlsDrawer = document.querySelector('#controls-drawer');
+const controlsDrawerToggle = document.querySelector('#controls-drawer-toggle');
+const missionDrawer = document.querySelector('#mission-drawer');
+const missionDrawerToggle = document.querySelector('#mission-drawer-toggle');
+const HUD_DRAWER_AUTO_COLLAPSE_MS = 5000;
 
 const runSummary = document.querySelector('#run-summary');
 const summaryScore = document.querySelector('#summary-score');
@@ -107,6 +112,7 @@ let game = null;
 let playerProgress = loadPlayerProgress();
 let activeRunContext = null;
 let lastCompletedRunContext = null;
+let drawerAutoCollapseTimer = null;
 
 const savedPlayerName = loadPlayerName();
 const savedMapTheme = loadMapTheme();
@@ -139,6 +145,48 @@ function setMapThemeLock(locked) {
 
 function hideRunSummary() {
   runSummary.hidden = true;
+}
+
+function setDrawerExpanded(drawer, toggle, expanded) {
+  if (!drawer || !toggle) {
+    return;
+  }
+  drawer.classList.toggle('hud-drawer--collapsed', !expanded);
+  toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+}
+
+function clearDrawerAutoCollapse() {
+  if (!drawerAutoCollapseTimer) {
+    return;
+  }
+  clearTimeout(drawerAutoCollapseTimer);
+  drawerAutoCollapseTimer = null;
+}
+
+function autoCollapseHudDrawers() {
+  setDrawerExpanded(controlsDrawer, controlsDrawerToggle, false);
+  setDrawerExpanded(missionDrawer, missionDrawerToggle, false);
+  clearDrawerAutoCollapse();
+}
+
+function primeHudDrawersForRun() {
+  clearDrawerAutoCollapse();
+  setDrawerExpanded(controlsDrawer, controlsDrawerToggle, true);
+  setDrawerExpanded(missionDrawer, missionDrawerToggle, true);
+  drawerAutoCollapseTimer = window.setTimeout(() => {
+    autoCollapseHudDrawers();
+  }, HUD_DRAWER_AUTO_COLLAPSE_MS);
+}
+
+function wireDrawer(drawer, toggle) {
+  if (!drawer || !toggle) {
+    return;
+  }
+  toggle.addEventListener('click', () => {
+    clearDrawerAutoCollapse();
+    const expanded = toggle.getAttribute('aria-expanded') === 'true';
+    setDrawerExpanded(drawer, toggle, !expanded);
+  });
 }
 
 function formatRecordDelta(current, previous, noun) {
@@ -292,6 +340,7 @@ function beginRun({ fromSummary = false } = {}) {
   hideRunSummary();
   startScreen.classList.add('start-screen--hidden');
   game.restartRun({ playerProgress, runModifiers, loadout });
+  primeHudDrawersForRun();
   void game.resumeAudio().catch(() => {});
 
   trackRunStarted(activeRunContext);
@@ -319,6 +368,8 @@ renderAbilityPicker();
 renderMutatorPicker();
 setMapThemeLock(false);
 playerNameInput.focus();
+wireDrawer(controlsDrawer, controlsDrawerToggle);
+wireDrawer(missionDrawer, missionDrawerToggle);
 
 playerNameInput.addEventListener('input', () => {
   playerNameInput.setCustomValidity('');

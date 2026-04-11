@@ -22,9 +22,30 @@
     <div id="app"></div>
     <div id="start-screen" class="start-screen">
       <div class="start-screen__panel">
-        <p class="start-screen__eyebrow">Pilot registration</p>
-        <h2 class="start-screen__title">Name your pilot and pick a battlefield</h2>
-        <p class="start-screen__copy">We&apos;ll remember your callsign and preferred map on this browser for your next launch.</p>
+        <section class="landing-hero">
+          <div class="landing-hero__copy">
+            <p class="start-screen__eyebrow">Arcade survival command</p>
+            <h1 class="landing-hero__title">Drone Wars</h1>
+            <p class="landing-hero__lede">Fast single-player drone combat with escalating contracts, unpredictable wave directives, and persistent hangar progression.</p>
+            <div class="landing-hero__pill-row">
+              <span class="landing-pill">Contract-driven runs</span>
+              <span class="landing-pill">Wave directives</span>
+              <span class="landing-pill">Abilities and mutators</span>
+            </div>
+          </div>
+          <div class="landing-preview">
+            <article class="landing-preview__card landing-preview__card--accent">
+              <span class="landing-preview__label">Run fantasy</span>
+              <strong>Dogfight, adapt, cash out, relaunch</strong>
+              <p>Every run can pivot into escort pressure, salvage spikes, hazard fields, or elite air swarms.</p>
+            </article>
+            <article class="landing-preview__card">
+              <span class="landing-preview__label">Current build</span>
+              <strong>Solo arcade combat</strong>
+              <p>Two maps, unlockable abilities, pre-run mutators, boss waves, and contract bonuses.</p>
+            </article>
+          </div>
+        </section>
         <div class="start-screen__meta">
           <div class="start-stat">
             <span class="start-stat__label">Best score</span>
@@ -43,145 +64,192 @@
             <strong id="start-currency">0</strong>
           </div>
         </div>
-        <form id="start-form" class="start-screen__form">
-          <label class="start-screen__label" for="player-name-input">Player name</label>
-          <input
-            id="player-name-input"
-            class="start-screen__input"
-            name="playerName"
-            type="text"
-            maxlength="24"
-            autocomplete="nickname"
-            placeholder="Phoenix Leader"
-            required
-          />
-          <fieldset class="start-screen__map-picker">
-            <legend class="start-screen__label">Battlefield map</legend>
-            <div class="map-options">
-              <label class="map-option">
-                <input
-                  class="map-option__input"
-                  type="radio"
-                  name="mapTheme"
-                  value="frontier"
-                  checked
-                />
-                <span class="map-option__card map-option__card--frontier">
-                  <span class="map-option__eyebrow">Current terrain</span>
-                  <strong class="map-option__title">Frontier Archipelago</strong>
-                  <span class="map-option__copy">Emerald islands, cliffs, and naval lanes for open-air sweeps.</span>
-                </span>
-              </label>
-              <label class="map-option">
-                <input
-                  class="map-option__input"
-                  type="radio"
-                  name="mapTheme"
-                  value="city"
-                />
-                <span class="map-option__card map-option__card--city">
-                  <span class="map-option__eyebrow">New map</span>
-                  <strong class="map-option__title">Siege City</strong>
-                  <span class="map-option__copy">Hyper-dense towers, riverside roads, traffic, crowds, and rooftop helicopters.</span>
-                </span>
-              </label>
-            </div>
-          </fieldset>
-          <fieldset class="start-screen__map-picker">
-            <legend class="start-screen__label">Active ability</legend>
-            <div class="map-options">
-              <label class="map-option">
-                <input
-                  class="map-option__input"
-                  type="radio"
-                  name="ability"
-                  value="pulse"
-                  checked
-                />
-                <span class="map-option__card">
-                  <span class="map-option__eyebrow">Default</span>
-                  <strong class="map-option__title">EMP Pulse</strong>
-                  <span class="map-option__copy">Close-range blast that damages nearby enemies.</span>
-                </span>
-              </label>
-              <label class="map-option">
-                <input
-                  class="map-option__input"
-                  type="radio"
-                  name="ability"
-                  value="dash"
-                />
-                <span class="map-option__card">
-                  <span class="map-option__eyebrow">Unlockable</span>
-                  <strong class="map-option__title">Vector Dash</strong>
-                  <span class="map-option__copy">Burst forward with brief invulnerability to break pressure.</span>
-                </span>
-              </label>
-            </div>
-            <p id="ability-unlock-note" class="start-screen__copy">Reach later waves to unlock more abilities.</p>
-          </fieldset>
-          <fieldset class="start-screen__map-picker">
-            <legend class="start-screen__label">Run mutator</legend>
-            <div class="map-options">
-              <label class="map-option">
-                <input
-                  class="map-option__input"
-                  type="radio"
-                  name="mutator"
-                  value="highRisk"
-                  checked
-                />
-                <span class="map-option__card">
-                  <span class="map-option__eyebrow">Risk / Reward</span>
-                  <strong class="map-option__title">High Risk</strong>
-                  <span class="map-option__copy">Faster hostiles with higher salvage returns.</span>
-                </span>
-              </label>
-              <label class="map-option">
-                <input
-                  class="map-option__input"
-                  type="radio"
-                  name="mutator"
-                  value="scavenger"
-                />
-                <span class="map-option__card">
-                  <span class="map-option__eyebrow">Survival</span>
-                  <strong class="map-option__title">Scavenger</strong>
-                  <span class="map-option__copy">More pickups, but your hull starts lighter.</span>
-                </span>
-              </label>
-              <label class="map-option">
-                <input
-                  class="map-option__input"
-                  type="radio"
-                  name="mutator"
-                  value="pulsePilot"
-                />
-                <span class="map-option__card">
-                  <span class="map-option__eyebrow">Specialist</span>
-                  <strong class="map-option__title">Pulse Pilot</strong>
-                  <span class="map-option__copy">Stronger EMP cadence at the cost of weapon damage.</span>
-                </span>
-              </label>
-            </div>
-            <p id="mutator-note" class="start-screen__copy">Choose one mutator for this run.</p>
-          </fieldset>
-          <section class="hangar-panel">
-            <div class="hangar-panel__header">
-              <div>
-                <p class="start-screen__label">Hangar upgrades</p>
-                <p class="hangar-panel__copy">Permanent passive upgrades bought with salvage from completed runs.</p>
+        <div class="landing-layout">
+          <section class="landing-brief">
+            <article class="landing-section">
+              <p class="start-screen__label">How a run works</p>
+              <div class="landing-steps">
+                <div class="landing-step">
+                  <strong>1. Pick a build</strong>
+                  <p>Choose your map, active ability, and mutator before takeoff.</p>
+                </div>
+                <div class="landing-step">
+                  <strong>2. Survive contracts</strong>
+                  <p>Each run mixes primary missions, bonus objectives, and dynamic wave directives.</p>
+                </div>
+                <div class="landing-step">
+                  <strong>3. Spend salvage</strong>
+                  <p>Turn completed runs into permanent hangar upgrades and stronger relaunches.</p>
+                </div>
               </div>
-              <div class="hangar-panel__wallet">
-                <span>Salvage</span>
-                <strong id="hangar-currency">0</strong>
+            </article>
+            <article class="landing-section">
+              <p class="start-screen__label">What is in this build</p>
+              <div class="landing-feature-grid">
+                <div class="landing-feature">
+                  <strong>Boss waves</strong>
+                  <p>Periodic spikes that force target priority shifts.</p>
+                </div>
+                <div class="landing-feature">
+                  <strong>Directive chaos</strong>
+                  <p>Reinforcements, salvage storms, hazard fields, and ace squadrons.</p>
+                </div>
+                <div class="landing-feature">
+                  <strong>Ability loadouts</strong>
+                  <p>Run EMP Pulse or unlock Vector Dash for evasive play.</p>
+                </div>
+                <div class="landing-feature">
+                  <strong>Mutators</strong>
+                  <p>Change risk, pickup cadence, and reward pacing before launch.</p>
+                </div>
               </div>
-            </div>
-            <p id="map-theme-note" class="hangar-panel__note" hidden>Map changes only apply on a full relaunch. Between runs, upgrades and loadout changes apply immediately.</p>
-            <div id="upgrade-shop" class="upgrade-shop"></div>
+            </article>
           </section>
-          <button class="start-screen__button" type="submit">Start run</button>
-        </form>
+          <form id="start-form" class="start-screen__form">
+            <div class="start-screen__intro">
+              <p class="start-screen__label">Launch setup</p>
+              <h2 class="start-screen__title">Configure your next run</h2>
+              <p class="start-screen__copy">We&apos;ll remember your callsign, preferred battlefield, and current build on this browser.</p>
+            </div>
+            <label class="start-screen__label" for="player-name-input">Player name</label>
+            <input
+              id="player-name-input"
+              class="start-screen__input"
+              name="playerName"
+              type="text"
+              maxlength="24"
+              autocomplete="nickname"
+              placeholder="Phoenix Leader"
+              required
+            />
+            <fieldset class="start-screen__map-picker">
+              <legend class="start-screen__label">Battlefield map</legend>
+              <div class="map-options">
+                <label class="map-option">
+                  <input
+                    class="map-option__input"
+                    type="radio"
+                    name="mapTheme"
+                    value="frontier"
+                    checked
+                  />
+                  <span class="map-option__card map-option__card--frontier">
+                    <span class="map-option__eyebrow">Current terrain</span>
+                    <strong class="map-option__title">Frontier Archipelago</strong>
+                    <span class="map-option__copy">Emerald islands, cliffs, and naval lanes for open-air sweeps.</span>
+                  </span>
+                </label>
+                <label class="map-option">
+                  <input
+                    class="map-option__input"
+                    type="radio"
+                    name="mapTheme"
+                    value="city"
+                  />
+                  <span class="map-option__card map-option__card--city">
+                    <span class="map-option__eyebrow">New map</span>
+                    <strong class="map-option__title">Siege City</strong>
+                    <span class="map-option__copy">Hyper-dense towers, riverside roads, traffic, crowds, and rooftop helicopters.</span>
+                  </span>
+                </label>
+              </div>
+            </fieldset>
+            <fieldset class="start-screen__map-picker">
+              <legend class="start-screen__label">Active ability</legend>
+              <div class="map-options">
+                <label class="map-option">
+                  <input
+                    class="map-option__input"
+                    type="radio"
+                    name="ability"
+                    value="pulse"
+                    checked
+                  />
+                  <span class="map-option__card">
+                    <span class="map-option__eyebrow">Default</span>
+                    <strong class="map-option__title">EMP Pulse</strong>
+                    <span class="map-option__copy">Close-range blast that damages nearby enemies.</span>
+                  </span>
+                </label>
+                <label class="map-option">
+                  <input
+                    class="map-option__input"
+                    type="radio"
+                    name="ability"
+                    value="dash"
+                  />
+                  <span class="map-option__card">
+                    <span class="map-option__eyebrow">Unlockable</span>
+                    <strong class="map-option__title">Vector Dash</strong>
+                    <span class="map-option__copy">Burst forward with brief invulnerability to break pressure.</span>
+                  </span>
+                </label>
+              </div>
+              <p id="ability-unlock-note" class="start-screen__copy">Reach later waves to unlock more abilities.</p>
+            </fieldset>
+            <fieldset class="start-screen__map-picker">
+              <legend class="start-screen__label">Run mutator</legend>
+              <div class="map-options">
+                <label class="map-option">
+                  <input
+                    class="map-option__input"
+                    type="radio"
+                    name="mutator"
+                    value="highRisk"
+                    checked
+                  />
+                  <span class="map-option__card">
+                    <span class="map-option__eyebrow">Risk / Reward</span>
+                    <strong class="map-option__title">High Risk</strong>
+                    <span class="map-option__copy">Faster hostiles with higher salvage returns.</span>
+                  </span>
+                </label>
+                <label class="map-option">
+                  <input
+                    class="map-option__input"
+                    type="radio"
+                    name="mutator"
+                    value="scavenger"
+                  />
+                  <span class="map-option__card">
+                    <span class="map-option__eyebrow">Survival</span>
+                    <strong class="map-option__title">Scavenger</strong>
+                    <span class="map-option__copy">More pickups, but your hull starts lighter.</span>
+                  </span>
+                </label>
+                <label class="map-option">
+                  <input
+                    class="map-option__input"
+                    type="radio"
+                    name="mutator"
+                    value="pulsePilot"
+                  />
+                  <span class="map-option__card">
+                    <span class="map-option__eyebrow">Specialist</span>
+                    <strong class="map-option__title">Pulse Pilot</strong>
+                    <span class="map-option__copy">Stronger EMP cadence at the cost of weapon damage.</span>
+                  </span>
+                </label>
+              </div>
+              <p id="mutator-note" class="start-screen__copy">Choose one mutator for this run.</p>
+            </fieldset>
+            <section class="hangar-panel">
+              <div class="hangar-panel__header">
+                <div>
+                  <p class="start-screen__label">Hangar upgrades</p>
+                  <p class="hangar-panel__copy">Permanent passive upgrades bought with salvage from completed runs.</p>
+                </div>
+                <div class="hangar-panel__wallet">
+                  <span>Salvage</span>
+                  <strong id="hangar-currency">0</strong>
+                </div>
+              </div>
+              <p id="map-theme-note" class="hangar-panel__note" hidden>Map changes only apply on a full relaunch. Between runs, upgrades and loadout changes apply immediately.</p>
+              <div id="upgrade-shop" class="upgrade-shop"></div>
+            </section>
+            <button class="start-screen__button" type="submit">Launch Drone Wars</button>
+          </form>
+        </div>
       </div>
     </div>
     <div id="run-summary" class="run-summary" hidden>
@@ -280,9 +348,7 @@
     <div id="hit-chevrons" class="hit-chevrons"></div>
     <aside class="hud">
       <div class="hud__topbar">
-        <div class="hud__identity">
-          <p class="hud__eyebrow">Single-player combat prototype</p>
-          <h1>Drone Wars</h1>
+        <div class="hud__identity hud__identity--compact">
           <p class="pilot-tag">Pilot <strong id="player-name-value">Awaiting registration</strong></p>
           <p class="pilot-tag">Battlefield <strong id="map-theme-value">Frontier Archipelago</strong></p>
         </div>
@@ -332,28 +398,46 @@
             </div>
           </div>
 
-          <div class="controls-card controls-card--compact" id="controls-panel">
-            <p class="controls-card__title">Systems</p>
-            <p class="controls-card__line">W/S thrust, A/D yaw, arrows strafe/pitch, Q/E altitude</p>
-            <p class="controls-card__line">Space fire, F active ability, R restart, P pause</p>
-            <div class="controls-card__readout">
-              <p id="powerup-value">No active power-up</p>
-              <p id="ability-value">EMP Pulse ready (F)</p>
-              <p id="mutator-value">Mutator: High Risk</p>
+          <div class="hud-drawer hud-drawer--collapsed" id="controls-drawer">
+            <button
+              id="controls-drawer-toggle"
+              class="hud-drawer__toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="controls-panel"
+            >Systems</button>
+            <div class="controls-card controls-card--compact hud-drawer__panel" id="controls-panel">
+              <p class="controls-card__title">Systems</p>
+              <p class="controls-card__line">W/S thrust, A/D yaw, arrows strafe/pitch, Q/E altitude</p>
+              <p class="controls-card__line">Space fire, F active ability, R restart, P pause</p>
+              <div class="controls-card__readout">
+                <p id="powerup-value">No active power-up</p>
+                <p id="ability-value">EMP Pulse ready (F)</p>
+                <p id="mutator-value">Mutator: High Risk</p>
+              </div>
             </div>
           </div>
 
-          <div class="controls-card controls-card--mission">
-            <p class="controls-card__title">Mission</p>
-            <p id="mission-name">No active objective</p>
-            <div class="mission-progressbar" aria-hidden="true">
-              <div id="mission-progress-fill" class="mission-progressbar__fill"></div>
+          <div class="hud-drawer hud-drawer--collapsed" id="mission-drawer">
+            <button
+              id="mission-drawer-toggle"
+              class="hud-drawer__toggle"
+              type="button"
+              aria-expanded="false"
+              aria-controls="mission-panel"
+            >Mission</button>
+            <div class="controls-card controls-card--mission hud-drawer__panel" id="mission-panel">
+              <p class="controls-card__title">Mission</p>
+              <p id="mission-name">No active objective</p>
+              <div class="mission-progressbar" aria-hidden="true">
+                <div id="mission-progress-fill" class="mission-progressbar__fill"></div>
+              </div>
+              <p id="mission-progress">Complete the run to receive a combat objective.</p>
+              <p id="bonus-objective-name" class="mission-bonus">Bonus: Stand by</p>
+              <p id="bonus-objective-progress" class="mission-bonus__copy">No bonus objective assigned for this wave.</p>
+              <p id="directive-name" class="mission-directive">Directive: Standard pressure</p>
+              <p id="directive-copy" class="mission-directive__copy">Wave conditions normal. Expect baseline enemy composition.</p>
             </div>
-            <p id="mission-progress">Complete the run to receive a combat objective.</p>
-            <p id="bonus-objective-name" class="mission-bonus">Bonus: Stand by</p>
-            <p id="bonus-objective-progress" class="mission-bonus__copy">No bonus objective assigned for this wave.</p>
-            <p id="directive-name" class="mission-directive">Directive: Standard pressure</p>
-            <p id="directive-copy" class="mission-directive__copy">Wave conditions normal. Expect baseline enemy composition.</p>
           </div>
         </div>
 
