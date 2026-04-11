@@ -239,6 +239,10 @@ export function createEnvironment(scene, { mapTheme } = {}) {
 
   scene.add(hemi, ambient, sun, sunTarget);
 
+  // Cached Color objects for height-based fog (avoid per-frame allocation)
+  const _baseFogColor = new THREE.Color(preset.fog);
+  const _distantFogColor = new THREE.Color(preset.fog).offsetHSL(0.05, 0, -0.05);
+
   return {
     update(center, time = 0) {
       skyGroup.position.copy(center);
@@ -257,7 +261,19 @@ export function createEnvironment(scene, { mapTheme } = {}) {
         preset.glowOffset.y + Math.sin(time * 0.08) * 8,
         center.z + preset.glowOffset.z,
       );
-      scene.fog.color.setStyle(preset.fog);
+
+      // Height-based fog: denser near ground, thinner at altitude
+      const cameraY = center.y;
+      const groundLevel = 5;
+      const maxAlt = 80;
+      const heightFactor = THREE.MathUtils.clamp((cameraY - groundLevel) / (maxAlt - groundLevel), 0, 1);
+
+      // Fog thins with altitude
+      scene.fog.near = preset.fogNear + heightFactor * 40;
+      scene.fog.far = preset.fogFar + heightFactor * 80;
+
+      // Fog shifts bluer at distance
+      scene.fog.color.copy(_baseFogColor).lerp(_distantFogColor, heightFactor * 0.3);
     },
     dispose() {
       scene.remove(skyGroup, hemi, ambient, sun, sunTarget, clouds.group);
