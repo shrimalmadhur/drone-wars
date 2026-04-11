@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+import * as THREE from 'three/webgpu';
 
 import { CONFIG } from '../config.js';
 import { normalizeAngle, randomRange, segmentIntersectsCylinder, segmentIntersectsCylinderAt } from '../math.js';
