@@ -1,7 +1,6 @@
 import * as THREE from 'three/webgpu';
 import { pass } from 'three/tsl';
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
-import { fxaa } from 'three/addons/tsl/display/FXAANode.js';
 
 import { CONFIG } from './config.js';
 import { InputController } from './input.js';
@@ -138,17 +137,13 @@ export class Game {
     const scenePass = pass(this.scene, this.camera);
     const scenePassColor = scenePass.getTextureNode('output');
 
-    // Bloom with threshold (emissive surfaces glow)
+    // Lightweight bloom — only emissive surfaces glow
     const bloomPass = bloom(scenePassColor);
-    bloomPass.threshold.value = 0.75;
-    bloomPass.strength.value = 0.3;
-    bloomPass.radius.value = 0.4;
+    bloomPass.threshold.value = 0.85;
+    bloomPass.strength.value = 0.2;
+    bloomPass.radius.value = 0.3;
 
-    // Combine: scene + bloom, then FXAA
-    let outputNode = scenePassColor.add(bloomPass);
-    outputNode = fxaa(outputNode);
-
-    this.postProcessing.outputNode = outputNode;
+    this.postProcessing.outputNode = scenePassColor.add(bloomPass);
   }
 
   resumeAudio() {

@@ -973,7 +973,7 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
   ground.receiveShadow = true;
   group.add(ground);
 
-  const seaSubdivisions = 80;
+  const seaSubdivisions = 40;
   const seaGeometry = new THREE.PlaneGeometry(
     renderExtent * 1.2, renderExtent * 1.2,
     seaSubdivisions, seaSubdivisions,
@@ -993,14 +993,12 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
     return positionLocal.add(vec3(0, 0, totalWave));
   });
 
-  const seaMaterial = new THREE.MeshPhysicalNodeMaterial({
+  const seaMaterial = new THREE.MeshStandardNodeMaterial({
     color: theme === MAP_THEMES.CITY ? '#214f78' : '#195f93',
     roughness: 0.15,
     metalness: 0.6,
     transparent: true,
     opacity: 0.85,
-    clearcoat: 0.9,
-    clearcoatRoughness: 0.25,
   });
   seaMaterial.positionNode = seaWavePosition();
 

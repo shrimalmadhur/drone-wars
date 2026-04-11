@@ -118,17 +118,12 @@ function createSkyMaterial(preset) {
     return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
   });
 
-  // Fractal Brownian Motion (4 octaves)
+  // Fractal Brownian Motion (2 octaves — reduced from 4 for performance)
   const fbm = Fn(([p_immutable]) => {
     const p = p_immutable.toVar();
-    const v = float(0).toVar();
-    const a = float(0.5).toVar();
-    Loop(4, () => {
-      v.addAssign(a.mul(noise2d(p)));
-      p.assign(p.mul(2.0).add(vec2(100.0)));
-      a.mulAssign(0.5);
-    });
-    return v;
+    const v = noise2d(p).mul(0.5);
+    const v2 = noise2d(p.mul(2.0).add(vec2(100.0))).mul(0.25);
+    return v.add(v2);
   });
 
   // Main sky color function
