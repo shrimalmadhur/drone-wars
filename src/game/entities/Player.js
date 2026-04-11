@@ -517,7 +517,7 @@ export class Player {
       }
       return {
         team: 'player',
-        damage: CONFIG.projectiles.playerDamage,
+        damage: CONFIG.projectiles.playerDamage * (this.runModifiers.playerDamageMultiplier ?? 1),
         radius: 1.05,
         maxLife: CONFIG.player.projectileLife,
         targetId,
@@ -704,6 +704,8 @@ export class Player {
       abilityLabel: ability.label,
       abilitySummary: ability.summary,
       abilityCooldown: this.abilityCooldown,
+      mutatorLabel: this.runModifiers.mutatorLabel,
+      mutatorSummary: this.runModifiers.mutatorSummary,
       shieldActive: this.activePowerUp === 'shield',
       shieldImpactFlash: this.shieldImpactTimer,
       shieldExpiryFlash: this.shieldExpiryTimer,

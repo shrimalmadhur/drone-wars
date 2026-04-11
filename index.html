@@ -120,6 +120,52 @@
             </div>
             <p id="ability-unlock-note" class="start-screen__copy">Reach later waves to unlock more abilities.</p>
           </fieldset>
+          <fieldset class="start-screen__map-picker">
+            <legend class="start-screen__label">Run mutator</legend>
+            <div class="map-options">
+              <label class="map-option">
+                <input
+                  class="map-option__input"
+                  type="radio"
+                  name="mutator"
+                  value="highRisk"
+                  checked
+                />
+                <span class="map-option__card">
+                  <span class="map-option__eyebrow">Risk / Reward</span>
+                  <strong class="map-option__title">High Risk</strong>
+                  <span class="map-option__copy">Faster hostiles with higher salvage returns.</span>
+                </span>
+              </label>
+              <label class="map-option">
+                <input
+                  class="map-option__input"
+                  type="radio"
+                  name="mutator"
+                  value="scavenger"
+                />
+                <span class="map-option__card">
+                  <span class="map-option__eyebrow">Survival</span>
+                  <strong class="map-option__title">Scavenger</strong>
+                  <span class="map-option__copy">More pickups, but your hull starts lighter.</span>
+                </span>
+              </label>
+              <label class="map-option">
+                <input
+                  class="map-option__input"
+                  type="radio"
+                  name="mutator"
+                  value="pulsePilot"
+                />
+                <span class="map-option__card">
+                  <span class="map-option__eyebrow">Specialist</span>
+                  <strong class="map-option__title">Pulse Pilot</strong>
+                  <span class="map-option__copy">Stronger EMP cadence at the cost of weapon damage.</span>
+                </span>
+              </label>
+            </div>
+            <p id="mutator-note" class="start-screen__copy">Choose one mutator for this run.</p>
+          </fieldset>
           <section class="hangar-panel">
             <div class="hangar-panel__header">
               <div>
@@ -199,6 +245,11 @@
             <span>Ability</span>
             <strong id="summary-ability">EMP Pulse</strong>
             <small>Equipped active system</small>
+          </div>
+          <div class="run-summary__stat">
+            <span>Mutator</span>
+            <strong id="summary-mutator">High Risk</strong>
+            <small>Selected pre-run risk layer</small>
           </div>
           <div class="run-summary__stat">
             <span>New awards</span>
@@ -287,6 +338,7 @@
             <div class="controls-card__readout">
               <p id="powerup-value">No active power-up</p>
               <p id="ability-value">EMP Pulse ready (F)</p>
+              <p id="mutator-value">Mutator: High Risk</p>
             </div>
           </div>
 

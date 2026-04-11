@@ -9,6 +9,7 @@ import {
   recordRunStart,
   recordPlayerRun,
   setEquippedAbility,
+  setEquippedMutator,
   sanitizePlayerName,
   saveMapTheme,
   savePlayerProgress,
@@ -165,6 +166,16 @@ describe('player profile', () => {
 
     expect(updated.loadout.ability).toBe('dash');
     expect(loadPlayerProgress(storage).loadout.ability).toBe('dash');
+  });
+
+  it('persists mutator selection for pre-run config', () => {
+    const storage = createStorage();
+
+    const updated = setEquippedMutator('scavenger', storage);
+
+    expect(updated.preRunSelection.mutator).toBe('scavenger');
+    expect(updated.loadout.mutator).toBe('scavenger');
+    expect(loadPlayerProgress(storage).preRunSelection.mutator).toBe('scavenger');
   });
 
   it('purchases upgrades when enough salvage is available', () => {

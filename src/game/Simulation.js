@@ -272,7 +272,7 @@ export class Simulation {
 
   spawnEnemy(type) {
     const baseType = getSpawnBaseType(type);
-    const profile = buildEnemySpawnProfile(type, this.state.wave);
+    const profile = buildEnemySpawnProfile(type, this.state.wave, this.player.runModifiers);
     const terrainSpawnType = baseType === 'turret' ? 'tank' : baseType === 'boss' ? 'drone' : baseType;
     const allowDistantObjectiveSpawn = type === 'ship';
     const position = this.terrain.getSpawnPoint(
@@ -446,7 +446,8 @@ export class Simulation {
       return;
     }
     const { spawnIntervalMin, spawnIntervalMax } = CONFIG.powerUps;
-    this.pickupSpawnTimer = spawnIntervalMin + this.rng() * (spawnIntervalMax - spawnIntervalMin);
+    this.pickupSpawnTimer = (spawnIntervalMin + this.rng() * (spawnIntervalMax - spawnIntervalMin))
+      * (this.player.runModifiers.pickupSpawnIntervalMultiplier ?? 1);
   }
 
   spawnAmbientPickup() {
@@ -668,7 +669,7 @@ export class Simulation {
       } else if (event.type === 'effect') {
         this.spawnEffect(event.position.x, event.position.y, event.position.z, event.size);
       } else if (event.type === 'spawnEnemy' && event.enemyType === 'missile') {
-        this.enemies.push(new MissileEnemy(this.scene, event.position, buildEnemySpawnProfile('missile', this.state.wave)));
+        this.enemies.push(new MissileEnemy(this.scene, event.position, buildEnemySpawnProfile('missile', this.state.wave, this.player.runModifiers)));
       }
     }
   }
@@ -1073,11 +1074,20 @@ export class Simulation {
   getRunSummary() {
     const fallbackCombatStatus = this.player?.getCombatStatus?.() ?? {
       abilityLabel: this.player?.equippedAbility === 'dash' ? 'Vector Dash' : 'EMP Pulse',
+      mutatorLabel: this.player?.runModifiers?.mutatorLabel ?? 'High Risk',
+      mutatorSummary: this.player?.runModifiers?.mutatorSummary ?? '',
     };
     const abilitySummary = this.player
       ? {
         id: this.player.equippedAbility ?? 'pulse',
         label: fallbackCombatStatus.abilityLabel,
+      }
+      : null;
+    const mutatorSummary = this.player
+      ? {
+        id: this.player.runModifiers.mutatorId,
+        label: this.player.runModifiers.mutatorLabel,
+        summary: this.player.runModifiers.mutatorSummary,
       }
       : null;
     if (!this.runStats) {
@@ -1090,7 +1100,9 @@ export class Simulation {
         maxPulseHits: 0,
         flawlessWaves: 0,
         damageTaken: 0,
+        rewardMultiplier: this.player?.runModifiers.rewardMultiplier ?? 1,
         ability: abilitySummary,
+        mutator: mutatorSummary,
         mission: this.state.mission ? { ...this.state.mission } : null,
       };
     }
@@ -1099,7 +1111,9 @@ export class Simulation {
       score: this.state.score,
       highestWave: Math.max(this.runStats.highestWave, this.state.wave),
       timePlayed: this.state.time,
+      rewardMultiplier: this.player?.runModifiers?.rewardMultiplier ?? 1,
       ability: abilitySummary,
+      mutator: mutatorSummary,
       mission: this.state.mission ? { ...this.state.mission } : null,
     };
   }

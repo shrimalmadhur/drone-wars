@@ -37,11 +37,13 @@ describe('wave system', () => {
   it('builds stronger spawn profiles as waves climb', () => {
     const earlyTank = buildEnemySpawnProfile('tank', 1);
     const lateTank = buildEnemySpawnProfile('tank', 8);
+    const mutatorTank = buildEnemySpawnProfile('tank', 8, { enemySpeedMultiplier: 1.18 });
 
     expect(lateTank.health).toBeGreaterThan(earlyTank.health);
     expect(lateTank.damage).toBeGreaterThan(earlyTank.damage);
     expect(lateTank.fireInterval).toBeLessThan(earlyTank.fireInterval);
     expect(lateTank.burstCount).toBeGreaterThan(earlyTank.burstCount);
+    expect(mutatorTank.moveSpeed).toBeGreaterThan(lateTank.moveSpeed);
   });
 
   it('unlocks higher weapon tiers at milestone waves', () => {

@@ -258,6 +258,7 @@ export class Game {
         ? `${snapshot.activePowerUpTimer <= 3 ? 'SHIELD FADING' : 'SHIELD ACTIVE'} ${snapshot.activePowerUpTimer.toFixed(1)}s`
         : `${snapshot.activePowerUp.toUpperCase()} ${snapshot.activePowerUpTimer.toFixed(1)}s`
       : 'No active power-up';
+    this.hud.mutator.textContent = `Mutator: ${snapshot.mutatorLabel}`;
     if (snapshot.equippedAbility === 'dash') {
       this.hud.pulse.textContent = snapshot.abilityCooldown > 0
         ? `${snapshot.abilityLabel} recharging ${snapshot.abilityCooldown.toFixed(1)}s`

@@ -231,3 +231,19 @@ export function setEquippedAbility(ability, storage = globalThis?.localStorage) 
   }, storage);
   return next;
 }
+
+export function setEquippedMutator(mutator, storage = globalThis?.localStorage) {
+  const previous = loadPlayerProgress(storage);
+  const next = savePlayerProgress({
+    ...previous,
+    preRunSelection: {
+      ...previous.preRunSelection,
+      mutator,
+    },
+    loadout: {
+      ...previous.loadout,
+      mutator,
+    },
+  }, storage);
+  return next;
+}

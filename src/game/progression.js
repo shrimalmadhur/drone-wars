@@ -55,7 +55,8 @@ export function calculateRunCurrency(runStats) {
   const waveReward = Math.max(0, Number(runStats?.highestWave) || 0) * 10;
   const bossReward = Math.max(0, Number(runStats?.bossesDefeated) || 0) * 40;
   const flawlessReward = Math.max(0, Number(runStats?.flawlessWaves) || 0) * 18;
-  return scoreReward + waveReward + bossReward + flawlessReward;
+  const total = scoreReward + waveReward + bossReward + flawlessReward;
+  return Math.floor(total * Math.max(1, Number(runStats?.rewardMultiplier) || 1));
 }
 
 export function mergeLifetimeStats(currentStats, runStats, { runStarted = false, runCompleted = false } = {}) {

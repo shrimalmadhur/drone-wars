@@ -73,7 +73,7 @@ export function getWaveDifficultyModifiers(wave) {
   };
 }
 
-export function buildEnemySpawnProfile(type, wave) {
+export function buildEnemySpawnProfile(type, wave, runModifiers = {}) {
   const modifiers = getWaveDifficultyModifiers(wave);
   const configKey = type === 'droneSupport'
     ? 'droneSupport'
@@ -85,8 +85,12 @@ export function buildEnemySpawnProfile(type, wave) {
     ...config,
     health: Math.round(config.health * modifiers.healthMultiplier),
     damage: config.damage ? Math.round(config.damage * modifiers.damageMultiplier) : config.damage,
-    moveSpeed: config.moveSpeed ? config.moveSpeed * modifiers.speedMultiplier : config.moveSpeed,
-    projectileSpeed: config.projectileSpeed ? config.projectileSpeed * modifiers.projectileSpeedMultiplier : config.projectileSpeed,
+    moveSpeed: config.moveSpeed
+      ? config.moveSpeed * modifiers.speedMultiplier * (runModifiers.enemySpeedMultiplier ?? 1)
+      : config.moveSpeed,
+    projectileSpeed: config.projectileSpeed
+      ? config.projectileSpeed * modifiers.projectileSpeedMultiplier * (runModifiers.enemyProjectileSpeedMultiplier ?? 1)
+      : config.projectileSpeed,
     fireInterval: config.fireInterval ? config.fireInterval / modifiers.fireRateMultiplier : config.fireInterval,
     missileInterval: config.missileInterval ? config.missileInterval / Math.min(1.35, modifiers.fireRateMultiplier) : config.missileInterval,
     turnRate: config.turnRate ? config.turnRate * Math.min(1.4, modifiers.speedMultiplier) : config.turnRate,

@@ -10,6 +10,7 @@ import {
 } from './game/analytics.js';
 import { createRunModifiers } from './game/meta/runModifiers.js';
 import { ABILITY_DEFINITIONS, getUnlockedAbilities, isAbilityUnlocked } from './game/meta/abilities.js';
+import { MUTATOR_DEFINITIONS } from './game/meta/mutators.js';
 import { getUpgradeCost, UPGRADE_DEFINITIONS } from './game/meta/upgrades.js';
 import { MAP_THEME_DETAILS } from './mapThemes.js';
 import {
@@ -20,6 +21,7 @@ import {
   recordRunComplete,
   recordRunStart,
   setEquippedAbility,
+  setEquippedMutator,
   saveMapTheme,
   savePlayerName,
 } from './playerProfile.js';
@@ -30,7 +32,9 @@ const startForm = document.querySelector('#start-form');
 const playerNameInput = document.querySelector('#player-name-input');
 const mapThemeInputs = Array.from(document.querySelectorAll('input[name="mapTheme"]'));
 const abilityInputs = Array.from(document.querySelectorAll('input[name="ability"]'));
+const mutatorInputs = Array.from(document.querySelectorAll('input[name="mutator"]'));
 const abilityUnlockNote = document.querySelector('#ability-unlock-note');
+const mutatorNote = document.querySelector('#mutator-note');
 const startCurrency = document.querySelector('#start-currency');
 const hangarCurrency = document.querySelector('#hangar-currency');
 const upgradeShop = document.querySelector('#upgrade-shop');
@@ -51,6 +55,7 @@ const summaryOutcome = document.querySelector('#summary-outcome');
 const summaryMission = document.querySelector('#summary-mission');
 const summaryMissionCopy = document.querySelector('#summary-mission-copy');
 const summaryAbility = document.querySelector('#summary-ability');
+const summaryMutator = document.querySelector('#summary-mutator');
 const summaryScoreDelta = document.querySelector('#summary-score-delta');
 const summaryWaveDelta = document.querySelector('#summary-wave-delta');
 const summaryMissionFill = document.querySelector('#summary-mission-fill');
@@ -84,6 +89,7 @@ const hud = {
   achievements: document.querySelector('#achievement-count-value'),
   powerup: document.querySelector('#powerup-value'),
   pulse: document.querySelector('#ability-value'),
+  mutator: document.querySelector('#mutator-value'),
   missionName: document.querySelector('#mission-name'),
   missionProgress: document.querySelector('#mission-progress'),
   missionProgressFill: document.querySelector('#mission-progress-fill'),
@@ -175,6 +181,7 @@ function showRunSummary(result, previousProgress) {
   summaryCurrency.textContent = currencyEarned.toString();
   summaryOutcome.textContent = missionSummary.outcome;
   summaryAbility.textContent = stats.ability?.label ?? ABILITY_DEFINITIONS.pulse.label;
+  summaryMutator.textContent = stats.mutator?.label ?? MUTATOR_DEFINITIONS.highRisk.label;
   summaryMission.textContent = missionSummary.title;
   summaryMissionCopy.textContent = missionSummary.copy;
   summaryMissionFill.style.width = missionSummary.progressWidth;
@@ -233,6 +240,15 @@ function renderAbilityPicker() {
     : `All abilities unlocked. Equipped: ${unlockedAbilities.find((ability) => ability.id === equippedAbility)?.label ?? ABILITY_DEFINITIONS.pulse.label}.`;
 }
 
+function renderMutatorPicker() {
+  const selectedMutator = playerProgress.preRunSelection?.mutator ?? playerProgress.loadout?.mutator;
+  for (const input of mutatorInputs) {
+    input.checked = input.value === selectedMutator;
+  }
+  const definition = MUTATOR_DEFINITIONS[selectedMutator] ?? MUTATOR_DEFINITIONS.highRisk;
+  mutatorNote.textContent = `${definition.summary} ${definition.detail}.`;
+}
+
 function applyIdentity(playerName, mapTheme) {
   playerNameInput.value = playerName;
   hud.playerName.textContent = playerName || 'Awaiting registration';
@@ -257,6 +273,7 @@ function beginRun({ fromSummary = false } = {}) {
   updateProfileReadouts();
   renderUpgradeShop();
   renderAbilityPicker();
+  renderMutatorPicker();
 
   const runModifiers = createRunModifiers(playerProgress);
   const loadout = playerProgress.loadout;
@@ -294,6 +311,7 @@ applyIdentity(savedPlayerName, savedMapTheme);
 updateProfileReadouts();
 renderUpgradeShop();
 renderAbilityPicker();
+renderMutatorPicker();
 setMapThemeLock(false);
 playerNameInput.focus();
 
@@ -313,6 +331,7 @@ upgradeShop.addEventListener('click', (event) => {
   updateProfileReadouts();
   renderUpgradeShop();
   renderAbilityPicker();
+  renderMutatorPicker();
 
   if (result.ok) {
     trackUpgradePurchased({
@@ -334,6 +353,16 @@ for (const input of abilityInputs) {
   });
 }
 
+for (const input of mutatorInputs) {
+  input.addEventListener('change', () => {
+    if (!input.checked) {
+      return;
+    }
+    playerProgress = setEquippedMutator(input.value);
+    renderMutatorPicker();
+  });
+}
+
 summaryRerunButton.addEventListener('click', () => {
   beginRun({ fromSummary: true });
 });
@@ -351,6 +380,7 @@ startForm.addEventListener('submit', (event) => {
     return;
   }
   playerNameInput.value = playerName;
+  playerProgress = setEquippedMutator(new FormData(startForm).get('mutator'));
 
   if (!game) {
     const initialMapTheme = saveMapTheme(new FormData(startForm).get('mapTheme'));
@@ -376,6 +406,7 @@ startForm.addEventListener('submit', (event) => {
         updateProfileReadouts();
         renderUpgradeShop();
         renderAbilityPicker();
+        renderMutatorPicker();
 
         if (activeRunContext) {
           lastCompletedRunContext = activeRunContext;
