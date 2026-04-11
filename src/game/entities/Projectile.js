@@ -82,73 +82,30 @@ export function stepProjectileStore(store, dt, expiryCheck) {
   }
 }
 
-// Scratch objects for instanced projectile transforms
-const _projMatrix = new THREE.Matrix4();
-const _projQuat = new THREE.Quaternion();
-const _projScale = new THREE.Vector3();
-const _projPos = new THREE.Vector3();
-const _projLookAt = new THREE.Vector3();
-const _projUp = new THREE.Vector3(0, 1, 0);
-const _hideMatrix = new THREE.Matrix4().compose(
-  new THREE.Vector3(0, -9999, 0),
-  new THREE.Quaternion(),
-  new THREE.Vector3(0.001, 0.001, 0.001),
-);
-
 export class ProjectilePool {
   constructor(scene) {
     this.scene = scene;
     this.store = createProjectileStore(CONFIG.projectiles.maxCount);
-    const maxCount = CONFIG.projectiles.maxCount;
+    this.geometry = new THREE.BoxGeometry(0.6, 0.6, 0.6);
+    this.trailGeometry = new THREE.BoxGeometry(0.15, 0.15, 3.5);
+    this.materials = {
+      player: new THREE.MeshBasicMaterial({ color: CONFIG.palette.playerShot }),
+      enemy: new THREE.MeshBasicMaterial({ color: CONFIG.palette.hostileShot }),
+    };
+    this.trailMaterials = {
+      player: new THREE.MeshBasicMaterial({ color: CONFIG.palette.playerShot, transparent: true, opacity: 0.45 }),
+      enemy: new THREE.MeshBasicMaterial({ color: CONFIG.palette.hostileShot, transparent: true, opacity: 0.4 }),
+    };
 
-    // Simple box projectiles — minimal geometry, maximum performance
-    const sphereGeo = new THREE.BoxGeometry(0.6, 0.6, 0.6);
-    const sphereMat = new THREE.MeshBasicMaterial({
-      color: 0xffffff,
-    });
-    this.spheres = new THREE.InstancedMesh(sphereGeo, sphereMat, maxCount);
-    this.spheres.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    this.spheres.instanceColor = new THREE.InstancedBufferAttribute(
-      new Float32Array(maxCount * 3), 3,
-    );
-    this.spheres.count = maxCount;
-
-    // Simple box trails
-    const trailGeo = new THREE.BoxGeometry(0.15, 0.15, 3.5);
-    const trailMat = new THREE.MeshBasicMaterial({
-      color: 0xffffff,
-      transparent: true,
-      opacity: 0.45,
-    });
-    this.trails = new THREE.InstancedMesh(trailGeo, trailMat, maxCount);
-    this.trails.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    this.trails.instanceColor = new THREE.InstancedBufferAttribute(
-      new Float32Array(maxCount * 3), 3,
-    );
-    this.trails.count = maxCount;
-
-    // Cache colors
-    this._playerColor = new THREE.Color(CONFIG.palette.playerShot);
-    this._enemyColor = new THREE.Color(CONFIG.palette.hostileShot);
-
-    // Hide all instances initially
-    for (let i = 0; i < maxCount; i++) {
-      this.spheres.setMatrixAt(i, _hideMatrix);
-      this.trails.setMatrixAt(i, _hideMatrix);
-      this.spheres.setColorAt(i, this._playerColor);
-      this.trails.setColorAt(i, this._playerColor);
-    }
-    this.spheres.instanceMatrix.needsUpdate = true;
-    this.trails.instanceMatrix.needsUpdate = true;
-    this.spheres.instanceColor.needsUpdate = true;
-    this.trails.instanceColor.needsUpdate = true;
-
-    scene.add(this.spheres);
-    scene.add(this.trails);
-
-    // Assign index to each store item for instanced access
-    for (let i = 0; i < this.store.items.length; i++) {
-      this.store.items[i]._idx = i;
+    for (const item of this.store.items) {
+      const mesh = new THREE.Mesh(this.geometry, this.materials.player);
+      const trail = new THREE.Mesh(this.trailGeometry, this.trailMaterials.player);
+      mesh.visible = false;
+      trail.visible = false;
+      item.mesh = mesh;
+      item.trail = trail;
+      scene.add(mesh);
+      scene.add(trail);
     }
   }
 
@@ -157,21 +114,13 @@ export class ProjectilePool {
     if (!item) {
       return false;
     }
-    const idx = item._idx;
-    const isPlayer = spec.team === 'player';
-    const color = isPlayer ? this._playerColor : this._enemyColor;
-    const scale = isPlayer ? 1.2 : 1.0;
-
-    this.spheres.setColorAt(idx, color);
-    this.trails.setColorAt(idx, color);
-
-    _projScale.set(scale, scale, scale);
-    _projPos.set(item.x, item.y, item.z);
-    _projQuat.identity();
-    _projMatrix.compose(_projPos, _projQuat, _projScale);
-    this.spheres.setMatrixAt(idx, _projMatrix);
-    this.trails.setMatrixAt(idx, _projMatrix);
-
+    item.mesh.visible = true;
+    item.trail.visible = true;
+    item.mesh.material = spec.team === 'player' ? this.materials.player : this.materials.enemy;
+    item.trail.material = spec.team === 'player' ? this.trailMaterials.player : this.trailMaterials.enemy;
+    item.mesh.scale.setScalar(spec.team === 'player' ? 1.2 : 1);
+    item.mesh.position.set(item.x, item.y, item.z);
+    item.trail.position.set(item.x, item.y, item.z);
     return true;
   }
 
@@ -211,7 +160,6 @@ export class ProjectilePool {
       if (playerDx * playerDx + playerDz * playerDz > CONFIG.world.arenaRadius * CONFIG.world.arenaRadius * 4) {
         return true;
       }
-      // Only check ground collision when close to ground (skip expensive getGroundHeight)
       if (item.y < 15 && item.y <= context.terrain.getGroundHeight(item.x, item.z) + 0.6) {
         context.recordImpact?.(item.x, item.y, item.z);
         context.spawnEffect(item.x, item.y, item.z, 0.8);
@@ -220,16 +168,12 @@ export class ProjectilePool {
       return false;
     });
 
-    let matrixDirty = false;
-    let colorDirty = false;
-
     for (const item of this.store.items) {
-      const idx = item._idx;
-
       if (!item.active) {
-        this.spheres.setMatrixAt(idx, _hideMatrix);
-        this.trails.setMatrixAt(idx, _hideMatrix);
-        matrixDirty = true;
+        if (item.mesh.visible) {
+          item.mesh.visible = false;
+          item.trail.visible = false;
+        }
         continue;
       }
 
@@ -245,64 +189,46 @@ export class ProjectilePool {
 
       if (hit) {
         item.active = false;
-        this.spheres.setMatrixAt(idx, _hideMatrix);
-        this.trails.setMatrixAt(idx, _hideMatrix);
-        matrixDirty = true;
+        item.mesh.visible = false;
+        item.trail.visible = false;
         continue;
       }
 
-      // Update sphere position
-      const scale = item.team === 'player' ? 1.2 : 1.0;
-      _projPos.set(item.x, item.y, item.z);
-      _projScale.set(scale, scale, scale);
-      _projQuat.identity();
-      _projMatrix.compose(_projPos, _projQuat, _projScale);
-      this.spheres.setMatrixAt(idx, _projMatrix);
-
-      // Update trail — position at midpoint, orient toward previous position
-      _projPos.set(
+      item.mesh.position.set(item.x, item.y, item.z);
+      item.trail.position.set(
         (item.prevX + item.x) * 0.5,
         (item.prevY + item.y) * 0.5,
         (item.prevZ + item.z) * 0.5,
       );
-      _projLookAt.set(item.prevX, item.prevY, item.prevZ);
-      _projMatrix.lookAt(_projPos, _projLookAt, _projUp);
-      _projQuat.setFromRotationMatrix(_projMatrix);
+      item.trail.lookAt(item.prevX, item.prevY, item.prevZ);
       const dist = Math.hypot(item.x - item.prevX, item.y - item.prevY, item.z - item.prevZ);
-      const tw = item.targetId ? CONFIG.effects.trail.trackingWidthMultiplier : 1;
-      _projScale.set(tw, tw, Math.max(2.2, dist * 0.7));
-      _projMatrix.compose(_projPos, _projQuat, _projScale);
-      this.trails.setMatrixAt(idx, _projMatrix);
-
-      matrixDirty = true;
-    }
-
-    if (matrixDirty) {
-      this.spheres.instanceMatrix.needsUpdate = true;
-      this.trails.instanceMatrix.needsUpdate = true;
-    }
-    if (colorDirty) {
-      this.spheres.instanceColor.needsUpdate = true;
-      this.trails.instanceColor.needsUpdate = true;
+      item.trail.scale.z = Math.max(2.2, dist * 0.7);
+      if (item.targetId) {
+        item.trail.scale.x = CONFIG.effects.trail.trackingWidthMultiplier;
+        item.trail.scale.y = CONFIG.effects.trail.trackingWidthMultiplier;
+      } else {
+        item.trail.scale.x = 1;
+        item.trail.scale.y = 1;
+      }
     }
   }
 
   reset() {
     resetProjectileStore(this.store);
-    for (let i = 0; i < this.store.items.length; i++) {
-      this.spheres.setMatrixAt(i, _hideMatrix);
-      this.trails.setMatrixAt(i, _hideMatrix);
+    for (const item of this.store.items) {
+      item.mesh.visible = false;
+      item.trail.visible = false;
     }
-    this.spheres.instanceMatrix.needsUpdate = true;
-    this.trails.instanceMatrix.needsUpdate = true;
   }
 
   dispose() {
-    this.scene.remove(this.spheres);
-    this.scene.remove(this.trails);
-    this.spheres.geometry.dispose();
-    this.spheres.material.dispose();
-    this.trails.geometry.dispose();
-    this.trails.material.dispose();
+    for (const item of this.store.items) {
+      this.scene.remove(item.mesh);
+      this.scene.remove(item.trail);
+    }
+    this.geometry.dispose();
+    this.trailGeometry.dispose();
+    Object.values(this.materials).forEach(m => m.dispose());
+    Object.values(this.trailMaterials).forEach(m => m.dispose());
   }
 }

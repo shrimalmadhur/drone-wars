@@ -33,17 +33,10 @@ describe('projectile store', () => {
   });
 
   it('records an impact when a projectile strikes the ground', () => {
-    const mockInstancedMesh = {
-      setMatrixAt() {},
-      setColorAt() {},
-      instanceMatrix: { needsUpdate: false },
-      instanceColor: { needsUpdate: false },
-    };
     const pool = {
       store: {
         items: [{
           active: true,
-          _idx: 0,
           team: 'player',
           damage: 10,
           radius: 0.9,
@@ -60,10 +53,10 @@ describe('projectile store', () => {
           maxLife: 1,
           targetId: null,
           turnRate: 0,
+          mesh: { visible: true, position: { set() {} }, scale: { setScalar() {} } },
+          trail: { visible: true, position: { set() {} }, lookAt() {}, scale: {} },
         }],
       },
-      spheres: { ...mockInstancedMesh },
-      trails: { ...mockInstancedMesh },
     };
     const recordImpact = vi.fn();
     const spawnEffect = vi.fn();
