@@ -88,8 +88,6 @@ export class ShipEnemy extends EnemyBase {
       color: 0x112233,
       roughness: 0.1,
       metalness: 0.8,
-      emissive: 0xffcc66,
-      emissiveIntensity: 0.4,
     });
     const windowGeo = new THREE.BoxGeometry(5.5, 0.8, 0.1);
     const windowFront = new THREE.Mesh(windowGeo, windowMat);
@@ -150,42 +148,6 @@ export class ShipEnemy extends EnemyBase {
         rail.position.set(side, 3.7, rz);
         this.group.add(rail);
       }
-    }
-
-    // Waterline weathering band
-    const waterlineGeo = new THREE.BoxGeometry(11.2, 0.5, 22.2);
-    const waterlineMat = new THREE.MeshStandardMaterial({
-      color: 0x1a3a3d, roughness: 0.8, metalness: 0.15,
-    });
-    const waterline = new THREE.Mesh(waterlineGeo, waterlineMat);
-    waterline.position.set(0, -1.2, 0);
-    this.group.add(waterline);
-
-    // Deck clutter (crates)
-    const crateMat = new THREE.MeshStandardMaterial({ color: 0x5a5040, roughness: 0.85, metalness: 0.08 });
-    const cratePositions = [
-      { x: -3.5, z: -6, s: 0.8 },
-      { x: 3.2, z: -7, s: 0.6 },
-      { x: -2.0, z: 8, s: 0.7 },
-      { x: 4.0, z: 3, s: 0.5 },
-    ];
-    for (const cp of cratePositions) {
-      const crate = new THREE.Mesh(
-        new THREE.BoxGeometry(cp.s, cp.s * 0.7, cp.s), crateMat
-      );
-      crate.position.set(cp.x, 1.85, cp.z);
-      crate.castShadow = true;
-      this.group.add(crate);
-    }
-
-    // Life rafts on sides
-    const raftGeo = new THREE.CylinderGeometry(0.5, 0.5, 0.3, 8);
-    const raftMat = new THREE.MeshStandardMaterial({ color: 0xff6633, roughness: 0.7, metalness: 0.1 });
-    for (const side of [-1, 1]) {
-      const raft = new THREE.Mesh(raftGeo, raftMat);
-      raft.position.set(side * 5.2, 3.5, -2);
-      raft.rotation.z = side * 0.3;
-      this.group.add(raft);
     }
 
     this.group.add(hullMain, bow, deck, bridge, mast, radarDish, this.turret);

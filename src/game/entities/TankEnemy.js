@@ -136,55 +136,8 @@ export class TankEnemy extends EnemyBase {
     );
     hatch.position.set(-0.6, 0.9, -0.5);
 
-    const hatchLightGeo = new THREE.CircleGeometry(0.35, 6);
-    const hatchLightMat = new THREE.MeshStandardMaterial({
-      color: 0x443322,
-      emissive: 0x664422,
-      emissiveIntensity: 0.6,
-      roughness: 0.5,
-      metalness: 0.3,
-    });
-    const hatchLight = new THREE.Mesh(hatchLightGeo, hatchLightMat);
-    hatchLight.rotation.x = -Math.PI / 2;
-    hatchLight.position.set(-0.6, 0.88, -0.5);
-
-    this.turret.add(turretBase, turretDome, barrel, hatch, hatchLight);
+    this.turret.add(turretBase, turretDome, barrel, hatch);
     this.turret.position.set(0, 2.5, -0.5);
-
-    // ERA (reactive armor) blocks on hull sides
-    const eraGeo = new THREE.BoxGeometry(0.5, 0.4, 0.15);
-    const eraMat = new THREE.MeshStandardMaterial({ color: 0x6b7e5a, roughness: 0.85, metalness: 0.1 });
-    for (let row = 0; row < 2; row++) {
-      for (let col = 0; col < 5; col++) {
-        for (const side of [-1, 1]) {
-          const era = new THREE.Mesh(eraGeo, eraMat);
-          era.position.set(side * 3.4, 0.3 + row * 0.5, -3.0 + col * 1.6);
-          era.castShadow = true;
-          this.group.add(era);
-        }
-      }
-    }
-
-    // Smoke grenade launchers on turret sides
-    const launcherGeo = new THREE.CylinderGeometry(0.08, 0.08, 0.4, 6);
-    const launcherMat = new THREE.MeshStandardMaterial({ color: 0x3a3a3a, roughness: 0.6, metalness: 0.5 });
-    for (const side of [-1, 1]) {
-      for (let i = 0; i < 4; i++) {
-        const launcher = new THREE.Mesh(launcherGeo, launcherMat);
-        launcher.rotation.z = side * 0.4;
-        launcher.position.set(side * 2.2, 0.3, -0.4 + i * 0.25);
-        this.turret.add(launcher);
-      }
-    }
-
-    // Antenna whip on turret
-    const whipGeo = new THREE.CylinderGeometry(0.02, 0.03, 2.5, 4);
-    const whipMat = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.3, metalness: 0.7 });
-    const whip = new THREE.Mesh(whipGeo, whipMat);
-    whip.position.set(-1.2, 1.5, -0.5);
-    whip.rotation.z = 0.15;
-    this.turret.add(whip);
-
     this.group.add(hullBottom, hullTop, glacis, this.turret);
 
     this.scene.add(this.group);

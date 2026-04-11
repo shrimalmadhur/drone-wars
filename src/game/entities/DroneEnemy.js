@@ -128,26 +128,6 @@ export class DroneEnemy extends EnemyBase {
 
     bodyTop.castShadow = true;
     bodyBottom.castShadow = true;
-
-    // Wire/cable between arms and body
-    const wireMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.5, metalness: 0.4 });
-    const wireGeo = new THREE.CylinderGeometry(0.03, 0.03, 1.8, 4);
-    for (let i = 0; i < 4; i++) {
-      const angle = (Math.PI / 4) + (Math.PI / 2) * i;
-      const wire = new THREE.Mesh(wireGeo, wireMat);
-      wire.position.set(Math.cos(angle) * 1.0, -0.25, Math.sin(angle) * 1.0);
-      wire.rotation.z = angle + Math.PI / 2;
-      wire.rotation.x = 0.15;
-      this.group.add(wire);
-    }
-
-    // Sensor array under body
-    const sensorMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.3, metalness: 0.6 });
-    const sensorGeo = new THREE.BoxGeometry(0.8, 0.08, 0.5);
-    const sensorArray = new THREE.Mesh(sensorGeo, sensorMat);
-    sensorArray.position.set(0, -0.55, 0);
-    this.group.add(sensorArray);
-
     this.group.add(bodyTop, bodyBottom, eye);
     this.scene.add(this.group);
   }
