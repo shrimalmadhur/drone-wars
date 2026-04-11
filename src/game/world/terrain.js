@@ -293,6 +293,13 @@ function setInstanceTransform(mesh, index, position, rotationY, scale) {
   mesh.setMatrixAt(index, matrix);
 }
 
+function setInstanceTransformEuler(mesh, index, position, rx, ry, rz, scale) {
+  const matrix = new THREE.Matrix4();
+  const quaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz, 'XYZ'));
+  matrix.compose(position, quaternion, scale);
+  mesh.setMatrixAt(index, matrix);
+}
+
 function setInstanceTransformWithLean(mesh, index, position, rotationY, leanX, leanZ, scale) {
   const matrix = new THREE.Matrix4();
   const qY = new THREE.Quaternion().setFromAxisAngle(UP, rotationY);
@@ -432,15 +439,41 @@ function buildFrontierDecorMeshes(group, maxCounts) {
     for (const crown of species.crowns) group.add(crown);
   }
 
-  // --- Non-tree decor (unchanged) ---
-  const rockGeometry = new THREE.DodecahedronGeometry(2.4, 0);
+  // --- Non-tree decor ---
+
+  // Rock variants: boulders, flat slabs, round stones
+  const rockVariantDefs = [
+    { geo: new THREE.DodecahedronGeometry(2.4, 0), color: 0x889077, weight: 0.4 },
+    { geo: new THREE.DodecahedronGeometry(1.8, 1), color: 0x7a8068, weight: 0.35 },
+    { geo: new THREE.DodecahedronGeometry(1.2, 2), color: 0x6b7560, weight: 0.25 },
+  ];
+  const rockVariantMaterials = rockVariantDefs.map(
+    (v) => new THREE.MeshStandardMaterial({ color: v.color, roughness: 1 }),
+  );
+  const rockVariants = rockVariantDefs.map((v, i) => {
+    const mesh = new THREE.InstancedMesh(v.geo, rockVariantMaterials[i], maxCounts.rocks);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    return mesh;
+  });
+
+  // Ground scatter: small stones
+  const smallStoneGeo = new THREE.DodecahedronGeometry(0.4, 0);
+  const smallStoneMat = new THREE.MeshStandardMaterial({ color: 0x7a7568, roughness: 0.95 });
+  const smallStones = new THREE.InstancedMesh(smallStoneGeo, smallStoneMat, maxCounts.smallStones);
+  smallStones.castShadow = true;
+  smallStones.receiveShadow = true;
+
+  // Ground scatter: fallen logs
+  const fallenLogGeo = new THREE.CylinderGeometry(0.2, 0.25, 3.5, 6);
+  const fallenLogMat = new THREE.MeshStandardMaterial({ color: 0x4a3420, roughness: 0.9 });
+  const fallenLogs = new THREE.InstancedMesh(fallenLogGeo, fallenLogMat, maxCounts.fallenLogs);
+  fallenLogs.castShadow = true;
+  fallenLogs.receiveShadow = true;
+
   const landmarkGeometry = new THREE.CylinderGeometry(0.9, 1.8, 14, 6);
   const cloudGeometry = new THREE.SphereGeometry(4.4, 10, 10);
 
-  const rockMaterial = new THREE.MeshStandardMaterial({
-    color: '#889077',
-    roughness: 1,
-  });
   const landmarkMaterial = new THREE.MeshStandardMaterial({
     color: '#8c6e56',
     roughness: 0.88,
@@ -462,17 +495,15 @@ function buildFrontierDecorMeshes(group, maxCounts) {
     depthWrite: false,
   });
 
-  const rocks = new THREE.InstancedMesh(rockGeometry, rockMaterial, maxCounts.rocks);
   const landmarks = new THREE.InstancedMesh(landmarkGeometry, landmarkMaterial, maxCounts.landmarks);
   const cloudsBody = new THREE.InstancedMesh(cloudGeometry, cloudBodyMaterial, maxCounts.cloudBody);
   const cloudsWisp = new THREE.InstancedMesh(cloudGeometry, cloudWispMaterial, maxCounts.cloudWisp);
 
-  rocks.castShadow = true;
-  rocks.receiveShadow = true;
   landmarks.castShadow = true;
   landmarks.receiveShadow = true;
 
-  group.add(rocks, landmarks, cloudsBody, cloudsWisp);
+  for (const rv of rockVariants) group.add(rv);
+  group.add(smallStones, fallenLogs, landmarks, cloudsBody, cloudsWisp);
 
   // Collect all geometries and materials for disposal
   const allGeometries = [
@@ -481,7 +512,9 @@ function buildFrontierDecorMeshes(group, maxCounts) {
     birchTrunkGeo, birchCrown0Geo, birchCrown1Geo, birchCrown2Geo,
     deadTrunkGeo, deadBranch0Geo, deadBranch1Geo, deadBranch2Geo,
     bushCrown0Geo, bushCrown1Geo,
-    rockGeometry, landmarkGeometry, cloudGeometry,
+    ...rockVariantDefs.map((v) => v.geo),
+    smallStoneGeo, fallenLogGeo,
+    landmarkGeometry, cloudGeometry,
   ];
   const allMaterials = [
     pineTrunkMat, pineCrown0Mat, pineCrown1Mat, pineCrown2Mat,
@@ -489,12 +522,16 @@ function buildFrontierDecorMeshes(group, maxCounts) {
     birchTrunkMat, birchCrown0Mat, birchCrown1Mat, birchCrown2Mat,
     deadTrunkMat, deadBranchMat,
     bushCrown0Mat, bushCrown1Mat,
-    rockMaterial, landmarkMaterial, cloudBodyMaterial, cloudWispMaterial,
+    ...rockVariantMaterials,
+    smallStoneMat, fallenLogMat,
+    landmarkMaterial, cloudBodyMaterial, cloudWispMaterial,
   ];
 
   return {
     treeSpecies,
-    rocks,
+    rockVariants,
+    smallStones,
+    fallenLogs,
     landmarks,
     cloudsBody,
     cloudsWisp,
@@ -920,6 +957,8 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
     : buildFrontierDecorMeshes(group, {
       trees: maxChunkCount * 12,
       rocks: maxChunkCount * 8,
+      smallStones: maxChunkCount * 8 * 5,
+      fallenLogs: maxChunkCount * 12,
       landmarks: maxChunkCount * 2,
       cloudBody: maxChunkCount * CLOUD_BODY_LOBES.length,
       cloudWisp: maxChunkCount * CLOUD_WISP_LOBES.length,
@@ -953,7 +992,9 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
 
   const rebuildFrontierDecor = (anchorX, anchorZ) => {
     const speciesCounters = { pine: 0, oak: 0, birch: 0, deadTree: 0, bush: 0 };
-    let rockIndex = 0;
+    const rockVariantCounters = [0, 0, 0];
+    let smallStoneIndex = 0;
+    let fallenLogIndex = 0;
     let landmarkIndex = 0;
     let cloudBodyIndex = 0;
     let cloudWispIndex = 0;
@@ -1107,15 +1148,92 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
           }
 
           const height = getGroundHeightAt(worldX, worldZ, theme);
-          const scaleValue = 0.7 + hash2(worldX + 9, worldZ + 11) * 1.7;
+          const rotY = hash2(worldX + 13, worldZ + 5) * Math.PI * 2;
+
+          // Select rock variant using hash-based cumulative weight
+          const variantRoll = hash2(worldX * 0.61, worldZ * 0.79);
+          let variantIdx;
+          if (variantRoll < 0.4) variantIdx = 0;        // boulders
+          else if (variantRoll < 0.75) variantIdx = 1;   // flat slabs
+          else variantIdx = 2;                            // round stones
+
+          const baseScale = 0.7 + hash2(worldX + 9, worldZ + 11) * 1.7;
+          let sx, sy, sz;
+          if (variantIdx === 0) {
+            // Boulders: non-uniform, tall-ish
+            sx = baseScale * (0.8 + hash2(worldX + 21, worldZ + 33) * 0.4);
+            sy = baseScale * (0.5 + hash2(worldX + 37, worldZ + 19) * 0.5);
+            sz = baseScale * (0.8 + hash2(worldX + 43, worldZ + 27) * 0.4);
+          } else if (variantIdx === 1) {
+            // Flat slabs: wide and flat
+            sx = baseScale * (1.0 + hash2(worldX + 21, worldZ + 33) * 0.8);
+            sy = baseScale * (0.3 + hash2(worldX + 37, worldZ + 19) * 0.3);
+            sz = baseScale * (1.0 + hash2(worldX + 43, worldZ + 27) * 0.5);
+          } else {
+            // Round stones: nearly uniform
+            sx = baseScale * (0.9 + hash2(worldX + 21, worldZ + 33) * 0.2);
+            sy = baseScale * (0.8 + hash2(worldX + 37, worldZ + 19) * 0.3);
+            sz = baseScale * (0.9 + hash2(worldX + 43, worldZ + 27) * 0.2);
+          }
+
+          const vidx = rockVariantCounters[variantIdx];
           setInstanceTransform(
-            decor.rocks,
-            rockIndex,
-            worldToLocal(worldX, height + 1.1 * scaleValue, worldZ, anchorX, anchorZ, scratchPosition),
-            hash2(worldX + 13, worldZ + 5) * Math.PI * 2,
-            scratchScale.set(scaleValue * 1.1, scaleValue, scaleValue * 0.9),
+            decor.rockVariants[variantIdx],
+            vidx,
+            worldToLocal(worldX, height + 1.1 * sy, worldZ, anchorX, anchorZ, scratchPosition),
+            rotY,
+            scratchScale.set(sx, sy, sz),
           );
-          rockIndex += 1;
+          rockVariantCounters[variantIdx] += 1;
+
+          // Ground scatter: 3-5 small stones near each rock
+          const stoneCount = 3 + Math.floor(hash2(worldX + 51, worldZ + 59) * 3);
+          for (let s = 0; s < stoneCount; s += 1) {
+            const stoneOffX = (hash2(worldX + s * 7 + 61, worldZ + s * 11 + 67) - 0.5) * 6;
+            const stoneOffZ = (hash2(worldX + s * 13 + 71, worldZ + s * 17 + 73) - 0.5) * 6;
+            const stoneX = worldX + stoneOffX;
+            const stoneZ = worldZ + stoneOffZ;
+            const stoneHeight = getGroundHeightAt(stoneX, stoneZ, theme);
+            const stoneScale = 0.5 + hash2(stoneX + 3, stoneZ + 7) * 1.0;
+            const stoneRotY = hash2(stoneX + 19, stoneZ + 23) * Math.PI * 2;
+            setInstanceTransform(
+              decor.smallStones,
+              smallStoneIndex,
+              worldToLocal(stoneX, stoneHeight + 0.15 * stoneScale, stoneZ, anchorX, anchorZ, scratchPosition),
+              stoneRotY,
+              scratchScale.set(stoneScale, stoneScale * 0.7, stoneScale),
+            );
+            smallStoneIndex += 1;
+          }
+        }
+
+        // Fallen logs near tree positions (~15% chance per tree)
+        for (let i = 0; i < 12; i += 1) {
+          const treeWorldX = worldChunkX + hash2(worldChunkX + i * 17, worldChunkZ + i * 31) * chunkSize;
+          const treeWorldZ = worldChunkZ + hash2(worldChunkX - i * 13, worldChunkZ + i * 19) * chunkSize;
+          const logChance = hash2(treeWorldX * 0.53, treeWorldZ * 0.47);
+          if (logChance > 0.15) {
+            continue;
+          }
+          const logBiome = getBiomeAt(treeWorldX, treeWorldZ, theme);
+          if (logBiome === 'sea') {
+            continue;
+          }
+          const logOffX = (hash2(treeWorldX + 81, treeWorldZ + 83) - 0.5) * 4;
+          const logOffZ = (hash2(treeWorldX + 87, treeWorldZ + 89) - 0.5) * 4;
+          const logX = treeWorldX + logOffX;
+          const logZ = treeWorldZ + logOffZ;
+          const logHeight = getGroundHeightAt(logX, logZ, theme);
+          const logRotY = hash2(logX + 91, logZ + 97) * Math.PI * 2;
+          const logScale = 0.8 + hash2(logX + 101, logZ + 103) * 0.5;
+          setInstanceTransformEuler(
+            decor.fallenLogs,
+            fallenLogIndex,
+            worldToLocal(logX, logHeight + 0.2, logZ, anchorX, anchorZ, scratchPosition),
+            0, logRotY, Math.PI / 2,
+            scratchScale.set(logScale, logScale, logScale),
+          );
+          fallenLogIndex += 1;
         }
 
         const landmarkChance = hash2(worldChunkX * 0.25, worldChunkZ * 0.25);
@@ -1210,7 +1328,11 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
     hideRemainingInstances(sp2.deadTree.trunk, speciesCounters.deadTree, scratchPosition);
     for (const c of sp2.deadTree.crowns) hideRemainingInstances(c, speciesCounters.deadTree, scratchPosition);
     for (const c of sp2.bush.crowns) hideRemainingInstances(c, speciesCounters.bush, scratchPosition);
-    hideRemainingInstances(decor.rocks, rockIndex, scratchPosition);
+    for (let v = 0; v < decor.rockVariants.length; v += 1) {
+      hideRemainingInstances(decor.rockVariants[v], rockVariantCounters[v], scratchPosition);
+    }
+    hideRemainingInstances(decor.smallStones, smallStoneIndex, scratchPosition);
+    hideRemainingInstances(decor.fallenLogs, fallenLogIndex, scratchPosition);
     hideRemainingInstances(decor.landmarks, landmarkIndex, scratchPosition);
     hideRemainingInstances(decor.cloudsBody, cloudBodyIndex, scratchPosition);
     hideRemainingInstances(decor.cloudsWisp, cloudWispIndex, scratchPosition);
