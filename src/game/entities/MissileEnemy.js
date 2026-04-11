@@ -94,6 +94,29 @@ export class MissileEnemy extends EnemyBase {
     exhaust.scale.set(0.8, 0.8, 1.5);
     this.exhaust = exhaust;
 
+    // Body panel line rings
+    const ringMat = new THREE.MeshStandardMaterial({ color: 0x992222, roughness: 0.4, metalness: 0.4 });
+    const ringPositions = [-0.8, 0.4, 1.6];
+    for (const rz of ringPositions) {
+      const ring = new THREE.Mesh(
+        new THREE.TorusGeometry(0.44, 0.03, 6, 12), ringMat
+      );
+      ring.rotation.x = Math.PI / 2;
+      ring.position.set(0, 0, rz);
+      this.group.add(ring);
+    }
+
+    // Enhanced exhaust with inner glow
+    const innerExhaustGeo = new THREE.SphereGeometry(0.2, 6, 6);
+    const innerExhaustMat = new THREE.MeshStandardMaterial({
+      color: 0xffff00, emissive: 0xffaa00, emissiveIntensity: 4,
+      transparent: true, opacity: 0.9,
+    });
+    this.innerExhaust = new THREE.Mesh(innerExhaustGeo, innerExhaustMat);
+    this.innerExhaust.position.set(0, 0, -2.5);
+    this.innerExhaust.scale.set(0.6, 0.6, 1.2);
+    this.group.add(this.innerExhaust);
+
     this.group.add(body, nose, seekerBand, exhaust);
     this.scene.add(this.group);
   }
@@ -113,6 +136,7 @@ export class MissileEnemy extends EnemyBase {
     // Flickering exhaust
     const flicker = 0.6 + Math.random() * 0.4;
     this.exhaust.scale.set(0.8 * flicker, 0.8 * flicker, 1.5 * flicker);
+    this.innerExhaust.scale.set(0.6 * flicker, 0.6 * flicker, 1.2 * flicker);
 
     if (this.life > this.profile.life) {
       this.alive = false;
