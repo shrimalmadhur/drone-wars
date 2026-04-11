@@ -991,7 +991,7 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
       towers: maxChunkCount * 10,
       annexes: maxChunkCount * 10,
       windowBands: maxChunkCount * 120,
-      rooftopUnits: maxChunkCount * 12,
+      rooftopUnits: maxChunkCount * 36,
       crowds: maxChunkCount * 10,
       cars: maxChunkCount * 8,
       helicopters: maxChunkCount * 2,
@@ -1527,6 +1527,13 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
               scratchScale.set(towerWidth, towerHeight, towerDepth),
             );
             tempColor.setStyle(materialColor);
+            // Per-building facade tint variation
+            const tintR = 1.0 + (hash2(worldX + 44.4, worldZ + 55.5) - 0.5) * 0.08;
+            const tintG = 1.0 + (hash2(worldX + 66.6, worldZ + 77.7) - 0.5) * 0.08;
+            const tintB = 1.0 + (hash2(worldX + 88.8, worldZ + 99.9) - 0.5) * 0.08;
+            tempColor.r *= tintR;
+            tempColor.g *= tintG;
+            tempColor.b *= tintB;
             decor.towerCores.setColorAt(towerIndex, tempColor);
             cityObstacles.push({
               center: new THREE.Vector3(worldX, height + towerHeight * 0.5, worldZ),
@@ -1606,8 +1613,25 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
                   : 2;
             const rowGap = towerHeight / (windowRows + 2);
             const rowHeight = Math.max(1.2, Math.min(3.4, rowGap * 0.34));
+            // Per-building window lit fraction — varies how many rows are illuminated
+            const litFraction = 0.3 + hash2(worldX + 99.9, worldZ + 111.1) * 0.4;
             for (let row = 0; row < windowRows; row += 1) {
               const rowOffset = -towerHeight * 0.34 + rowGap * (row + 1);
+
+              // Per-row window warmth variation
+              const windowHash = hash2(worldX + row * 7.1, worldZ + row * 11.3);
+              const isLit = windowHash < litFraction;
+              let nsWindowColor;
+              let ewWindowColor;
+              if (isLit) {
+                const warmth = 0.8 + hash2(worldX + row * 3.3, worldZ + row * 5.5) * 0.4;
+                nsWindowColor = { r: warmth, g: warmth * 0.85, b: warmth * 0.65 };
+                ewWindowColor = { r: warmth * 0.9, g: warmth * 0.78, b: warmth * 0.58 };
+              } else {
+                nsWindowColor = null; // use dark unlit
+                ewWindowColor = null;
+              }
+
               setLocalInstanceTransform(
                 decor.windowBandsNorthSouth,
                 windowNsIndex,
@@ -1619,7 +1643,11 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
                 scratchScale.set(towerWidth * 0.82, rowHeight, 0.34),
                 scratchPosition,
               );
-              tempColor.setStyle(frontWindowColor);
+              if (nsWindowColor) {
+                tempColor.setRGB(nsWindowColor.r, nsWindowColor.g, nsWindowColor.b);
+              } else {
+                tempColor.set(0x112233);
+              }
               decor.windowBandsNorthSouth.setColorAt(windowNsIndex, tempColor);
               windowNsIndex += 1;
               setLocalInstanceTransform(
@@ -1633,7 +1661,17 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
                 scratchScale.set(towerWidth * 0.82, rowHeight, 0.34),
                 scratchPosition,
               );
-              tempColor.setStyle(frontWindowColor);
+              if (nsWindowColor) {
+                const backWarmth = 0.8 + hash2(worldX + row * 4.7, worldZ + row * 9.1) * 0.4;
+                const backLit = hash2(worldX + row * 13.1, worldZ + row * 17.3) < litFraction;
+                if (backLit) {
+                  tempColor.setRGB(backWarmth, backWarmth * 0.85, backWarmth * 0.65);
+                } else {
+                  tempColor.set(0x112233);
+                }
+              } else {
+                tempColor.set(0x112233);
+              }
               decor.windowBandsNorthSouth.setColorAt(windowNsIndex, tempColor);
               windowNsIndex += 1;
               setLocalInstanceTransform(
@@ -1647,7 +1685,11 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
                 scratchScale.set(0.34, rowHeight, towerDepth * 0.8),
                 scratchPosition,
               );
-              tempColor.setStyle(sideWindowColor);
+              if (ewWindowColor) {
+                tempColor.setRGB(ewWindowColor.r, ewWindowColor.g, ewWindowColor.b);
+              } else {
+                tempColor.set(0x112233);
+              }
               decor.windowBandsEastWest.setColorAt(windowEwIndex, tempColor);
               windowEwIndex += 1;
               setLocalInstanceTransform(
@@ -1661,7 +1703,17 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
                 scratchScale.set(0.34, rowHeight, towerDepth * 0.8),
                 scratchPosition,
               );
-              tempColor.setStyle(sideWindowColor);
+              if (ewWindowColor) {
+                const sideWarmth = 0.8 + hash2(worldX + row * 6.1, worldZ + row * 8.7) * 0.4;
+                const sideLit = hash2(worldX + row * 15.7, worldZ + row * 19.3) < litFraction;
+                if (sideLit) {
+                  tempColor.setRGB(sideWarmth * 0.9, sideWarmth * 0.78, sideWarmth * 0.58);
+                } else {
+                  tempColor.set(0x112233);
+                }
+              } else {
+                tempColor.set(0x112233);
+              }
               decor.windowBandsEastWest.setColorAt(windowEwIndex, tempColor);
               windowEwIndex += 1;
             }
@@ -1686,6 +1738,96 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
               tempColor.setStyle('#4f555e');
               decor.rooftopUnits.setColorAt(rooftopIndex, tempColor);
               rooftopIndex += 1;
+            }
+
+            // Enhanced rooftop features for tall buildings
+            if (towerHeight > 22) {
+              const roofFeatureHash = hash2(worldX + 31.1, worldZ + 43.7);
+              // Antenna — tall thin element
+              if (roofFeatureHash > 0.7) {
+                const antennaH = 3 + hash2(worldX + 37.2, worldZ + 51.3) * 2;
+                setLocalInstanceTransform(
+                  decor.rooftopUnits,
+                  rooftopIndex,
+                  anchorX,
+                  anchorZ,
+                  { x: worldX, y: height + towerHeight + antennaH * 0.5, z: worldZ },
+                  towerRotation,
+                  {
+                    x: towerWidth * 0.08,
+                    y: 0,
+                    z: -towerDepth * 0.12,
+                  },
+                  scratchScale.set(0.3, antennaH, 0.3),
+                  scratchPosition,
+                );
+                tempColor.setStyle('#6b7178');
+                decor.rooftopUnits.setColorAt(rooftopIndex, tempColor);
+                rooftopIndex += 1;
+              }
+              // AC unit cluster — two squat boxes
+              if (roofFeatureHash > 0.4) {
+                const acH = 1 + hash2(worldX + 41.5, worldZ + 59.2) * 1;
+                setLocalInstanceTransform(
+                  decor.rooftopUnits,
+                  rooftopIndex,
+                  anchorX,
+                  anchorZ,
+                  { x: worldX, y: height + towerHeight + acH * 0.5, z: worldZ },
+                  towerRotation,
+                  {
+                    x: -towerWidth * 0.22,
+                    y: 0,
+                    z: towerDepth * 0.24,
+                  },
+                  scratchScale.set(1.5, acH, 1.2),
+                  scratchPosition,
+                );
+                tempColor.setStyle('#555d64');
+                decor.rooftopUnits.setColorAt(rooftopIndex, tempColor);
+                rooftopIndex += 1;
+                // Second AC unit offset nearby
+                setLocalInstanceTransform(
+                  decor.rooftopUnits,
+                  rooftopIndex,
+                  anchorX,
+                  anchorZ,
+                  { x: worldX, y: height + towerHeight + acH * 0.5, z: worldZ },
+                  towerRotation,
+                  {
+                    x: -towerWidth * 0.22 + 2.0,
+                    y: 0,
+                    z: towerDepth * 0.24,
+                  },
+                  scratchScale.set(1.3, acH * 0.85, 1.1),
+                  scratchPosition,
+                );
+                tempColor.setStyle('#4d545b');
+                decor.rooftopUnits.setColorAt(rooftopIndex, tempColor);
+                rooftopIndex += 1;
+              }
+              // Water tower — wider, medium height
+              if (roofFeatureHash > 0.2 && roofFeatureHash <= 0.4) {
+                const wtH = 2 + hash2(worldX + 47.8, worldZ + 63.4) * 1;
+                setLocalInstanceTransform(
+                  decor.rooftopUnits,
+                  rooftopIndex,
+                  anchorX,
+                  anchorZ,
+                  { x: worldX, y: height + towerHeight + wtH * 0.5, z: worldZ },
+                  towerRotation,
+                  {
+                    x: towerWidth * 0.26,
+                    y: 0,
+                    z: -towerDepth * 0.22,
+                  },
+                  scratchScale.set(2.0, wtH, 2.0),
+                  scratchPosition,
+                );
+                tempColor.setStyle('#7a8088');
+                decor.rooftopUnits.setColorAt(rooftopIndex, tempColor);
+                rooftopIndex += 1;
+              }
             }
 
             if (hash2(worldX - 4, worldZ + 13) > 0.35) {
