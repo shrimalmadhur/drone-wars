@@ -22,93 +22,60 @@
     <div id="app"></div>
     <div id="start-screen" class="start-screen">
       <div class="start-screen__panel">
-        <section class="landing-hero">
-          <div class="landing-hero__copy">
+        <section id="start-landing-intro" class="landing-intro">
+          <div class="landing-intro__hero">
             <p class="start-screen__eyebrow">Arcade survival command</p>
             <h1 class="landing-hero__title">Drone Wars</h1>
-            <p class="landing-hero__lede">Fast single-player drone combat with escalating contracts, unpredictable wave directives, and persistent hangar progression.</p>
-            <div class="landing-hero__pill-row">
-              <span class="landing-pill">Contract-driven runs</span>
-              <span class="landing-pill">Wave directives</span>
-              <span class="landing-pill">Abilities and mutators</span>
+            <p class="landing-hero__lede">Fast drone combat, quick runs, escalating waves, and a persistent hangar that gets stronger every relaunch.</p>
+            <div class="landing-intro__actions">
+              <button id="start-play-button" class="start-screen__button landing-intro__play" type="button">Play</button>
             </div>
           </div>
-          <div class="landing-preview">
-            <article class="landing-preview__card landing-preview__card--accent">
-              <span class="landing-preview__label">Run fantasy</span>
-              <strong>Dogfight, adapt, cash out, relaunch</strong>
-              <p>Every run can pivot into escort pressure, salvage spikes, hazard fields, or elite air swarms.</p>
-            </article>
-            <article class="landing-preview__card">
-              <span class="landing-preview__label">Current build</span>
-              <strong>Solo arcade combat</strong>
-              <p>Two maps, unlockable abilities, pre-run mutators, boss waves, and contract bonuses.</p>
-            </article>
+          <div class="start-screen__meta landing-intro__stats">
+            <div class="start-stat">
+              <span class="start-stat__label">Best score</span>
+              <strong id="start-best-score">0</strong>
+            </div>
+            <div class="start-stat">
+              <span class="start-stat__label">Best wave</span>
+              <strong id="start-best-wave">0</strong>
+            </div>
+            <div class="start-stat">
+              <span class="start-stat__label">Achievements</span>
+              <strong id="start-achievement-count">0</strong>
+            </div>
+            <div class="start-stat">
+              <span class="start-stat__label">Salvage</span>
+              <strong id="start-currency">0</strong>
+            </div>
+          </div>
+          <div class="landing-info-grid">
+            <details class="landing-detail" open>
+              <summary>How to play</summary>
+              <p>Choose a callsign, launch a run, survive escalating waves, then spend salvage on permanent upgrades between runs.</p>
+            </details>
+            <details class="landing-detail" open>
+              <summary>Controls</summary>
+              <p>W/S thrust, A/D yaw, arrows strafe and pitch, Q/E altitude, Space fire, F active ability, P pause, R restart.</p>
+            </details>
+            <details class="landing-detail" open>
+              <summary>This build</summary>
+              <p>Two maps, unlockable abilities, run mutators, boss waves, wave directives, missions, and persistent hangar upgrades.</p>
+            </details>
           </div>
         </section>
-        <div class="start-screen__meta">
-          <div class="start-stat">
-            <span class="start-stat__label">Best score</span>
-            <strong id="start-best-score">0</strong>
+        <div id="start-setup-view" class="start-setup-view">
+          <div class="start-setup-view__header">
+            <div>
+              <p class="start-screen__eyebrow">Preflight</p>
+              <h2 class="start-screen__title">Configure your next run</h2>
+              <p class="start-screen__copy">Choose your callsign, battlefield, and build. Hangar upgrades stay available below.</p>
+            </div>
           </div>
-          <div class="start-stat">
-            <span class="start-stat__label">Best wave</span>
-            <strong id="start-best-wave">0</strong>
-          </div>
-          <div class="start-stat">
-            <span class="start-stat__label">Achievements</span>
-            <strong id="start-achievement-count">0</strong>
-          </div>
-          <div class="start-stat">
-            <span class="start-stat__label">Salvage</span>
-            <strong id="start-currency">0</strong>
-          </div>
-        </div>
-        <div class="landing-layout">
-          <section class="landing-brief">
-            <article class="landing-section">
-              <p class="start-screen__label">How a run works</p>
-              <div class="landing-steps">
-                <div class="landing-step">
-                  <strong>1. Pick a build</strong>
-                  <p>Choose your map, active ability, and mutator before takeoff.</p>
-                </div>
-                <div class="landing-step">
-                  <strong>2. Survive contracts</strong>
-                  <p>Each run mixes primary missions, bonus objectives, and dynamic wave directives.</p>
-                </div>
-                <div class="landing-step">
-                  <strong>3. Spend salvage</strong>
-                  <p>Turn completed runs into permanent hangar upgrades and stronger relaunches.</p>
-                </div>
-              </div>
-            </article>
-            <article class="landing-section">
-              <p class="start-screen__label">What is in this build</p>
-              <div class="landing-feature-grid">
-                <div class="landing-feature">
-                  <strong>Boss waves</strong>
-                  <p>Periodic spikes that force target priority shifts.</p>
-                </div>
-                <div class="landing-feature">
-                  <strong>Directive chaos</strong>
-                  <p>Reinforcements, salvage storms, hazard fields, and ace squadrons.</p>
-                </div>
-                <div class="landing-feature">
-                  <strong>Ability loadouts</strong>
-                  <p>Run EMP Pulse or unlock Vector Dash for evasive play.</p>
-                </div>
-                <div class="landing-feature">
-                  <strong>Mutators</strong>
-                  <p>Change risk, pickup cadence, and reward pacing before launch.</p>
-                </div>
-              </div>
-            </article>
-          </section>
           <form id="start-form" class="start-screen__form">
             <div class="start-screen__intro">
               <p class="start-screen__label">Launch setup</p>
-              <h2 class="start-screen__title">Configure your next run</h2>
+              <h3 class="start-screen__subtitle">Loadout and hangar</h3>
               <p class="start-screen__copy">We&apos;ll remember your callsign, preferred battlefield, and current build on this browser.</p>
             </div>
             <label class="start-screen__label" for="player-name-input">Player name</label>

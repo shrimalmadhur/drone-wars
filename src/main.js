@@ -15,6 +15,7 @@ import { getUpgradeCost, UPGRADE_DEFINITIONS } from './game/meta/upgrades.js';
 import { getPortalContext } from './game/portal.js';
 import { MAP_THEME_DETAILS, MAP_THEMES } from './mapThemes.js';
 import {
+  createDefaultPlayerName,
   loadMapTheme,
   loadPlayerName,
   loadPlayerProgress,
@@ -29,6 +30,8 @@ import {
 
 const mount = document.querySelector('#app');
 const startScreen = document.querySelector('#start-screen');
+const startSetupView = document.querySelector('#start-setup-view');
+const startPlayButton = document.querySelector('#start-play-button');
 const startForm = document.querySelector('#start-form');
 const playerNameInput = document.querySelector('#player-name-input');
 const mapThemeInputs = Array.from(document.querySelectorAll('input[name="mapTheme"]'));
@@ -116,6 +119,7 @@ let lastCompletedRunContext = null;
 let drawerAutoCollapseTimer = null;
 
 const savedPlayerName = loadPlayerName();
+const initialPlayerName = savedPlayerName || createDefaultPlayerName();
 const savedMapTheme = loadMapTheme();
 const portalContext = getPortalContext();
 let currentMapTheme = savedMapTheme;
@@ -146,6 +150,13 @@ function updateProfileReadouts() {
   hud.startAchievements.textContent = playerProgress.achievements.length.toString();
   startCurrency.textContent = playerProgress.currency.toString();
   hangarCurrency.textContent = playerProgress.currency.toString();
+}
+
+function focusSetupSection() {
+  startSetupView?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  window.setTimeout(() => {
+    playerNameInput.focus();
+  }, 120);
 }
 
 function setMapThemeLock(locked) {
@@ -415,15 +426,14 @@ function openHangar() {
   hideRunSummary();
   renderUpgradeShop();
   startScreen.classList.remove('start-screen--hidden');
+  focusSetupSection();
 }
 
-if (savedPlayerName) {
-  playerNameInput.value = savedPlayerName;
-}
+playerNameInput.value = initialPlayerName;
 for (const input of mapThemeInputs) {
   input.checked = input.value === savedMapTheme;
 }
-applyIdentity(savedPlayerName, savedMapTheme);
+applyIdentity(initialPlayerName, savedMapTheme);
 updateProfileReadouts();
 renderUpgradeShop();
 renderAbilityPicker();
@@ -433,7 +443,7 @@ wireDrawer(controlsDrawer, controlsDrawerToggle);
 wireDrawer(missionDrawer, missionDrawerToggle);
 
 if (!portalContext.active) {
-  playerNameInput.focus();
+  startPlayButton?.focus();
 }
 
 playerNameInput.addEventListener('input', () => {
@@ -490,6 +500,14 @@ summaryRerunButton.addEventListener('click', () => {
 
 summaryHangarButton.addEventListener('click', () => {
   openHangar();
+});
+
+startPlayButton?.addEventListener('click', () => {
+  if (typeof startForm.requestSubmit === 'function') {
+    startForm.requestSubmit();
+    return;
+  }
+  startForm.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
 });
 
 startForm.addEventListener('submit', (event) => {

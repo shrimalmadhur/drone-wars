@@ -13,6 +13,8 @@ const MAP_THEME_KEY = 'drone-wars.map-theme';
 const PLAYER_PROGRESS_KEY = 'drone-wars.player-progress';
 const MAX_PLAYER_NAME_LENGTH = 24;
 const PLAYER_PROFILE_VERSION = 2;
+const CALLSIGN_PREFIXES = ['Nova', 'Vector', 'Ghost', 'Atlas', 'Viper', 'Echo', 'Falcon', 'Comet'];
+const CALLSIGN_SUFFIXES = ['Lead', 'Wing', 'Crown', 'Shift', 'Strike', 'Lancer', 'Rider', 'Zero'];
 
 export const DEFAULT_PLAYER_PROGRESS = {
   version: PLAYER_PROFILE_VERSION,
@@ -69,6 +71,13 @@ export function sanitizePlayerName(name) {
   }
 
   return name.trim().replace(/\s+/g, ' ').slice(0, MAX_PLAYER_NAME_LENGTH);
+}
+
+export function createDefaultPlayerName(random = Math.random) {
+  const prefix = CALLSIGN_PREFIXES[Math.floor(random() * CALLSIGN_PREFIXES.length)] ?? 'Nova';
+  const suffix = CALLSIGN_SUFFIXES[Math.floor(random() * CALLSIGN_SUFFIXES.length)] ?? 'Lead';
+  const serial = (Math.floor(random() * 90) + 10).toString();
+  return sanitizePlayerName(`${prefix} ${suffix} ${serial}`);
 }
 
 export function loadPlayerName(storage = globalThis?.localStorage) {

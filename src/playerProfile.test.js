@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { MAP_THEMES } from './mapThemes.js';
 import {
+  createDefaultPlayerName,
   loadPlayerProgress,
   loadMapTheme,
   loadPlayerName,
@@ -40,6 +41,14 @@ describe('player profile', () => {
 
     expect(savePlayerName('  Phoenix   Leader ', storage)).toBe('Phoenix Leader');
     expect(loadPlayerName(storage)).toBe('Phoenix Leader');
+  });
+
+  it('creates a compact default player name when none is stored', () => {
+    const values = [0, 0, 0];
+    const generated = createDefaultPlayerName(() => values.shift() ?? 0);
+
+    expect(generated).toBe('Nova Lead 10');
+    expect(generated.length).toBeLessThanOrEqual(24);
   });
 
   it('loads and saves the selected map theme via storage', () => {
