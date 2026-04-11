@@ -1042,6 +1042,7 @@ export class Simulation {
     }
     this.environment.update(this.player.group.position, this.state.time);
     this.terrain.update(this.player.group.position, this.state.time);
+    this.terrain.updateWater(this.state.time);
     this.state.health = this.player.health;
 
     if (controls.abilityPressed) {

@@ -970,14 +970,19 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
   ground.receiveShadow = true;
   group.add(ground);
 
+  const seaSubdivisions = 80;
+  const seaGeometry = new THREE.PlaneGeometry(
+    renderExtent * 1.2, renderExtent * 1.2,
+    seaSubdivisions, seaSubdivisions,
+  );
   const sea = new THREE.Mesh(
-    new THREE.PlaneGeometry(renderExtent * 1.2, renderExtent * 1.2, 1, 1),
+    seaGeometry,
     new THREE.MeshPhysicalMaterial({
-      color: theme === MAP_THEMES.CITY ? '#214f78' : '#1e6da2',
-      roughness: theme === MAP_THEMES.CITY ? 0.26 : 0.18,
-      metalness: 0.05,
+      color: theme === MAP_THEMES.CITY ? '#214f78' : '#195f93',
+      roughness: 0.15,
+      metalness: 0.6,
       transparent: true,
-      opacity: theme === MAP_THEMES.CITY ? 0.66 : 0.72,
+      opacity: 0.85,
       clearcoat: 0.9,
       clearcoatRoughness: 0.25,
     }),
@@ -985,6 +990,17 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
   sea.rotation.x = -Math.PI / 2;
   sea.position.y = CONFIG.world.seaLevel + 0.1;
   group.add(sea);
+
+  // Store original sea vertex Z positions for wave animation
+  // (sea plane is rotated -PI/2 around X, so local Z maps to world Y)
+  const seaPositions = seaGeometry.attributes.position;
+  const seaOriginalZ = new Float32Array(seaPositions.count);
+  for (let i = 0; i < seaPositions.count; i++) {
+    seaOriginalZ[i] = seaPositions.getZ(i);
+  }
+
+  // Track which ground vertices are sea-biome for wave displacement
+  const groundSeaFlags = new Uint8Array(positions.count);
 
   const decor = theme === MAP_THEMES.CITY
     ? buildCityDecorMeshes(group, {
@@ -2122,6 +2138,7 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
       positions.setY(i, height);
       tempColor.copy(getSurfaceColor(worldX, worldZ, height, theme));
       colorAttribute.setXYZ(i, tempColor.r, tempColor.g, tempColor.b);
+      groundSeaFlags[i] = getBiomeAt(worldX, worldZ, theme) === 'sea' ? 1 : 0;
     }
     positions.needsUpdate = true;
     colorAttribute.needsUpdate = true;
@@ -2149,6 +2166,48 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
 
   refreshTerrain(new THREE.Vector3(0, 0, 0), 0);
 
+  const updateWater = (time) => {
+    const anchorX = chunkAnchor.x;
+    const anchorZ = chunkAnchor.z;
+
+    // Animate sea plane vertices
+    // Sea plane is rotated -PI/2 around X: local X -> world X, local Y -> world -Z, local Z -> world Y
+    for (let i = 0; i < seaPositions.count; i++) {
+      const localX = seaPositions.getX(i);
+      const localY = seaPositions.getY(i);
+      const wx = localX + anchorX;
+      const wz = -localY + anchorZ;
+
+      const wave1 = Math.sin(wx * 0.08 + time * 1.2) * 0.3;
+      const wave2 = Math.cos(wz * 0.06 + time * 0.8) * 0.25;
+      const wave3 = Math.sin((wx + wz) * 0.12 + time * 1.6) * 0.15;
+
+      seaPositions.setZ(i, seaOriginalZ[i] + wave1 + wave2 + wave3);
+    }
+    seaPositions.needsUpdate = true;
+    seaGeometry.computeVertexNormals();
+
+    // Animate ground vertices that are in sea biome
+    let hasSeaVerts = false;
+    for (let i = 0; i < positions.count; i++) {
+      if (!groundSeaFlags[i]) continue;
+      hasSeaVerts = true;
+      const local = basePositions[i];
+      const wx = anchorX + local.x;
+      const wz = anchorZ + local.z;
+
+      const wave1 = Math.sin(wx * 0.08 + time * 1.2) * 0.3;
+      const wave2 = Math.cos(wz * 0.06 + time * 0.8) * 0.25;
+      const wave3 = Math.sin((wx + wz) * 0.12 + time * 1.6) * 0.15;
+
+      positions.setY(i, CONFIG.world.seaLevel + wave1 + wave2 + wave3);
+    }
+    if (hasSeaVerts) {
+      positions.needsUpdate = true;
+      groundGeometry.computeVertexNormals();
+    }
+  };
+
   return {
     group,
     getBiomeAt: (x, z) => getBiomeAt(x, z, theme),
@@ -2163,6 +2222,9 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
     clampToArena,
     update(center, time = 0) {
       refreshTerrain(center, time);
+    },
+    updateWater(time) {
+      updateWater(time);
     },
     getSpawnPoint(type, playerPosition, options) {
       return resolveSpawnPosition(type, playerPosition, rng, theme, options);
