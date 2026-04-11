@@ -42,30 +42,30 @@ export class DroneEnemy extends EnemyBase {
         ? 0xffd166
         : 0xff2200;
 
-    const bodyMat = new THREE.MeshStandardMaterial({
+    const bodyMat = new THREE.MeshStandardNodeMaterial({
       color: 0x3a3a3a,
       roughness: 0.35,
       metalness: 0.5,
     });
-    const darkMat = new THREE.MeshStandardMaterial({
+    const darkMat = new THREE.MeshStandardNodeMaterial({
       color: 0x222222,
       roughness: 0.4,
       metalness: 0.4,
     });
-    const accentMat = new THREE.MeshStandardMaterial({
+    const accentMat = new THREE.MeshStandardNodeMaterial({
       color: accentColor,
       emissive: accentEmissive,
       roughness: 0.3,
       metalness: 0.3,
     });
-    const rotorMat = new THREE.MeshStandardMaterial({
+    const rotorMat = new THREE.MeshStandardNodeMaterial({
       color: 0x666666,
       transparent: true,
       opacity: 0.3,
       side: THREE.DoubleSide,
       depthWrite: false,
     });
-    const eyeMat = new THREE.MeshStandardMaterial({
+    const eyeMat = new THREE.MeshStandardNodeMaterial({
       color: eyeColor,
       emissive: eyeColor,
       emissiveIntensity: 2,
@@ -130,7 +130,7 @@ export class DroneEnemy extends EnemyBase {
     bodyBottom.castShadow = true;
 
     // Wire/cable between arms and body
-    const wireMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.5, metalness: 0.4 });
+    const wireMat = new THREE.MeshStandardNodeMaterial({ color: 0x333333, roughness: 0.5, metalness: 0.4 });
     const wireGeo = new THREE.CylinderGeometry(0.03, 0.03, 1.8, 4);
     for (let i = 0; i < 4; i++) {
       const angle = (Math.PI / 4) + (Math.PI / 2) * i;
@@ -142,7 +142,7 @@ export class DroneEnemy extends EnemyBase {
     }
 
     // Sensor array under body
-    const sensorMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.3, metalness: 0.6 });
+    const sensorMat = new THREE.MeshStandardNodeMaterial({ color: 0x222222, roughness: 0.3, metalness: 0.6 });
     const sensorGeo = new THREE.BoxGeometry(0.8, 0.08, 0.5);
     const sensorArray = new THREE.Mesh(sensorGeo, sensorMat);
     sensorArray.position.set(0, -0.55, 0);

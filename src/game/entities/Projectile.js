@@ -90,24 +90,24 @@ export class ProjectilePool {
     this.trailGeometry = new THREE.CylinderGeometry(0.18, 0.44, 4.8, 8);
     this.trailGeometry.rotateX(Math.PI / 2);
     this.materials = {
-      player: new THREE.MeshStandardMaterial({
+      player: new THREE.MeshStandardNodeMaterial({
         color: CONFIG.palette.playerShot,
         emissive: CONFIG.palette.playerShot,
         emissiveIntensity: 1.8,
       }),
-      enemy: new THREE.MeshStandardMaterial({
+      enemy: new THREE.MeshStandardNodeMaterial({
         color: CONFIG.palette.hostileShot,
         emissive: CONFIG.palette.hostileShot,
         emissiveIntensity: 1.4,
       }),
     };
     this.trailMaterials = {
-      player: new THREE.MeshBasicMaterial({
+      player: new THREE.MeshBasicNodeMaterial({
         color: CONFIG.palette.playerShot,
         transparent: true,
         opacity: 0.58,
       }),
-      enemy: new THREE.MeshBasicMaterial({
+      enemy: new THREE.MeshBasicNodeMaterial({
         color: CONFIG.palette.hostileShot,
         transparent: true,
         opacity: 0.52,

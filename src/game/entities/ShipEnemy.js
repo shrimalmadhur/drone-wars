@@ -17,27 +17,27 @@ export class ShipEnemy extends EnemyBase {
     this.fireCooldown = 1.2;
     this.bob = Math.random() * Math.PI * 2;
 
-    const hullMat = new THREE.MeshStandardMaterial({
+    const hullMat = new THREE.MeshStandardNodeMaterial({
       color: CONFIG.palette.ship,
       roughness: 0.62,
       metalness: 0.2,
     });
-    const deckMat = new THREE.MeshStandardMaterial({
+    const deckMat = new THREE.MeshStandardNodeMaterial({
       color: 0x3a5a5e,
       roughness: 0.7,
       metalness: 0.15,
     });
-    const superMat = new THREE.MeshStandardMaterial({
+    const superMat = new THREE.MeshStandardNodeMaterial({
       color: 0xcccccc,
       roughness: 0.5,
       metalness: 0.3,
     });
-    const darkMat = new THREE.MeshStandardMaterial({
+    const darkMat = new THREE.MeshStandardNodeMaterial({
       color: 0x0f3f44,
       roughness: 0.45,
       metalness: 0.4,
     });
-    const metalMat = new THREE.MeshStandardMaterial({
+    const metalMat = new THREE.MeshStandardNodeMaterial({
       color: 0x555555,
       roughness: 0.4,
       metalness: 0.7,
@@ -84,7 +84,7 @@ export class ShipEnemy extends EnemyBase {
     bridge.castShadow = true;
 
     // Bridge windows
-    const windowMat = new THREE.MeshStandardMaterial({
+    const windowMat = new THREE.MeshStandardNodeMaterial({
       color: 0x112233,
       roughness: 0.1,
       metalness: 0.8,
@@ -154,7 +154,7 @@ export class ShipEnemy extends EnemyBase {
 
     // Waterline weathering band
     const waterlineGeo = new THREE.BoxGeometry(11.2, 0.5, 22.2);
-    const waterlineMat = new THREE.MeshStandardMaterial({
+    const waterlineMat = new THREE.MeshStandardNodeMaterial({
       color: 0x1a3a3d, roughness: 0.8, metalness: 0.15,
     });
     const waterline = new THREE.Mesh(waterlineGeo, waterlineMat);
@@ -162,7 +162,7 @@ export class ShipEnemy extends EnemyBase {
     this.group.add(waterline);
 
     // Deck clutter (crates)
-    const crateMat = new THREE.MeshStandardMaterial({ color: 0x5a5040, roughness: 0.85, metalness: 0.08 });
+    const crateMat = new THREE.MeshStandardNodeMaterial({ color: 0x5a5040, roughness: 0.85, metalness: 0.08 });
     const cratePositions = [
       { x: -3.5, z: -6, s: 0.8 },
       { x: 3.2, z: -7, s: 0.6 },
@@ -180,7 +180,7 @@ export class ShipEnemy extends EnemyBase {
 
     // Life rafts on sides
     const raftGeo = new THREE.CylinderGeometry(0.5, 0.5, 0.3, 8);
-    const raftMat = new THREE.MeshStandardMaterial({ color: 0xff6633, roughness: 0.7, metalness: 0.1 });
+    const raftMat = new THREE.MeshStandardNodeMaterial({ color: 0xff6633, roughness: 0.7, metalness: 0.1 });
     for (const side of [-1, 1]) {
       const raft = new THREE.Mesh(raftGeo, raftMat);
       raft.position.set(side * 5.2, 3.5, -2);

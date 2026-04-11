@@ -88,7 +88,7 @@ function createPortalGroup({ color, label, position }) {
 
   const outerRing = new THREE.Mesh(
     new THREE.TorusGeometry(PORTAL_RADIUS, 1.4, 18, 56),
-    new THREE.MeshStandardMaterial({
+    new THREE.MeshStandardNodeMaterial({
       color,
       emissive: color,
       emissiveIntensity: 1.15,
@@ -102,7 +102,7 @@ function createPortalGroup({ color, label, position }) {
 
   const innerDisc = new THREE.Mesh(
     new THREE.CircleGeometry(PORTAL_INNER_RADIUS, 40),
-    new THREE.MeshBasicMaterial({
+    new THREE.MeshBasicNodeMaterial({
       color,
       transparent: true,
       opacity: 0.18,
@@ -113,7 +113,7 @@ function createPortalGroup({ color, label, position }) {
 
   const shimmer = new THREE.Mesh(
     new THREE.RingGeometry(PORTAL_INNER_RADIUS * 0.45, PORTAL_INNER_RADIUS * 0.88, 40),
-    new THREE.MeshBasicMaterial({
+    new THREE.MeshBasicNodeMaterial({
       color,
       transparent: true,
       opacity: 0.24,
