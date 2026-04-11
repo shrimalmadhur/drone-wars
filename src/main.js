@@ -335,7 +335,7 @@ function getCurrentMapTheme() {
   return currentMapTheme;
 }
 
-async function createGameInstance(mapTheme, playerName) {
+function createGameInstance(mapTheme, playerName) {
   currentMapTheme = mapTheme;
   const initialRunModifiers = createRunModifiers(playerProgress);
   const initialLoadout = playerProgress.loadout;
@@ -378,7 +378,6 @@ async function createGameInstance(mapTheme, playerName) {
       return result;
     },
   });
-  await game.init();
   game.start();
   trackGameStart(playerName, mapTheme);
   setMapThemeLock(true);

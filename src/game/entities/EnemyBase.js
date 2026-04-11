@@ -1,4 +1,4 @@
-import * as THREE from 'three/webgpu';
+import * as THREE from 'three';
 
 export class EnemyBase {
   constructor(scene, options) {
