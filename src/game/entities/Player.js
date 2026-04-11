@@ -104,6 +104,35 @@ export class Player {
     fuselage.rotation.z = Math.PI * 0.5;
     fuselage.castShadow = true;
 
+    // Panel lines on fuselage
+    const panelLineMat = new THREE.MeshStandardMaterial({
+      color: 0x1a2030,
+      roughness: 0.6,
+      metalness: 0.4,
+    });
+
+    // Dorsal panel lines (2 parallel lines on top)
+    const panelLineGeo = new THREE.BoxGeometry(0.04, 0.04, 2.2);
+    const panelLine1 = new THREE.Mesh(panelLineGeo, panelLineMat);
+    panelLine1.position.set(0.4, 0.85, 0);
+    this.model.add(panelLine1);
+
+    const panelLine2 = new THREE.Mesh(panelLineGeo, panelLineMat);
+    panelLine2.position.set(-0.4, 0.85, 0);
+    this.model.add(panelLine2);
+
+    // Side panel lines (vertical seams)
+    const sidePanelGeo = new THREE.BoxGeometry(0.04, 0.6, 0.04);
+    const sidePanelPositions = [
+      [0.88, 0.2, 0.8], [-0.88, 0.2, 0.8],
+      [0.88, 0.2, -0.6], [-0.88, 0.2, -0.6],
+    ];
+    for (const [px, py, pz] of sidePanelPositions) {
+      const sp = new THREE.Mesh(sidePanelGeo, panelLineMat);
+      sp.position.set(px, py, pz);
+      this.model.add(sp);
+    }
+
     const belly = new THREE.Mesh(
       new THREE.BoxGeometry(1.4, 0.45, 3.9),
       darkMaterial,
@@ -148,6 +177,20 @@ export class Player {
     chinMount.position.set(0, -0.32, 1.92);
     chinMount.castShadow = true;
 
+    // Landing light under nose
+    const landingLightGeo = new THREE.CircleGeometry(0.15, 8);
+    const landingLightMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      emissive: 0xffffcc,
+      emissiveIntensity: 1.5,
+      roughness: 0.1,
+      metalness: 0.3,
+    });
+    const landingLight = new THREE.Mesh(landingLightGeo, landingLightMat);
+    landingLight.rotation.x = -Math.PI / 2;
+    landingLight.position.set(0, -0.5, 2.2);
+    this.model.add(landingLight);
+
     const wingGeometry = new THREE.BoxGeometry(5.2, 0.18, 1.55);
     const wingletGeometry = new THREE.BoxGeometry(0.14, 0.9, 0.62);
     const pylonGeometry = new THREE.BoxGeometry(0.34, 0.22, 1.8);
@@ -174,6 +217,13 @@ export class Player {
     tailBoom.position.set(0, 0.02, -3.65);
     tailBoom.castShadow = true;
 
+    // Antenna on tail boom
+    const antennaGeo = new THREE.CylinderGeometry(0.02, 0.04, 0.8, 4);
+    const antennaMat = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.3, metalness: 0.7 });
+    const antenna = new THREE.Mesh(antennaGeo, antennaMat);
+    antenna.position.set(0, 0.6, -3.5);
+    this.model.add(antenna);
+
     const tailPlane = new THREE.Mesh(
       new THREE.BoxGeometry(2.1, 0.12, 0.75),
       darkMaterial,
@@ -194,6 +244,9 @@ export class Player {
       [2.18, 0.14, -1.55],
       [-2.18, 0.14, -1.55],
     ];
+    const ventGeo = new THREE.BoxGeometry(0.3, 0.03, 0.12);
+    const ventMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.5, metalness: 0.6 });
+
     this.rotors = [];
     for (const [x, y, z] of nacellePositions) {
       const pylon = new THREE.Mesh(pylonGeometry, darkMaterial);
@@ -201,10 +254,19 @@ export class Player {
       pylon.castShadow = true;
       this.model.add(pylon);
 
+      const motorGroup = new THREE.Group();
+      motorGroup.position.set(x, y, z);
       const motor = new THREE.Mesh(motorGeometry, panelMaterial);
-      motor.position.set(x, y, z);
       motor.castShadow = true;
-      this.model.add(motor);
+      motorGroup.add(motor);
+
+      // Ventilation grates on motor shroud
+      for (let v = 0; v < 3; v++) {
+        const vent = new THREE.Mesh(ventGeo, ventMat);
+        vent.position.set(0, 0.35, -0.2 + v * 0.2);
+        motorGroup.add(vent);
+      }
+      this.model.add(motorGroup);
 
       const rotorRing = new THREE.Mesh(rotorRingGeometry, rotorRingMaterial);
       rotorRing.position.set(x, y + 0.26, z);
@@ -456,10 +518,11 @@ export class Player {
     this.model.rotation.x = damp(this.model.rotation.x, controls.pitch * 0.22 - controls.thrust * 0.08, 7, dt);
     this.group.rotation.y = this.yaw;
 
-    // Spin rotor discs
-    for (const rotor of this.rotors) {
-      rotor.rotation.y += 35 * dt;
-    }
+    // Spin rotor discs with per-motor speed variation
+    const speedOffsets = [1.0, 1.06, 0.94, 1.03];
+    this.rotors.forEach((r, i) => {
+      r.rotation.y += 35 * speedOffsets[i % speedOffsets.length] * dt;
+    });
 
     if (this.muzzleFlashTimer > 0) {
       this.muzzleFlashTimer -= dt;
