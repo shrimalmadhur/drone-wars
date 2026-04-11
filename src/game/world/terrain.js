@@ -1,4 +1,7 @@
 import * as THREE from 'three/webgpu';
+import {
+  Fn, vec3, positionLocal, positionWorld, sin, cos, time as tslTime,
+} from 'three/tsl';
 
 import { DEFAULT_MAP_THEME, MAP_THEMES, sanitizeMapTheme } from '../../mapThemes.js';
 import { CONFIG } from '../config.js';
@@ -975,29 +978,36 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
     renderExtent * 1.2, renderExtent * 1.2,
     seaSubdivisions, seaSubdivisions,
   );
-  const sea = new THREE.Mesh(
-    seaGeometry,
-    new THREE.MeshPhysicalMaterial({
-      color: theme === MAP_THEMES.CITY ? '#214f78' : '#195f93',
-      roughness: 0.15,
-      metalness: 0.6,
-      transparent: true,
-      opacity: 0.85,
-      clearcoat: 0.9,
-      clearcoatRoughness: 0.25,
-    }),
-  );
+  // GPU wave displacement via TSL positionNode
+  // Sea plane is rotated -PI/2 around X: local Z maps to world Y
+  // Compute waves from world X/Z, displace in local Z
+  const seaWavePosition = Fn(() => {
+    const wx = positionWorld.x;
+    const wz = positionWorld.z;
+
+    const wave1 = sin(wx.mul(0.08).add(tslTime.mul(1.2))).mul(0.3);
+    const wave2 = cos(wz.mul(0.06).add(tslTime.mul(0.8))).mul(0.25);
+    const wave3 = sin(wx.add(wz).mul(0.12).add(tslTime.mul(1.6))).mul(0.15);
+
+    const totalWave = wave1.add(wave2).add(wave3);
+    return positionLocal.add(vec3(0, 0, totalWave));
+  });
+
+  const seaMaterial = new THREE.MeshPhysicalNodeMaterial({
+    color: theme === MAP_THEMES.CITY ? '#214f78' : '#195f93',
+    roughness: 0.15,
+    metalness: 0.6,
+    transparent: true,
+    opacity: 0.85,
+    clearcoat: 0.9,
+    clearcoatRoughness: 0.25,
+  });
+  seaMaterial.positionNode = seaWavePosition();
+
+  const sea = new THREE.Mesh(seaGeometry, seaMaterial);
   sea.rotation.x = -Math.PI / 2;
   sea.position.y = CONFIG.world.seaLevel + 0.1;
   group.add(sea);
-
-  // Store original sea vertex Z positions for wave animation
-  // (sea plane is rotated -PI/2 around X, so local Z maps to world Y)
-  const seaPositions = seaGeometry.attributes.position;
-  const seaOriginalZ = new Float32Array(seaPositions.count);
-  for (let i = 0; i < seaPositions.count; i++) {
-    seaOriginalZ[i] = seaPositions.getZ(i);
-  }
 
   // Track which ground vertices are sea-biome for wave displacement
   const groundSeaFlags = new Uint8Array(positions.count);
@@ -2166,26 +2176,11 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
 
   refreshTerrain(new THREE.Vector3(0, 0, 0), 0);
 
+  // Sea plane waves are now GPU-driven via TSL positionNode on seaMaterial.
+  // Only ground sea-biome vertices still need CPU animation.
   const updateWater = (time) => {
     const anchorX = chunkAnchor.x;
     const anchorZ = chunkAnchor.z;
-
-    // Animate sea plane vertices
-    // Sea plane is rotated -PI/2 around X: local X -> world X, local Y -> world -Z, local Z -> world Y
-    for (let i = 0; i < seaPositions.count; i++) {
-      const localX = seaPositions.getX(i);
-      const localY = seaPositions.getY(i);
-      const wx = localX + anchorX;
-      const wz = -localY + anchorZ;
-
-      const wave1 = Math.sin(wx * 0.08 + time * 1.2) * 0.3;
-      const wave2 = Math.cos(wz * 0.06 + time * 0.8) * 0.25;
-      const wave3 = Math.sin((wx + wz) * 0.12 + time * 1.6) * 0.15;
-
-      seaPositions.setZ(i, seaOriginalZ[i] + wave1 + wave2 + wave3);
-    }
-    seaPositions.needsUpdate = true;
-    seaGeometry.computeVertexNormals();
 
     // Animate ground vertices that are in sea biome
     let hasSeaVerts = false;
