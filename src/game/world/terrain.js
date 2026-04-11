@@ -1008,6 +1008,13 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
   sea.position.y = CONFIG.world.seaLevel + 0.1;
   group.add(sea);
 
+  // Store original sea vertex positions for CPU wave animation
+  const seaPositions = seaGeometry.attributes.position;
+  const seaOriginalZ = new Float32Array(seaPositions.count);
+  for (let i = 0; i < seaPositions.count; i++) {
+    seaOriginalZ[i] = seaPositions.getZ(i);
+  }
+
   // Track which ground vertices are sea-biome for wave displacement
   const groundSeaFlags = new Uint8Array(positions.count);
 
