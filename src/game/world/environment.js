@@ -200,7 +200,7 @@ export function createEnvironment(scene, { mapTheme } = {}) {
   const sunTarget = new THREE.Object3D();
   sun.position.set(preset.sunOffset.x, preset.sunOffset.y, preset.sunOffset.z);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.mapSize.set(1024, 1024);
   sun.shadow.camera.near = 10;
   sun.shadow.camera.far = 360;
   sun.shadow.camera.left = -180;

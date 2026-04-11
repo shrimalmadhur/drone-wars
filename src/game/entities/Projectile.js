@@ -119,7 +119,6 @@ export class ProjectilePool {
       const trail = new THREE.Mesh(this.trailGeometry, this.trailMaterials.player);
       mesh.visible = false;
       trail.visible = false;
-      mesh.castShadow = true;
       item.mesh = mesh;
       item.trail = trail;
       item.light = null;
