@@ -510,7 +510,7 @@ startPlayButton?.addEventListener('click', () => {
   startForm.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
 });
 
-startForm.addEventListener('submit', async (event) => {
+startForm.addEventListener('submit', (event) => {
   event.preventDefault();
   const playerName = savePlayerName(playerNameInput.value);
   if (!playerName) {
