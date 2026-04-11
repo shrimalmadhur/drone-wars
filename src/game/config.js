@@ -43,7 +43,7 @@ export const CONFIG = {
     pulseDamage: 30,
   },
   projectiles: {
-    maxCount: 240,
+    maxCount: 80,
     playerDamage: 20,
     enemyDamage: 10,
   },

@@ -24,12 +24,12 @@ export class ExplosionEffect {
         active: false,
         elapsed: 0,
         fireballs: [],
-        fireLight: new THREE.PointLight(0xff8800, 0, 20),
+        fireLight: null,
         debris: [],
       };
 
       for (let f = 0; f < 3; f++) {
-        const geo = new THREE.SphereGeometry(1, 8, 6);
+        const geo = new THREE.SphereGeometry(1, 6, 4);
         const mat = new THREE.MeshBasicMaterial({
           color: 0xffaa44,
           transparent: true,
@@ -41,16 +41,12 @@ export class ExplosionEffect {
         entry.fireballs.push({ mesh, mat, offsetX: 0, offsetY: 0, offsetZ: 0 });
       }
 
-      entry.fireLight.visible = false;
-      scene.add(entry.fireLight);
-
       for (let d = 0; d < cfg.debrisCount; d++) {
         const geo = _debrisGeos[d % _debrisGeos.length];
-        const mat = new THREE.MeshStandardMaterial({
+        const mat = new THREE.MeshBasicMaterial({
           color: 0xffffff,
           transparent: true,
           opacity: 1,
-          roughness: 0.7,
         });
         const mesh = new THREE.Mesh(geo, mat);
         mesh.visible = false;
@@ -95,10 +91,7 @@ export class ExplosionEffect {
       fb.mesh.visible = true;
     }
 
-    entry.fireLight.position.set(x, y, z);
-    entry.fireLight.color.set(0xff8800);
-    entry.fireLight.intensity = 5;
-    entry.fireLight.visible = true;
+    // PointLight removed for performance
 
     _tempColor.set(color);
     for (let i = 0; i < entry.debris.length; i++) {
@@ -145,11 +138,7 @@ export class ExplosionEffect {
         }
       }
 
-      if (fbProgress < 1) {
-        entry.fireLight.intensity = 5 * (1 - fbProgress);
-      } else {
-        entry.fireLight.visible = false;
-      }
+      // No fireLight to update
 
       const debrisProgress = entry.elapsed / cfg.debrisDuration;
       for (const d of entry.debris) {
@@ -176,7 +165,7 @@ export class ExplosionEffect {
       if (entry.elapsed >= cfg.debrisDuration) {
         entry.active = false;
         for (const fb of entry.fireballs) fb.mesh.visible = false;
-        entry.fireLight.visible = false;
+        // no fireLight
         for (const d of entry.debris) d.mesh.visible = false;
       }
     }
@@ -186,7 +175,7 @@ export class ExplosionEffect {
     for (const entry of this.pool) {
       entry.active = false;
       for (const fb of entry.fireballs) fb.mesh.visible = false;
-      entry.fireLight.visible = false;
+      // no fireLight
       for (const d of entry.debris) d.mesh.visible = false;
     }
   }
@@ -198,7 +187,7 @@ export class ExplosionEffect {
         fb.mesh.geometry.dispose();
         fb.mat.dispose();
       }
-      this.scene.remove(entry.fireLight);
+      // no fireLight to remove
       for (const d of entry.debris) {
         this.scene.remove(d.mesh);
         d.mat.dispose();

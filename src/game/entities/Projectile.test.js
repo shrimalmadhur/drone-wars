@@ -55,7 +55,6 @@ describe('projectile store', () => {
           turnRate: 0,
           mesh: { visible: true, position: { set() {} }, scale: { setScalar() {} } },
           trail: { visible: true, position: { set() {} }, lookAt() {}, scale: {} },
-          light: { visible: true, position: { set() {} }, color: { setHex() {} } },
         }],
       },
     };

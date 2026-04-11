@@ -20,6 +20,48 @@ const CLOUD_WISP_LOBES = [
   { x: 7.8, y: -0.8, z: -4.1, sx: 1.55, sy: 0.3, sz: 1.18 },
   { x: 0.8, y: -2.2, z: 0.4, sx: 2.15, sy: 0.28, sz: 1.55 },
 ];
+const CLOUD_TYPES = [
+  {
+    name: 'cumulus',
+    lobes: CLOUD_BODY_LOBES,
+    wisps: CLOUD_WISP_LOBES,
+    baseScale: 1.0,
+    scaleRange: [0.7, 1.5],
+    opacity: 0.55,
+    altitudeRange: [95, 140],
+    weight: 0.4,
+  },
+  {
+    name: 'small_puff',
+    lobes: CLOUD_BODY_LOBES.slice(0, 3),
+    wisps: [],
+    baseScale: 0.5,
+    scaleRange: [0.3, 0.7],
+    opacity: 0.45,
+    altitudeRange: [85, 120],
+    weight: 0.3,
+  },
+  {
+    name: 'high_cirrus',
+    lobes: [],
+    wisps: CLOUD_WISP_LOBES,
+    baseScale: 1.8,
+    scaleRange: [1.2, 2.5],
+    opacity: 0.2,
+    altitudeRange: [140, 180],
+    weight: 0.2,
+  },
+  {
+    name: 'low_haze',
+    lobes: CLOUD_BODY_LOBES.slice(0, 2),
+    wisps: CLOUD_WISP_LOBES.slice(0, 1),
+    baseScale: 1.4,
+    scaleRange: [1.0, 2.0],
+    opacity: 0.25,
+    altitudeRange: [70, 95],
+    weight: 0.1,
+  },
+];
 
 function fract(value) {
   return value - Math.floor(value);
@@ -63,27 +105,32 @@ function getFrontierGroundHeightAt(x, z) {
   return rolling + ridges + mesas + shoreLift;
 }
 
+// Cached colors for frontier surface — avoids allocations per vertex
+const _seaColor = new THREE.Color('#195f93');
+const _shoreSand = new THREE.Color('#c9b17e');
+const _shoreGrass = new THREE.Color('#5f8154');
+const _shoreResult = new THREE.Color();
+const _landHigh = new THREE.Color('#708564');
+const _landMid = new THREE.Color('#5b774f');
+const _landLow = new THREE.Color('#48663f');
+
 function getFrontierSurfaceColor(x, z, height) {
   const biome = getFrontierBiomeAt(x, z);
   if (biome === 'sea') {
-    return new THREE.Color('#195f93');
+    return _seaColor;
   }
   if (biome === 'shore') {
     const t = THREE.MathUtils.clamp((height - CONFIG.world.seaLevel) / 12, 0, 1);
-    return new THREE.Color().lerpColors(
-      new THREE.Color('#c9b17e'),
-      new THREE.Color('#5f8154'),
-      t,
-    );
+    return _shoreResult.lerpColors(_shoreSand, _shoreGrass, t);
   }
 
   if (height > 18) {
-    return new THREE.Color('#708564');
+    return _landHigh;
   }
   if (height > 10) {
-    return new THREE.Color('#5b774f');
+    return _landMid;
   }
-  return new THREE.Color('#48663f');
+  return _landLow;
 }
 
 function getCityRiverOffset(x) {
@@ -138,21 +185,28 @@ function getCityGroundHeightAt(x, z) {
   return base + embankment + parkLift;
 }
 
+// Cached colors for city surface
+const _citySeaColor = new THREE.Color('#214f78');
+const _cityShoreColor = new THREE.Color('#66717a');
+const _cityParkColor = new THREE.Color('#526b48');
+const _cityRoadColor = new THREE.Color('#2d333b');
+const _cityBuildingColor = new THREE.Color('#43484f');
+
 function getCitySurfaceColor(x, z) {
   const biome = getCityBiomeAt(x, z);
   if (biome === 'sea') {
-    return new THREE.Color('#214f78');
+    return _citySeaColor;
   }
   if (biome === 'shore') {
-    return new THREE.Color('#66717a');
+    return _cityShoreColor;
   }
   if (sampleCityParkField(x, z) > 0.72 && !isCityRoad(x, z)) {
-    return new THREE.Color('#526b48');
+    return _cityParkColor;
   }
   if (isCityRoad(x, z)) {
-    return new THREE.Color('#2d333b');
+    return _cityRoadColor;
   }
-  return new THREE.Color('#43484f');
+  return _cityBuildingColor;
 }
 
 export function getBiomeAt(x, z, mapTheme = DEFAULT_MAP_THEME) {
@@ -286,16 +340,39 @@ function resolveSpawnPosition(type, playerPosition, rng, mapTheme, options = {})
   return fallback;
 }
 
+// Scratch objects for instance transforms — avoids per-call allocation
+const _instMatrix = new THREE.Matrix4();
+const _instQuat = new THREE.Quaternion();
+const _instQuat2 = new THREE.Quaternion();
+const _instEuler = new THREE.Euler();
+
 function setInstanceTransform(mesh, index, position, rotationY, scale) {
-  const matrix = new THREE.Matrix4();
-  const quaternion = new THREE.Quaternion().setFromAxisAngle(UP, rotationY);
-  matrix.compose(position, quaternion, scale);
-  mesh.setMatrixAt(index, matrix);
+  _instQuat.setFromAxisAngle(UP, rotationY);
+  _instMatrix.compose(position, _instQuat, scale);
+  mesh.setMatrixAt(index, _instMatrix);
 }
+
+function setInstanceTransformEuler(mesh, index, position, rx, ry, rz, scale) {
+  _instEuler.set(rx, ry, rz, 'XYZ');
+  _instQuat.setFromEuler(_instEuler);
+  _instMatrix.compose(position, _instQuat, scale);
+  mesh.setMatrixAt(index, _instMatrix);
+}
+
+function setInstanceTransformWithLean(mesh, index, position, rotationY, leanX, leanZ, scale) {
+  _instQuat.setFromAxisAngle(UP, rotationY);
+  _instEuler.set(leanX, 0, leanZ, 'XYZ');
+  _instQuat2.setFromEuler(_instEuler);
+  _instQuat.multiply(_instQuat2);
+  _instMatrix.compose(position, _instQuat, scale);
+  mesh.setMatrixAt(index, _instMatrix);
+}
+
+const _hideScale = new THREE.Vector3(0.0001, 0.0001, 0.0001);
 
 function hideRemainingInstances(mesh, startIndex, scratchPosition) {
   for (let index = startIndex; index < mesh.count; index += 1) {
-    setInstanceTransform(mesh, index, scratchPosition, 0, new THREE.Vector3(0.0001, 0.0001, 0.0001));
+    setInstanceTransform(mesh, index, scratchPosition, 0, _hideScale);
   }
   mesh.instanceMatrix.needsUpdate = true;
 }
@@ -323,34 +400,141 @@ function setLocalInstanceTransform(mesh, index, anchorX, anchorZ, base, rotation
 }
 
 function buildFrontierDecorMeshes(group, maxCounts) {
-  const trunkGeometry = new THREE.CylinderGeometry(0.25, 0.55, 6, 8);
-  const crownBottomGeometry = new THREE.ConeGeometry(3.4, 4.5, 8);
-  const crownMiddleGeometry = new THREE.ConeGeometry(2.6, 4.0, 8);
-  const crownTopGeometry = new THREE.ConeGeometry(1.8, 3.5, 8);
-  const rockGeometry = new THREE.DodecahedronGeometry(2.4, 0);
+  // --- Geometry per species ---
+  // Pine (3-tier cone)
+  const pineTrunkGeo = new THREE.CylinderGeometry(0.2, 0.5, 7, 6);
+  const pineCrown0Geo = new THREE.ConeGeometry(2.8, 5.5, 7);
+  const pineCrown1Geo = new THREE.ConeGeometry(2.1, 4.5, 7);
+  const pineCrown2Geo = new THREE.ConeGeometry(1.4, 3.5, 7);
+
+  // Oak (round canopy)
+  const oakTrunkGeo = new THREE.CylinderGeometry(0.35, 0.65, 5, 6);
+  const oakCrownGeo = new THREE.SphereGeometry(3.2, 8, 6);
+
+  // Birch (thin trunk, clustered small spheres)
+  const birchTrunkGeo = new THREE.CylinderGeometry(0.12, 0.22, 8, 5);
+  const birchCrown0Geo = new THREE.SphereGeometry(1.6, 7, 5);
+  const birchCrown1Geo = new THREE.SphereGeometry(1.3, 7, 5);
+  const birchCrown2Geo = new THREE.SphereGeometry(1.0, 7, 5);
+
+  // Dead tree (bare trunk + angled branches)
+  const deadTrunkGeo = new THREE.CylinderGeometry(0.18, 0.45, 6, 5);
+  const deadBranch0Geo = new THREE.CylinderGeometry(0.06, 0.12, 3.5, 4);
+  const deadBranch1Geo = new THREE.CylinderGeometry(0.05, 0.10, 2.8, 4);
+  const deadBranch2Geo = new THREE.CylinderGeometry(0.04, 0.09, 2.2, 4);
+
+  // Bush (low ground cover, no trunk)
+  const bushCrown0Geo = new THREE.SphereGeometry(1.5, 6, 5);
+  const bushCrown1Geo = new THREE.SphereGeometry(1.1, 6, 5);
+
+  // --- Materials per species ---
+  const pineTrunkMat = new THREE.MeshStandardMaterial({ color: 0x3d2415, roughness: 1 });
+  const pineCrown0Mat = new THREE.MeshStandardMaterial({ color: 0x1a5428, roughness: 0.92 });
+  const pineCrown1Mat = new THREE.MeshStandardMaterial({ color: 0x226b35, roughness: 0.90 });
+  const pineCrown2Mat = new THREE.MeshStandardMaterial({ color: 0x2d8044, roughness: 0.88 });
+
+  const oakTrunkMat = new THREE.MeshStandardMaterial({ color: 0x4a3020, roughness: 1 });
+  const oakCrownMat = new THREE.MeshStandardMaterial({ color: 0x3a6e2e, roughness: 0.90 });
+
+  const birchTrunkMat = new THREE.MeshStandardMaterial({ color: 0xd4cfc4, roughness: 1 });
+  const birchCrown0Mat = new THREE.MeshStandardMaterial({ color: 0x5a9e48, roughness: 0.90 });
+  const birchCrown1Mat = new THREE.MeshStandardMaterial({ color: 0x68ac55, roughness: 0.88 });
+  const birchCrown2Mat = new THREE.MeshStandardMaterial({ color: 0x76ba62, roughness: 0.86 });
+
+  const deadTrunkMat = new THREE.MeshStandardMaterial({ color: 0x4a3828, roughness: 1 });
+  const deadBranchMat = new THREE.MeshStandardMaterial({ color: 0x3d2e20, roughness: 1 });
+
+  const bushCrown0Mat = new THREE.MeshStandardMaterial({ color: 0x456b38, roughness: 0.92 });
+  const bushCrown1Mat = new THREE.MeshStandardMaterial({ color: 0x507a42, roughness: 0.90 });
+
+  // --- InstancedMesh creation helper ---
+  const treeCount = maxCounts.trees;
+  function makeTreeMesh(geo, mat) {
+    const mesh = new THREE.InstancedMesh(geo, mat, treeCount);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    return mesh;
+  }
+
+  const treeSpecies = {
+    pine: {
+      trunk: makeTreeMesh(pineTrunkGeo, pineTrunkMat),
+      crowns: [
+        makeTreeMesh(pineCrown0Geo, pineCrown0Mat),
+        makeTreeMesh(pineCrown1Geo, pineCrown1Mat),
+        makeTreeMesh(pineCrown2Geo, pineCrown2Mat),
+      ],
+    },
+    oak: {
+      trunk: makeTreeMesh(oakTrunkGeo, oakTrunkMat),
+      crowns: [makeTreeMesh(oakCrownGeo, oakCrownMat)],
+    },
+    birch: {
+      trunk: makeTreeMesh(birchTrunkGeo, birchTrunkMat),
+      crowns: [
+        makeTreeMesh(birchCrown0Geo, birchCrown0Mat),
+        makeTreeMesh(birchCrown1Geo, birchCrown1Mat),
+        makeTreeMesh(birchCrown2Geo, birchCrown2Mat),
+      ],
+    },
+    deadTree: {
+      trunk: makeTreeMesh(deadTrunkGeo, deadTrunkMat),
+      crowns: [
+        makeTreeMesh(deadBranch0Geo, deadBranchMat),
+        makeTreeMesh(deadBranch1Geo, deadBranchMat),
+        makeTreeMesh(deadBranch2Geo, deadBranchMat),
+      ],
+    },
+    bush: {
+      crowns: [
+        makeTreeMesh(bushCrown0Geo, bushCrown0Mat),
+        makeTreeMesh(bushCrown1Geo, bushCrown1Mat),
+      ],
+    },
+  };
+
+  // Add all tree meshes to the group
+  for (const speciesKey of Object.keys(treeSpecies)) {
+    const species = treeSpecies[speciesKey];
+    if (species.trunk) group.add(species.trunk);
+    for (const crown of species.crowns) group.add(crown);
+  }
+
+  // --- Non-tree decor ---
+
+  // Rock variants: boulders, flat slabs, round stones
+  const rockVariantDefs = [
+    { geo: new THREE.DodecahedronGeometry(2.4, 0), color: 0x889077, weight: 0.4 },
+    { geo: new THREE.DodecahedronGeometry(1.8, 1), color: 0x7a8068, weight: 0.35 },
+    { geo: new THREE.DodecahedronGeometry(1.2, 2), color: 0x6b7560, weight: 0.25 },
+  ];
+  const rockVariantMaterials = rockVariantDefs.map(
+    (v) => new THREE.MeshStandardMaterial({ color: v.color, roughness: 1 }),
+  );
+  const rockVariants = rockVariantDefs.map((v, i) => {
+    const mesh = new THREE.InstancedMesh(v.geo, rockVariantMaterials[i], maxCounts.rocks);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    return mesh;
+  });
+
+  // Ground scatter: small stones
+  const smallStoneGeo = new THREE.DodecahedronGeometry(0.4, 0);
+  const smallStoneMat = new THREE.MeshStandardMaterial({ color: 0x7a7568, roughness: 0.95 });
+  const smallStones = new THREE.InstancedMesh(smallStoneGeo, smallStoneMat, maxCounts.smallStones);
+  smallStones.castShadow = true;
+  smallStones.receiveShadow = true;
+
+  // Ground scatter: fallen logs
+  const fallenLogGeo = new THREE.CylinderGeometry(0.2, 0.25, 3.5, 6);
+  const fallenLogMat = new THREE.MeshStandardMaterial({ color: 0x4a3420, roughness: 0.9 });
+  const fallenLogs = new THREE.InstancedMesh(fallenLogGeo, fallenLogMat, maxCounts.fallenLogs);
+  fallenLogs.castShadow = true;
+  fallenLogs.receiveShadow = true;
+
   const landmarkGeometry = new THREE.CylinderGeometry(0.9, 1.8, 14, 6);
   const cloudGeometry = new THREE.SphereGeometry(4.4, 10, 10);
 
-  const trunkMaterial = new THREE.MeshStandardMaterial({
-    color: '#4a2d1a',
-    roughness: 1,
-  });
-  const crownBottomMaterial = new THREE.MeshStandardMaterial({
-    color: '#1e5e2e',
-    roughness: 0.92,
-  });
-  const crownMiddleMaterial = new THREE.MeshStandardMaterial({
-    color: '#2b6b3e',
-    roughness: 0.9,
-  });
-  const crownTopMaterial = new THREE.MeshStandardMaterial({
-    color: '#358748',
-    roughness: 0.88,
-  });
-  const rockMaterial = new THREE.MeshStandardMaterial({
-    color: '#889077',
-    roughness: 1,
-  });
   const landmarkMaterial = new THREE.MeshStandardMaterial({
     color: '#8c6e56',
     roughness: 0.88,
@@ -372,55 +556,49 @@ function buildFrontierDecorMeshes(group, maxCounts) {
     depthWrite: false,
   });
 
-  const treesTrunk = new THREE.InstancedMesh(trunkGeometry, trunkMaterial, maxCounts.trees);
-  const treesCrownBottom = new THREE.InstancedMesh(crownBottomGeometry, crownBottomMaterial, maxCounts.trees);
-  const treesCrownMiddle = new THREE.InstancedMesh(crownMiddleGeometry, crownMiddleMaterial, maxCounts.trees);
-  const treesCrownTop = new THREE.InstancedMesh(crownTopGeometry, crownTopMaterial, maxCounts.trees);
-  const rocks = new THREE.InstancedMesh(rockGeometry, rockMaterial, maxCounts.rocks);
   const landmarks = new THREE.InstancedMesh(landmarkGeometry, landmarkMaterial, maxCounts.landmarks);
   const cloudsBody = new THREE.InstancedMesh(cloudGeometry, cloudBodyMaterial, maxCounts.cloudBody);
   const cloudsWisp = new THREE.InstancedMesh(cloudGeometry, cloudWispMaterial, maxCounts.cloudWisp);
 
-  treesTrunk.castShadow = true;
-  treesTrunk.receiveShadow = true;
-  treesCrownBottom.castShadow = true;
-  treesCrownBottom.receiveShadow = true;
-  treesCrownMiddle.castShadow = true;
-  treesCrownMiddle.receiveShadow = true;
-  treesCrownTop.castShadow = true;
-  treesCrownTop.receiveShadow = true;
-  rocks.castShadow = true;
-  rocks.receiveShadow = true;
   landmarks.castShadow = true;
   landmarks.receiveShadow = true;
 
-  group.add(treesTrunk, treesCrownBottom, treesCrownMiddle, treesCrownTop, rocks, landmarks, cloudsBody, cloudsWisp);
+  for (const rv of rockVariants) group.add(rv);
+  group.add(smallStones, fallenLogs, landmarks, cloudsBody, cloudsWisp);
+
+  // Collect all geometries and materials for disposal
+  const allGeometries = [
+    pineTrunkGeo, pineCrown0Geo, pineCrown1Geo, pineCrown2Geo,
+    oakTrunkGeo, oakCrownGeo,
+    birchTrunkGeo, birchCrown0Geo, birchCrown1Geo, birchCrown2Geo,
+    deadTrunkGeo, deadBranch0Geo, deadBranch1Geo, deadBranch2Geo,
+    bushCrown0Geo, bushCrown1Geo,
+    ...rockVariantDefs.map((v) => v.geo),
+    smallStoneGeo, fallenLogGeo,
+    landmarkGeometry, cloudGeometry,
+  ];
+  const allMaterials = [
+    pineTrunkMat, pineCrown0Mat, pineCrown1Mat, pineCrown2Mat,
+    oakTrunkMat, oakCrownMat,
+    birchTrunkMat, birchCrown0Mat, birchCrown1Mat, birchCrown2Mat,
+    deadTrunkMat, deadBranchMat,
+    bushCrown0Mat, bushCrown1Mat,
+    ...rockVariantMaterials,
+    smallStoneMat, fallenLogMat,
+    landmarkMaterial, cloudBodyMaterial, cloudWispMaterial,
+  ];
 
   return {
-    treesTrunk,
-    treesCrownBottom,
-    treesCrownMiddle,
-    treesCrownTop,
-    rocks,
+    treeSpecies,
+    rockVariants,
+    smallStones,
+    fallenLogs,
     landmarks,
     cloudsBody,
     cloudsWisp,
     dispose() {
-      trunkGeometry.dispose();
-      crownBottomGeometry.dispose();
-      crownMiddleGeometry.dispose();
-      crownTopGeometry.dispose();
-      rockGeometry.dispose();
-      landmarkGeometry.dispose();
-      cloudGeometry.dispose();
-      trunkMaterial.dispose();
-      crownBottomMaterial.dispose();
-      crownMiddleMaterial.dispose();
-      crownTopMaterial.dispose();
-      rockMaterial.dispose();
-      landmarkMaterial.dispose();
-      cloudBodyMaterial.dispose();
-      cloudWispMaterial.dispose();
+      for (const geo of allGeometries) geo.dispose();
+      for (const mat of allMaterials) mat.dispose();
     },
   };
 }
@@ -811,28 +989,41 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
   ground.receiveShadow = true;
   group.add(ground);
 
-  const sea = new THREE.Mesh(
-    new THREE.PlaneGeometry(renderExtent * 1.2, renderExtent * 1.2, 1, 1),
-    new THREE.MeshPhysicalMaterial({
-      color: theme === MAP_THEMES.CITY ? '#214f78' : '#1e6da2',
-      roughness: theme === MAP_THEMES.CITY ? 0.26 : 0.18,
-      metalness: 0.05,
-      transparent: true,
-      opacity: theme === MAP_THEMES.CITY ? 0.66 : 0.72,
-      clearcoat: 0.9,
-      clearcoatRoughness: 0.25,
-    }),
+  const seaSubdivisions = 40;
+  const seaGeometry = new THREE.PlaneGeometry(
+    renderExtent * 1.2, renderExtent * 1.2,
+    seaSubdivisions, seaSubdivisions,
   );
+
+  const seaMaterial = new THREE.MeshStandardMaterial({
+    color: theme === MAP_THEMES.CITY ? '#214f78' : '#195f93',
+    roughness: 0.15,
+    metalness: 0.6,
+    transparent: true,
+    opacity: 0.85,
+  });
+
+  const sea = new THREE.Mesh(seaGeometry, seaMaterial);
   sea.rotation.x = -Math.PI / 2;
   sea.position.y = CONFIG.world.seaLevel + 0.1;
   group.add(sea);
+
+  // Store original sea vertex positions for CPU wave animation
+  const seaPositions = seaGeometry.attributes.position;
+  const seaOriginalZ = new Float32Array(seaPositions.count);
+  for (let i = 0; i < seaPositions.count; i++) {
+    seaOriginalZ[i] = seaPositions.getZ(i);
+  }
+
+  // Track which ground vertices are sea-biome for wave displacement
+  const groundSeaFlags = new Uint8Array(positions.count);
 
   const decor = theme === MAP_THEMES.CITY
     ? buildCityDecorMeshes(group, {
       towers: maxChunkCount * 10,
       annexes: maxChunkCount * 10,
       windowBands: maxChunkCount * 120,
-      rooftopUnits: maxChunkCount * 12,
+      rooftopUnits: maxChunkCount * 36,
       crowds: maxChunkCount * 10,
       cars: maxChunkCount * 8,
       helicopters: maxChunkCount * 2,
@@ -840,9 +1031,11 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
     : buildFrontierDecorMeshes(group, {
       trees: maxChunkCount * 12,
       rocks: maxChunkCount * 8,
+      smallStones: maxChunkCount * 8 * 5,
+      fallenLogs: maxChunkCount * 12,
       landmarks: maxChunkCount * 2,
-      cloudBody: maxChunkCount * CLOUD_BODY_LOBES.length,
-      cloudWisp: maxChunkCount * CLOUD_WISP_LOBES.length,
+      cloudBody: maxChunkCount * CLOUD_BODY_LOBES.length * 2,
+      cloudWisp: maxChunkCount * CLOUD_WISP_LOBES.length * 2,
     });
 
   scene.add(group);
@@ -872,11 +1065,15 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
   };
 
   const rebuildFrontierDecor = (anchorX, anchorZ) => {
-    let treeIndex = 0;
-    let rockIndex = 0;
+    const speciesCounters = { pine: 0, oak: 0, birch: 0, deadTree: 0, bush: 0 };
+    const rockVariantCounters = [0, 0, 0];
+    let smallStoneIndex = 0;
+    let fallenLogIndex = 0;
     let landmarkIndex = 0;
     let cloudBodyIndex = 0;
     let cloudWispIndex = 0;
+
+    const sp = decor.treeSpecies;
 
     for (let chunkZ = -radius; chunkZ <= radius; chunkZ += 1) {
       for (let chunkX = -radius; chunkX <= radius; chunkX += 1) {
@@ -892,40 +1089,128 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
           }
 
           const height = getGroundHeightAt(worldX, worldZ, theme);
-          const treeHeight = 0.9 + hash2(worldX, worldZ) * 1.2;
           const rotY = hash2(worldX + 7, worldZ - 5) * Math.PI * 2;
-          const s = 0.85 + treeHeight * 0.25;
 
-          setInstanceTransform(
-            decor.treesTrunk,
-            treeIndex,
-            worldToLocal(worldX, height + 3 * treeHeight, worldZ, anchorX, anchorZ, scratchPosition),
-            rotY,
-            scratchScale.set(1, treeHeight, 1),
-          );
-          setInstanceTransform(
-            decor.treesCrownBottom,
-            treeIndex,
-            worldToLocal(worldX, height + 5.2 * treeHeight, worldZ, anchorX, anchorZ, scratchPosition),
-            rotY,
-            scratchScale.set(s, s, s),
-          );
-          setInstanceTransform(
-            decor.treesCrownMiddle,
-            treeIndex,
-            worldToLocal(worldX, height + 7.4 * treeHeight, worldZ, anchorX, anchorZ, scratchPosition),
-            rotY,
-            scratchScale.set(s * 0.9, s * 0.95, s * 0.9),
-          );
-          setInstanceTransform(
-            decor.treesCrownTop,
-            treeIndex,
-            worldToLocal(worldX, height + 9.2 * treeHeight, worldZ, anchorX, anchorZ, scratchPosition),
-            rotY,
-            scratchScale.set(s * 0.75, s * 0.85, s * 0.75),
-          );
+          // Select species based on cumulative weights
+          const speciesRoll = hash2(worldX * 0.73, worldZ * 0.91);
+          let speciesKey;
+          if (speciesRoll < 0.35) speciesKey = 'pine';
+          else if (speciesRoll < 0.60) speciesKey = 'oak';
+          else if (speciesRoll < 0.80) speciesKey = 'birch';
+          else if (speciesRoll < 0.90) speciesKey = 'deadTree';
+          else speciesKey = 'bush';
 
-          treeIndex += 1;
+          const idx = speciesCounters[speciesKey];
+
+          // Per-instance variation
+          const leanAngle = (hash2(worldX + 23, worldZ - 17) - 0.5) * 0.174; // +-5 degrees
+          const leanDir = hash2(worldX - 31, worldZ + 41) * Math.PI * 2;
+          const leanX = Math.sin(leanDir) * leanAngle;
+          const leanZ = Math.cos(leanDir) * leanAngle;
+
+          if (speciesKey === 'pine') {
+            const s = 0.7 + hash2(worldX, worldZ) * 0.8; // 0.7-1.5
+            setInstanceTransformWithLean(
+              sp.pine.trunk, idx,
+              worldToLocal(worldX, height + 3.5 * s, worldZ, anchorX, anchorZ, scratchPosition),
+              rotY, leanX, leanZ, scratchScale.set(s, s, s),
+            );
+            setInstanceTransformWithLean(
+              sp.pine.crowns[0], idx,
+              worldToLocal(worldX, height + 3.5 * s, worldZ, anchorX, anchorZ, scratchPosition),
+              rotY, leanX, leanZ, scratchScale.set(s, s, s),
+            );
+            setInstanceTransformWithLean(
+              sp.pine.crowns[1], idx,
+              worldToLocal(worldX, height + 6.0 * s, worldZ, anchorX, anchorZ, scratchPosition),
+              rotY, leanX, leanZ, scratchScale.set(s, s, s),
+            );
+            setInstanceTransformWithLean(
+              sp.pine.crowns[2], idx,
+              worldToLocal(worldX, height + 8.0 * s, worldZ, anchorX, anchorZ, scratchPosition),
+              rotY, leanX, leanZ, scratchScale.set(s, s, s),
+            );
+          } else if (speciesKey === 'oak') {
+            const s = 0.8 + hash2(worldX, worldZ) * 0.5; // 0.8-1.3
+            setInstanceTransformWithLean(
+              sp.oak.trunk, idx,
+              worldToLocal(worldX, height + 2.5 * s, worldZ, anchorX, anchorZ, scratchPosition),
+              rotY, leanX, leanZ, scratchScale.set(s, s, s),
+            );
+            setInstanceTransformWithLean(
+              sp.oak.crowns[0], idx,
+              worldToLocal(worldX, height + 5.5 * s, worldZ, anchorX, anchorZ, scratchPosition),
+              rotY, leanX, leanZ, scratchScale.set(s, 0.65 * s, s),
+            );
+          } else if (speciesKey === 'birch') {
+            const s = 0.75 + hash2(worldX, worldZ) * 0.55; // 0.75-1.3
+            setInstanceTransformWithLean(
+              sp.birch.trunk, idx,
+              worldToLocal(worldX, height + 4.0 * s, worldZ, anchorX, anchorZ, scratchPosition),
+              rotY, leanX, leanZ, scratchScale.set(s, s, s),
+            );
+            // Spread crowns horizontally
+            const spreadX = Math.cos(rotY) * 0.8 * s;
+            const spreadZ = Math.sin(rotY) * 0.8 * s;
+            setInstanceTransformWithLean(
+              sp.birch.crowns[0], idx,
+              worldToLocal(worldX - spreadX, height + 5.0 * s, worldZ - spreadZ, anchorX, anchorZ, scratchPosition),
+              rotY, leanX, leanZ, scratchScale.set(s, s, s),
+            );
+            setInstanceTransformWithLean(
+              sp.birch.crowns[1], idx,
+              worldToLocal(worldX + spreadX * 0.5, height + 6.8 * s, worldZ + spreadZ * 0.5, anchorX, anchorZ, scratchPosition),
+              rotY, leanX, leanZ, scratchScale.set(s, s, s),
+            );
+            setInstanceTransformWithLean(
+              sp.birch.crowns[2], idx,
+              worldToLocal(worldX + spreadX, height + 8.2 * s, worldZ + spreadZ, anchorX, anchorZ, scratchPosition),
+              rotY, leanX, leanZ, scratchScale.set(s * 0.9, s * 0.9, s * 0.9),
+            );
+          } else if (speciesKey === 'deadTree') {
+            const s = 0.7 + hash2(worldX, worldZ) * 0.6; // 0.7-1.3
+            setInstanceTransformWithLean(
+              sp.deadTree.trunk, idx,
+              worldToLocal(worldX, height + 3.0 * s, worldZ, anchorX, anchorZ, scratchPosition),
+              rotY, leanX, leanZ, scratchScale.set(s, s, s),
+            );
+            // Branches at different angles
+            const branchAngle0 = rotY + 0.6;
+            const branchAngle1 = rotY + 2.4;
+            const branchAngle2 = rotY + 4.2;
+            setInstanceTransformWithLean(
+              sp.deadTree.crowns[0], idx,
+              worldToLocal(worldX, height + 3.5 * s, worldZ, anchorX, anchorZ, scratchPosition),
+              branchAngle0, 0.5, leanZ, scratchScale.set(s, s, s),
+            );
+            setInstanceTransformWithLean(
+              sp.deadTree.crowns[1], idx,
+              worldToLocal(worldX, height + 4.5 * s, worldZ, anchorX, anchorZ, scratchPosition),
+              branchAngle1, -0.4, leanZ, scratchScale.set(s, s, s),
+            );
+            setInstanceTransformWithLean(
+              sp.deadTree.crowns[2], idx,
+              worldToLocal(worldX, height + 5.0 * s, worldZ, anchorX, anchorZ, scratchPosition),
+              branchAngle2, 0.3, leanZ, scratchScale.set(s, s, s),
+            );
+          } else {
+            // bush
+            const s = 0.7 + hash2(worldX, worldZ) * 0.6; // 0.7-1.3
+            const bSpreadX = Math.cos(rotY) * 1.2 * s;
+            const bSpreadZ = Math.sin(rotY) * 1.2 * s;
+            setInstanceTransform(
+              sp.bush.crowns[0], idx,
+              worldToLocal(worldX - bSpreadX * 0.5, height + 0.8 * s, worldZ - bSpreadZ * 0.5, anchorX, anchorZ, scratchPosition),
+              rotY, scratchScale.set(s, s * 0.8, s),
+            );
+            setInstanceTransform(
+              sp.bush.crowns[1], idx,
+              worldToLocal(worldX + bSpreadX * 0.5, height + 0.6 * s, worldZ + bSpreadZ * 0.5, anchorX, anchorZ, scratchPosition),
+              rotY, scratchScale.set(s * 0.9, s * 0.7, s * 0.9),
+            );
+          }
+
+          speciesCounters[speciesKey] += 1;
         }
 
         for (let i = 0; i < 8; i += 1) {
@@ -937,15 +1222,92 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
           }
 
           const height = getGroundHeightAt(worldX, worldZ, theme);
-          const scaleValue = 0.7 + hash2(worldX + 9, worldZ + 11) * 1.7;
+          const rotY = hash2(worldX + 13, worldZ + 5) * Math.PI * 2;
+
+          // Select rock variant using hash-based cumulative weight
+          const variantRoll = hash2(worldX * 0.61, worldZ * 0.79);
+          let variantIdx;
+          if (variantRoll < 0.4) variantIdx = 0;        // boulders
+          else if (variantRoll < 0.75) variantIdx = 1;   // flat slabs
+          else variantIdx = 2;                            // round stones
+
+          const baseScale = 0.7 + hash2(worldX + 9, worldZ + 11) * 1.7;
+          let sx, sy, sz;
+          if (variantIdx === 0) {
+            // Boulders: non-uniform, tall-ish
+            sx = baseScale * (0.8 + hash2(worldX + 21, worldZ + 33) * 0.4);
+            sy = baseScale * (0.5 + hash2(worldX + 37, worldZ + 19) * 0.5);
+            sz = baseScale * (0.8 + hash2(worldX + 43, worldZ + 27) * 0.4);
+          } else if (variantIdx === 1) {
+            // Flat slabs: wide and flat
+            sx = baseScale * (1.0 + hash2(worldX + 21, worldZ + 33) * 0.8);
+            sy = baseScale * (0.3 + hash2(worldX + 37, worldZ + 19) * 0.3);
+            sz = baseScale * (1.0 + hash2(worldX + 43, worldZ + 27) * 0.5);
+          } else {
+            // Round stones: nearly uniform
+            sx = baseScale * (0.9 + hash2(worldX + 21, worldZ + 33) * 0.2);
+            sy = baseScale * (0.8 + hash2(worldX + 37, worldZ + 19) * 0.3);
+            sz = baseScale * (0.9 + hash2(worldX + 43, worldZ + 27) * 0.2);
+          }
+
+          const vidx = rockVariantCounters[variantIdx];
           setInstanceTransform(
-            decor.rocks,
-            rockIndex,
-            worldToLocal(worldX, height + 1.1 * scaleValue, worldZ, anchorX, anchorZ, scratchPosition),
-            hash2(worldX + 13, worldZ + 5) * Math.PI * 2,
-            scratchScale.set(scaleValue * 1.1, scaleValue, scaleValue * 0.9),
+            decor.rockVariants[variantIdx],
+            vidx,
+            worldToLocal(worldX, height + 1.1 * sy, worldZ, anchorX, anchorZ, scratchPosition),
+            rotY,
+            scratchScale.set(sx, sy, sz),
           );
-          rockIndex += 1;
+          rockVariantCounters[variantIdx] += 1;
+
+          // Ground scatter: 3-5 small stones near each rock
+          const stoneCount = 3 + Math.floor(hash2(worldX + 51, worldZ + 59) * 3);
+          for (let s = 0; s < stoneCount; s += 1) {
+            const stoneOffX = (hash2(worldX + s * 7 + 61, worldZ + s * 11 + 67) - 0.5) * 6;
+            const stoneOffZ = (hash2(worldX + s * 13 + 71, worldZ + s * 17 + 73) - 0.5) * 6;
+            const stoneX = worldX + stoneOffX;
+            const stoneZ = worldZ + stoneOffZ;
+            const stoneHeight = getGroundHeightAt(stoneX, stoneZ, theme);
+            const stoneScale = 0.5 + hash2(stoneX + 3, stoneZ + 7) * 1.0;
+            const stoneRotY = hash2(stoneX + 19, stoneZ + 23) * Math.PI * 2;
+            setInstanceTransform(
+              decor.smallStones,
+              smallStoneIndex,
+              worldToLocal(stoneX, stoneHeight + 0.15 * stoneScale, stoneZ, anchorX, anchorZ, scratchPosition),
+              stoneRotY,
+              scratchScale.set(stoneScale, stoneScale * 0.7, stoneScale),
+            );
+            smallStoneIndex += 1;
+          }
+        }
+
+        // Fallen logs near tree positions (~15% chance per tree)
+        for (let i = 0; i < 12; i += 1) {
+          const treeWorldX = worldChunkX + hash2(worldChunkX + i * 17, worldChunkZ + i * 31) * chunkSize;
+          const treeWorldZ = worldChunkZ + hash2(worldChunkX - i * 13, worldChunkZ + i * 19) * chunkSize;
+          const logChance = hash2(treeWorldX * 0.53, treeWorldZ * 0.47);
+          if (logChance > 0.15) {
+            continue;
+          }
+          const logBiome = getBiomeAt(treeWorldX, treeWorldZ, theme);
+          if (logBiome === 'sea') {
+            continue;
+          }
+          const logOffX = (hash2(treeWorldX + 81, treeWorldZ + 83) - 0.5) * 4;
+          const logOffZ = (hash2(treeWorldX + 87, treeWorldZ + 89) - 0.5) * 4;
+          const logX = treeWorldX + logOffX;
+          const logZ = treeWorldZ + logOffZ;
+          const logHeight = getGroundHeightAt(logX, logZ, theme);
+          const logRotY = hash2(logX + 91, logZ + 97) * Math.PI * 2;
+          const logScale = 0.8 + hash2(logX + 101, logZ + 103) * 0.5;
+          setInstanceTransformEuler(
+            decor.fallenLogs,
+            fallenLogIndex,
+            worldToLocal(logX, logHeight + 0.2, logZ, anchorX, anchorZ, scratchPosition),
+            0, logRotY, Math.PI / 2,
+            scratchScale.set(logScale, logScale, logScale),
+          );
+          fallenLogIndex += 1;
         }
 
         const landmarkChance = hash2(worldChunkX * 0.25, worldChunkZ * 0.25);
@@ -967,19 +1329,37 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
         }
 
         const cloudChance = hash2(worldChunkX * 0.17, worldChunkZ * 0.17);
-        if (cloudChance > 0.28) {
+        if (cloudChance > 0.18) {
           const worldX = worldChunkX + chunkSize * (0.12 + hash2(worldChunkX + 18, worldChunkZ - 7) * 0.76);
           const worldZ = worldChunkZ + chunkSize * (0.12 + hash2(worldChunkX - 11, worldChunkZ + 13) * 0.76);
-          const y = 50 + hash2(worldChunkX * 0.21, worldChunkZ * 0.19) * 20;
-          const bankWidth = 1.5 + cloudChance * 2.1;
-          const bankHeight = 1.1 + cloudChance * 0.85;
-          const bankDepth = 1.2 + hash2(worldChunkX * 0.09, worldChunkZ * 0.09) * 0.85;
+
+          // Select cloud type using hash against cumulative weights
+          const typeHash = hash2(worldChunkX * 0.53, worldChunkZ * 0.47);
+          let cloudType = CLOUD_TYPES[0];
+          if (typeHash > 0.4 && typeHash <= 0.7) cloudType = CLOUD_TYPES[1];
+          else if (typeHash > 0.7 && typeHash <= 0.9) cloudType = CLOUD_TYPES[2];
+          else if (typeHash > 0.9) cloudType = CLOUD_TYPES[3];
+
+          // Altitude from the type's range
+          const altHash = hash2(worldChunkX * 0.21, worldChunkZ * 0.19);
+          const y = cloudType.altitudeRange[0] + altHash * (cloudType.altitudeRange[1] - cloudType.altitudeRange[0]);
+
+          // Scale from the type's scaleRange
+          const scaleHash = hash2(worldChunkX * 0.33, worldChunkZ * 0.29);
+          const typeScale = cloudType.baseScale * (cloudType.scaleRange[0] + scaleHash * (cloudType.scaleRange[1] - cloudType.scaleRange[0]));
+
+          const bankWidth = (1.5 + cloudChance * 2.1) * typeScale;
+          const bankHeight = (1.1 + cloudChance * 0.85) * typeScale;
+          const bankDepth = (1.2 + hash2(worldChunkX * 0.09, worldChunkZ * 0.09) * 0.85) * typeScale;
           const bankRotation = (hash2(worldChunkX + 91, worldChunkZ - 37) - 0.5) * 0.42;
 
-          for (let i = 0; i < CLOUD_BODY_LOBES.length; i += 1) {
-            const lobe = CLOUD_BODY_LOBES[i];
+          // Grey tint variation via slight scale jitter per cloud instance
+          const tintJitter = 0.92 + hash2(worldChunkX * 0.61, worldChunkZ * 0.59) * 0.16;
+
+          for (let i = 0; i < cloudType.lobes.length; i += 1) {
+            const lobe = cloudType.lobes[i];
             const jitter = hash2(worldChunkX * (0.37 + i * 0.11), worldChunkZ * (0.31 + i * 0.07));
-            const puffScale = 0.86 + jitter * 0.42;
+            const puffScale = (0.86 + jitter * 0.42) * tintJitter;
             setInstanceTransform(
               decor.cloudsBody,
               cloudBodyIndex,
@@ -1001,10 +1381,10 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
             cloudBodyIndex += 1;
           }
 
-          for (let i = 0; i < CLOUD_WISP_LOBES.length; i += 1) {
-            const lobe = CLOUD_WISP_LOBES[i];
+          for (let i = 0; i < cloudType.wisps.length; i += 1) {
+            const lobe = cloudType.wisps[i];
             const jitter = hash2(worldChunkX * (0.43 + i * 0.09), worldChunkZ * (0.29 + i * 0.12));
-            const puffScale = 0.92 + jitter * 0.34;
+            const puffScale = (0.92 + jitter * 0.34) * tintJitter;
             setInstanceTransform(
               decor.cloudsWisp,
               cloudWispIndex,
@@ -1029,11 +1409,22 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
       }
     }
 
-    hideRemainingInstances(decor.treesTrunk, treeIndex, scratchPosition);
-    hideRemainingInstances(decor.treesCrownBottom, treeIndex, scratchPosition);
-    hideRemainingInstances(decor.treesCrownMiddle, treeIndex, scratchPosition);
-    hideRemainingInstances(decor.treesCrownTop, treeIndex, scratchPosition);
-    hideRemainingInstances(decor.rocks, rockIndex, scratchPosition);
+    // Hide remaining instances for all tree species
+    const sp2 = decor.treeSpecies;
+    hideRemainingInstances(sp2.pine.trunk, speciesCounters.pine, scratchPosition);
+    for (const c of sp2.pine.crowns) hideRemainingInstances(c, speciesCounters.pine, scratchPosition);
+    hideRemainingInstances(sp2.oak.trunk, speciesCounters.oak, scratchPosition);
+    for (const c of sp2.oak.crowns) hideRemainingInstances(c, speciesCounters.oak, scratchPosition);
+    hideRemainingInstances(sp2.birch.trunk, speciesCounters.birch, scratchPosition);
+    for (const c of sp2.birch.crowns) hideRemainingInstances(c, speciesCounters.birch, scratchPosition);
+    hideRemainingInstances(sp2.deadTree.trunk, speciesCounters.deadTree, scratchPosition);
+    for (const c of sp2.deadTree.crowns) hideRemainingInstances(c, speciesCounters.deadTree, scratchPosition);
+    for (const c of sp2.bush.crowns) hideRemainingInstances(c, speciesCounters.bush, scratchPosition);
+    for (let v = 0; v < decor.rockVariants.length; v += 1) {
+      hideRemainingInstances(decor.rockVariants[v], rockVariantCounters[v], scratchPosition);
+    }
+    hideRemainingInstances(decor.smallStones, smallStoneIndex, scratchPosition);
+    hideRemainingInstances(decor.fallenLogs, fallenLogIndex, scratchPosition);
     hideRemainingInstances(decor.landmarks, landmarkIndex, scratchPosition);
     hideRemainingInstances(decor.cloudsBody, cloudBodyIndex, scratchPosition);
     hideRemainingInstances(decor.cloudsWisp, cloudWispIndex, scratchPosition);
@@ -1168,6 +1559,13 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
               scratchScale.set(towerWidth, towerHeight, towerDepth),
             );
             tempColor.setStyle(materialColor);
+            // Per-building facade tint variation
+            const tintR = 1.0 + (hash2(worldX + 44.4, worldZ + 55.5) - 0.5) * 0.08;
+            const tintG = 1.0 + (hash2(worldX + 66.6, worldZ + 77.7) - 0.5) * 0.08;
+            const tintB = 1.0 + (hash2(worldX + 88.8, worldZ + 99.9) - 0.5) * 0.08;
+            tempColor.r *= tintR;
+            tempColor.g *= tintG;
+            tempColor.b *= tintB;
             decor.towerCores.setColorAt(towerIndex, tempColor);
             cityObstacles.push({
               center: new THREE.Vector3(worldX, height + towerHeight * 0.5, worldZ),
@@ -1247,8 +1645,25 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
                   : 2;
             const rowGap = towerHeight / (windowRows + 2);
             const rowHeight = Math.max(1.2, Math.min(3.4, rowGap * 0.34));
+            // Per-building window lit fraction — varies how many rows are illuminated
+            const litFraction = 0.3 + hash2(worldX + 99.9, worldZ + 111.1) * 0.4;
             for (let row = 0; row < windowRows; row += 1) {
               const rowOffset = -towerHeight * 0.34 + rowGap * (row + 1);
+
+              // Per-row window warmth variation
+              const windowHash = hash2(worldX + row * 7.1, worldZ + row * 11.3);
+              const isLit = windowHash < litFraction;
+              let nsWindowColor;
+              let ewWindowColor;
+              if (isLit) {
+                const warmth = 0.8 + hash2(worldX + row * 3.3, worldZ + row * 5.5) * 0.4;
+                nsWindowColor = { r: warmth, g: warmth * 0.85, b: warmth * 0.65 };
+                ewWindowColor = { r: warmth * 0.9, g: warmth * 0.78, b: warmth * 0.58 };
+              } else {
+                nsWindowColor = null; // use dark unlit
+                ewWindowColor = null;
+              }
+
               setLocalInstanceTransform(
                 decor.windowBandsNorthSouth,
                 windowNsIndex,
@@ -1260,7 +1675,11 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
                 scratchScale.set(towerWidth * 0.82, rowHeight, 0.34),
                 scratchPosition,
               );
-              tempColor.setStyle(frontWindowColor);
+              if (nsWindowColor) {
+                tempColor.setRGB(nsWindowColor.r, nsWindowColor.g, nsWindowColor.b);
+              } else {
+                tempColor.set(0x112233);
+              }
               decor.windowBandsNorthSouth.setColorAt(windowNsIndex, tempColor);
               windowNsIndex += 1;
               setLocalInstanceTransform(
@@ -1274,7 +1693,17 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
                 scratchScale.set(towerWidth * 0.82, rowHeight, 0.34),
                 scratchPosition,
               );
-              tempColor.setStyle(frontWindowColor);
+              if (nsWindowColor) {
+                const backWarmth = 0.8 + hash2(worldX + row * 4.7, worldZ + row * 9.1) * 0.4;
+                const backLit = hash2(worldX + row * 13.1, worldZ + row * 17.3) < litFraction;
+                if (backLit) {
+                  tempColor.setRGB(backWarmth, backWarmth * 0.85, backWarmth * 0.65);
+                } else {
+                  tempColor.set(0x112233);
+                }
+              } else {
+                tempColor.set(0x112233);
+              }
               decor.windowBandsNorthSouth.setColorAt(windowNsIndex, tempColor);
               windowNsIndex += 1;
               setLocalInstanceTransform(
@@ -1288,7 +1717,11 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
                 scratchScale.set(0.34, rowHeight, towerDepth * 0.8),
                 scratchPosition,
               );
-              tempColor.setStyle(sideWindowColor);
+              if (ewWindowColor) {
+                tempColor.setRGB(ewWindowColor.r, ewWindowColor.g, ewWindowColor.b);
+              } else {
+                tempColor.set(0x112233);
+              }
               decor.windowBandsEastWest.setColorAt(windowEwIndex, tempColor);
               windowEwIndex += 1;
               setLocalInstanceTransform(
@@ -1302,7 +1735,17 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
                 scratchScale.set(0.34, rowHeight, towerDepth * 0.8),
                 scratchPosition,
               );
-              tempColor.setStyle(sideWindowColor);
+              if (ewWindowColor) {
+                const sideWarmth = 0.8 + hash2(worldX + row * 6.1, worldZ + row * 8.7) * 0.4;
+                const sideLit = hash2(worldX + row * 15.7, worldZ + row * 19.3) < litFraction;
+                if (sideLit) {
+                  tempColor.setRGB(sideWarmth * 0.9, sideWarmth * 0.78, sideWarmth * 0.58);
+                } else {
+                  tempColor.set(0x112233);
+                }
+              } else {
+                tempColor.set(0x112233);
+              }
               decor.windowBandsEastWest.setColorAt(windowEwIndex, tempColor);
               windowEwIndex += 1;
             }
@@ -1327,6 +1770,96 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
               tempColor.setStyle('#4f555e');
               decor.rooftopUnits.setColorAt(rooftopIndex, tempColor);
               rooftopIndex += 1;
+            }
+
+            // Enhanced rooftop features for tall buildings
+            if (towerHeight > 22) {
+              const roofFeatureHash = hash2(worldX + 31.1, worldZ + 43.7);
+              // Antenna — tall thin element
+              if (roofFeatureHash > 0.7) {
+                const antennaH = 3 + hash2(worldX + 37.2, worldZ + 51.3) * 2;
+                setLocalInstanceTransform(
+                  decor.rooftopUnits,
+                  rooftopIndex,
+                  anchorX,
+                  anchorZ,
+                  { x: worldX, y: height + towerHeight + antennaH * 0.5, z: worldZ },
+                  towerRotation,
+                  {
+                    x: towerWidth * 0.08,
+                    y: 0,
+                    z: -towerDepth * 0.12,
+                  },
+                  scratchScale.set(0.3, antennaH, 0.3),
+                  scratchPosition,
+                );
+                tempColor.setStyle('#6b7178');
+                decor.rooftopUnits.setColorAt(rooftopIndex, tempColor);
+                rooftopIndex += 1;
+              }
+              // AC unit cluster — two squat boxes
+              if (roofFeatureHash > 0.4) {
+                const acH = 1 + hash2(worldX + 41.5, worldZ + 59.2) * 1;
+                setLocalInstanceTransform(
+                  decor.rooftopUnits,
+                  rooftopIndex,
+                  anchorX,
+                  anchorZ,
+                  { x: worldX, y: height + towerHeight + acH * 0.5, z: worldZ },
+                  towerRotation,
+                  {
+                    x: -towerWidth * 0.22,
+                    y: 0,
+                    z: towerDepth * 0.24,
+                  },
+                  scratchScale.set(1.5, acH, 1.2),
+                  scratchPosition,
+                );
+                tempColor.setStyle('#555d64');
+                decor.rooftopUnits.setColorAt(rooftopIndex, tempColor);
+                rooftopIndex += 1;
+                // Second AC unit offset nearby
+                setLocalInstanceTransform(
+                  decor.rooftopUnits,
+                  rooftopIndex,
+                  anchorX,
+                  anchorZ,
+                  { x: worldX, y: height + towerHeight + acH * 0.5, z: worldZ },
+                  towerRotation,
+                  {
+                    x: -towerWidth * 0.22 + 2.0,
+                    y: 0,
+                    z: towerDepth * 0.24,
+                  },
+                  scratchScale.set(1.3, acH * 0.85, 1.1),
+                  scratchPosition,
+                );
+                tempColor.setStyle('#4d545b');
+                decor.rooftopUnits.setColorAt(rooftopIndex, tempColor);
+                rooftopIndex += 1;
+              }
+              // Water tower — wider, medium height
+              if (roofFeatureHash > 0.2 && roofFeatureHash <= 0.4) {
+                const wtH = 2 + hash2(worldX + 47.8, worldZ + 63.4) * 1;
+                setLocalInstanceTransform(
+                  decor.rooftopUnits,
+                  rooftopIndex,
+                  anchorX,
+                  anchorZ,
+                  { x: worldX, y: height + towerHeight + wtH * 0.5, z: worldZ },
+                  towerRotation,
+                  {
+                    x: towerWidth * 0.26,
+                    y: 0,
+                    z: -towerDepth * 0.22,
+                  },
+                  scratchScale.set(2.0, wtH, 2.0),
+                  scratchPosition,
+                );
+                tempColor.setStyle('#7a8088');
+                decor.rooftopUnits.setColorAt(rooftopIndex, tempColor);
+                rooftopIndex += 1;
+              }
             }
 
             if (hash2(worldX - 4, worldZ + 13) > 0.35) {
@@ -1604,27 +2137,30 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
     if (snappedX !== chunkAnchor.x || snappedZ !== chunkAnchor.z) {
       chunkAnchor.x = snappedX;
       chunkAnchor.z = snappedZ;
+
+      // Rebuild ground mesh — only when chunk anchor changes
+      group.position.set(snappedX, 0, snappedZ);
+      const colorAttribute = groundGeometry.getAttribute('color');
+      for (let i = 0; i < positions.count; i += 1) {
+        const local = basePositions[i];
+        const worldX = snappedX + local.x;
+        const worldZ = snappedZ + local.z;
+        const height = getGroundHeightAt(worldX, worldZ, theme);
+        positions.setY(i, height);
+        tempColor.copy(getSurfaceColor(worldX, worldZ, height, theme));
+        colorAttribute.setXYZ(i, tempColor.r, tempColor.g, tempColor.b);
+        groundSeaFlags[i] = getBiomeAt(worldX, worldZ, theme) === 'sea' ? 1 : 0;
+      }
+      positions.needsUpdate = true;
+      colorAttribute.needsUpdate = true;
+      groundGeometry.computeVertexNormals();
+
       if (theme === MAP_THEMES.CITY) {
         rebuildCityDecor(snappedX, snappedZ);
       } else {
         rebuildFrontierDecor(snappedX, snappedZ);
       }
     }
-
-    group.position.set(snappedX, 0, snappedZ);
-    const colorAttribute = groundGeometry.getAttribute('color');
-    for (let i = 0; i < positions.count; i += 1) {
-      const local = basePositions[i];
-      const worldX = snappedX + local.x;
-      const worldZ = snappedZ + local.z;
-      const height = getGroundHeightAt(worldX, worldZ, theme);
-      positions.setY(i, height);
-      tempColor.copy(getSurfaceColor(worldX, worldZ, height, theme));
-      colorAttribute.setXYZ(i, tempColor.r, tempColor.g, tempColor.b);
-    }
-    positions.needsUpdate = true;
-    colorAttribute.needsUpdate = true;
-    groundGeometry.computeVertexNormals();
 
     if (theme === MAP_THEMES.CITY) {
       updateCityAnimations(snappedX, snappedZ, time);
@@ -1648,6 +2184,45 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
 
   refreshTerrain(new THREE.Vector3(0, 0, 0), 0);
 
+  const updateWater = (time) => {
+    const anchorX = chunkAnchor.x;
+    const anchorZ = chunkAnchor.z;
+
+    // Animate sea plane vertices
+    for (let i = 0; i < seaPositions.count; i++) {
+      const localX = seaPositions.getX(i);
+      const localY = seaPositions.getY(i);
+      const wx = localX + anchorX;
+      const wz = -localY + anchorZ;
+      const wave1 = Math.sin(wx * 0.08 + time * 1.2) * 0.3;
+      const wave2 = Math.cos(wz * 0.06 + time * 0.8) * 0.25;
+      const wave3 = Math.sin((wx + wz) * 0.12 + time * 1.6) * 0.15;
+      seaPositions.setZ(i, seaOriginalZ[i] + wave1 + wave2 + wave3);
+    }
+    seaPositions.needsUpdate = true;
+    seaGeometry.computeVertexNormals();
+
+    // Animate ground vertices that are in sea biome
+    let hasSeaVerts = false;
+    for (let i = 0; i < positions.count; i++) {
+      if (!groundSeaFlags[i]) continue;
+      hasSeaVerts = true;
+      const local = basePositions[i];
+      const wx = anchorX + local.x;
+      const wz = anchorZ + local.z;
+
+      const wave1 = Math.sin(wx * 0.08 + time * 1.2) * 0.3;
+      const wave2 = Math.cos(wz * 0.06 + time * 0.8) * 0.25;
+      const wave3 = Math.sin((wx + wz) * 0.12 + time * 1.6) * 0.15;
+
+      positions.setY(i, CONFIG.world.seaLevel + wave1 + wave2 + wave3);
+    }
+    if (hasSeaVerts) {
+      positions.needsUpdate = true;
+      groundGeometry.computeVertexNormals();
+    }
+  };
+
   return {
     group,
     getBiomeAt: (x, z) => getBiomeAt(x, z, theme),
@@ -1662,6 +2237,9 @@ export function createTerrain(scene, rng, { mapTheme } = {}) {
     clampToArena,
     update(center, time = 0) {
       refreshTerrain(center, time);
+    },
+    updateWater(time) {
+      updateWater(time);
     },
     getSpawnPoint(type, playerPosition, options) {
       return resolveSpawnPosition(type, playerPosition, rng, theme, options);

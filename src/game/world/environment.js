@@ -94,25 +94,60 @@ function createSkyMaterial(preset) {
       topColor: { value: new THREE.Color(preset.topColor) },
       horizonColor: { value: new THREE.Color(preset.horizonColor) },
       bottomColor: { value: new THREE.Color(preset.bottomColor) },
+      sunDirection: { value: new THREE.Vector3(preset.sunOffset.x, preset.sunOffset.y, preset.sunOffset.z).normalize() },
+      sunColor: { value: new THREE.Color(preset.sunGlow) },
+      time: { value: 0 },
     },
     vertexShader: `
       varying vec3 vWorldPosition;
       void main() {
-        vec4 worldPosition = modelMatrix * vec4(position, 1.0);
-        vWorldPosition = worldPosition.xyz;
-        gl_Position = projectionMatrix * viewMatrix * worldPosition;
+        vec4 worldPos = modelMatrix * vec4(position, 1.0);
+        vWorldPosition = worldPos.xyz;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
       }
     `,
     fragmentShader: `
       uniform vec3 topColor;
       uniform vec3 horizonColor;
       uniform vec3 bottomColor;
+      uniform vec3 sunDirection;
+      uniform vec3 sunColor;
+      uniform float time;
       varying vec3 vWorldPosition;
 
+      float hash(vec2 p) {
+        return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+      }
+      float noise(vec2 p) {
+        vec2 i = floor(p);
+        vec2 f = fract(p);
+        f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(hash(i), hash(i + vec2(1,0)), f.x),
+                   mix(hash(i + vec2(0,1)), hash(i + vec2(1,1)), f.x), f.y);
+      }
+      float fbm(vec2 p) {
+        return noise(p) * 0.5 + noise(p * 2.0 + vec2(100.0)) * 0.25;
+      }
+
       void main() {
-        float h = normalize(vWorldPosition).y * 0.5 + 0.5;
-        vec3 color = mix(bottomColor, horizonColor, smoothstep(0.0, 0.45, h));
-        color = mix(color, topColor, smoothstep(0.48, 1.0, h));
+        vec3 dir = normalize(vWorldPosition);
+        float h = dir.y;
+        vec3 color = h > 0.0
+          ? mix(horizonColor, topColor, smoothstep(0.0, 0.45, h))
+          : mix(horizonColor, bottomColor, smoothstep(0.0, -0.25, h));
+
+        float sunDot = dot(dir, normalize(sunDirection));
+        color += sunColor * (smoothstep(0.9965, 0.9985, sunDot)
+          + pow(max(sunDot, 0.0), 64.0) * 0.4
+          + pow(max(sunDot, 0.0), 8.0) * 0.15);
+        color += vec3(0.3, 0.15, 0.05) * (1.0 - abs(h)) * pow(max(sunDot, 0.0), 3.0) * 0.3;
+
+        if (h > -0.05 && h < 0.35) {
+          vec2 cloudUV = dir.xz / (h + 0.1) * 0.3 + time * 0.002;
+          float clouds = smoothstep(0.35, 0.65, fbm(cloudUV * 3.0));
+          float cloudFade = smoothstep(-0.05, 0.05, h) * smoothstep(0.35, 0.15, h);
+          color = mix(color, mix(horizonColor, vec3(1.0), 0.6), clouds * cloudFade * 0.5);
+        }
         gl_FragColor = vec4(color, 1.0);
       }
     `,
@@ -127,7 +162,8 @@ export function createEnvironment(scene, { mapTheme } = {}) {
   scene.fog = new THREE.Fog(preset.fog, preset.fogNear, preset.fogFar);
 
   const skyGroup = new THREE.Group();
-  const sky = new THREE.Mesh(new THREE.SphereGeometry(420, 32, 32), createSkyMaterial(preset));
+  const skyMat = createSkyMaterial(preset);
+  const sky = new THREE.Mesh(new THREE.SphereGeometry(420, 32, 32), skyMat);
   const sunGlow = new THREE.Mesh(
     new THREE.SphereGeometry(9, 18, 18),
     new THREE.MeshBasicMaterial({
@@ -159,7 +195,7 @@ export function createEnvironment(scene, { mapTheme } = {}) {
   const sunTarget = new THREE.Object3D();
   sun.position.set(preset.sunOffset.x, preset.sunOffset.y, preset.sunOffset.z);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.mapSize.set(1024, 1024);
   sun.shadow.camera.near = 10;
   sun.shadow.camera.far = 360;
   sun.shadow.camera.left = -180;
@@ -172,9 +208,16 @@ export function createEnvironment(scene, { mapTheme } = {}) {
 
   scene.add(hemi, ambient, sun, sunTarget);
 
+  // Cached Color objects for height-based fog (avoid per-frame allocation)
+  const _baseFogColor = new THREE.Color(preset.fog);
+  const _distantFogColor = new THREE.Color(preset.fog).offsetHSL(0.05, 0, -0.05);
+
   return {
     update(center, time = 0) {
       skyGroup.position.copy(center);
+      if (skyMat && skyMat.uniforms) {
+        skyMat.uniforms.time.value = time;
+      }
       sun.position.set(
         center.x + preset.sunOffset.x,
         preset.sunOffset.y,
@@ -187,7 +230,19 @@ export function createEnvironment(scene, { mapTheme } = {}) {
         preset.glowOffset.y + Math.sin(time * 0.08) * 8,
         center.z + preset.glowOffset.z,
       );
-      scene.fog.color.setStyle(preset.fog);
+
+      // Height-based fog: denser near ground, thinner at altitude
+      const cameraY = center.y;
+      const groundLevel = 5;
+      const maxAlt = 80;
+      const heightFactor = THREE.MathUtils.clamp((cameraY - groundLevel) / (maxAlt - groundLevel), 0, 1);
+
+      // Fog thins with altitude
+      scene.fog.near = preset.fogNear + heightFactor * 40;
+      scene.fog.far = preset.fogFar + heightFactor * 80;
+
+      // Fog shifts bluer at distance
+      scene.fog.color.copy(_baseFogColor).lerp(_distantFogColor, heightFactor * 0.3);
     },
     dispose() {
       scene.remove(skyGroup, hemi, ambient, sun, sunTarget, clouds.group);

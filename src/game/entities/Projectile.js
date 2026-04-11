@@ -86,48 +86,26 @@ export class ProjectilePool {
   constructor(scene) {
     this.scene = scene;
     this.store = createProjectileStore(CONFIG.projectiles.maxCount);
-    this.geometry = new THREE.SphereGeometry(0.8, 10, 10);
-    this.trailGeometry = new THREE.CylinderGeometry(0.18, 0.44, 4.8, 8);
-    this.trailGeometry.rotateX(Math.PI / 2);
+    this.geometry = new THREE.BoxGeometry(0.6, 0.6, 0.6);
+    this.trailGeometry = new THREE.BoxGeometry(0.15, 0.15, 3.5);
     this.materials = {
-      player: new THREE.MeshStandardMaterial({
-        color: CONFIG.palette.playerShot,
-        emissive: CONFIG.palette.playerShot,
-        emissiveIntensity: 1.8,
-      }),
-      enemy: new THREE.MeshStandardMaterial({
-        color: CONFIG.palette.hostileShot,
-        emissive: CONFIG.palette.hostileShot,
-        emissiveIntensity: 1.4,
-      }),
+      player: new THREE.MeshBasicMaterial({ color: CONFIG.palette.playerShot }),
+      enemy: new THREE.MeshBasicMaterial({ color: CONFIG.palette.hostileShot }),
     };
     this.trailMaterials = {
-      player: new THREE.MeshBasicMaterial({
-        color: CONFIG.palette.playerShot,
-        transparent: true,
-        opacity: 0.58,
-      }),
-      enemy: new THREE.MeshBasicMaterial({
-        color: CONFIG.palette.hostileShot,
-        transparent: true,
-        opacity: 0.52,
-      }),
+      player: new THREE.MeshBasicMaterial({ color: CONFIG.palette.playerShot, transparent: true, opacity: 0.45 }),
+      enemy: new THREE.MeshBasicMaterial({ color: CONFIG.palette.hostileShot, transparent: true, opacity: 0.4 }),
     };
 
     for (const item of this.store.items) {
       const mesh = new THREE.Mesh(this.geometry, this.materials.player);
       const trail = new THREE.Mesh(this.trailGeometry, this.trailMaterials.player);
-      const light = new THREE.PointLight(CONFIG.palette.playerShot, CONFIG.effects.trail.lightIntensity, CONFIG.effects.trail.lightRange, 2);
       mesh.visible = false;
       trail.visible = false;
-      light.visible = false;
-      mesh.castShadow = true;
       item.mesh = mesh;
       item.trail = trail;
-      item.light = light;
-      this.scene.add(mesh);
-      this.scene.add(trail);
-      this.scene.add(light);
+      scene.add(mesh);
+      scene.add(trail);
     }
   }
 
@@ -138,14 +116,11 @@ export class ProjectilePool {
     }
     item.mesh.visible = true;
     item.trail.visible = true;
-    item.light.visible = true;
     item.mesh.material = spec.team === 'player' ? this.materials.player : this.materials.enemy;
     item.trail.material = spec.team === 'player' ? this.trailMaterials.player : this.trailMaterials.enemy;
     item.mesh.scale.setScalar(spec.team === 'player' ? 1.2 : 1);
     item.mesh.position.set(item.x, item.y, item.z);
     item.trail.position.set(item.x, item.y, item.z);
-    item.light.position.set(item.x, item.y, item.z);
-    item.light.color.setHex(spec.team === 'player' ? CONFIG.palette.playerShot : CONFIG.palette.hostileShot);
     return true;
   }
 
@@ -177,13 +152,15 @@ export class ProjectilePool {
     }
 
     stepProjectileStore(this.store, dt, (item) => {
-      const playerDx = item.x - context.playerPosition.x;
-      const playerDz = item.z - context.playerPosition.z;
-      const distanceFromPlayer = Math.hypot(playerDx, playerDz);
-      if (item.age >= item.maxLife || distanceFromPlayer > CONFIG.world.arenaRadius * 2 || item.y < -12 || item.y > 120) {
+      if (item.age >= item.maxLife || item.y < -12 || item.y > 120) {
         return true;
       }
-      if (item.y <= context.terrain.getGroundHeight(item.x, item.z) + 0.6) {
+      const playerDx = item.x - context.playerPosition.x;
+      const playerDz = item.z - context.playerPosition.z;
+      if (playerDx * playerDx + playerDz * playerDz > CONFIG.world.arenaRadius * CONFIG.world.arenaRadius * 4) {
+        return true;
+      }
+      if (item.y < 25 && item.y <= context.terrain.getGroundHeight(item.x, item.z) + 0.6) {
         context.recordImpact?.(item.x, item.y, item.z);
         context.spawnEffect(item.x, item.y, item.z, 0.8);
         return true;
@@ -193,9 +170,10 @@ export class ProjectilePool {
 
     for (const item of this.store.items) {
       if (!item.active) {
-        item.mesh.visible = false;
-        item.trail.visible = false;
-        item.light.visible = false;
+        if (item.mesh.visible) {
+          item.mesh.visible = false;
+          item.trail.visible = false;
+        }
         continue;
       }
 
@@ -213,13 +191,10 @@ export class ProjectilePool {
         item.active = false;
         item.mesh.visible = false;
         item.trail.visible = false;
-        item.light.visible = false;
         continue;
       }
 
-      item.mesh.visible = true;
       item.mesh.position.set(item.x, item.y, item.z);
-      item.trail.visible = true;
       item.trail.position.set(
         (item.prevX + item.x) * 0.5,
         (item.prevY + item.y) * 0.5,
@@ -228,8 +203,6 @@ export class ProjectilePool {
       item.trail.lookAt(item.prevX, item.prevY, item.prevZ);
       const dist = Math.hypot(item.x - item.prevX, item.y - item.prevY, item.z - item.prevZ);
       item.trail.scale.z = Math.max(2.2, dist * 0.7);
-
-      // Widen trail when tracking a target (don't mutate shared material opacity)
       if (item.targetId) {
         item.trail.scale.x = CONFIG.effects.trail.trackingWidthMultiplier;
         item.trail.scale.y = CONFIG.effects.trail.trackingWidthMultiplier;
@@ -237,8 +210,6 @@ export class ProjectilePool {
         item.trail.scale.x = 1;
         item.trail.scale.y = 1;
       }
-      item.light.visible = true;
-      item.light.position.set(item.x, item.y, item.z);
     }
   }
 
@@ -247,7 +218,6 @@ export class ProjectilePool {
     for (const item of this.store.items) {
       item.mesh.visible = false;
       item.trail.visible = false;
-      item.light.visible = false;
     }
   }
 
@@ -255,13 +225,10 @@ export class ProjectilePool {
     for (const item of this.store.items) {
       this.scene.remove(item.mesh);
       this.scene.remove(item.trail);
-      this.scene.remove(item.light);
     }
     this.geometry.dispose();
     this.trailGeometry.dispose();
-    this.materials.player.dispose();
-    this.materials.enemy.dispose();
-    this.trailMaterials.player.dispose();
-    this.trailMaterials.enemy.dispose();
+    Object.values(this.materials).forEach(m => m.dispose());
+    Object.values(this.trailMaterials).forEach(m => m.dispose());
   }
 }

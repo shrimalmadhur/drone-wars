@@ -44,7 +44,7 @@ export class Game {
     this.camera = new THREE.PerspectiveCamera(62, 1, 0.1, 500);
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.08;
@@ -118,15 +118,10 @@ export class Game {
     this.onBlur = () => {
       this.handleImmediatePause('Auto-paused: focus lost.');
     };
-    this.onContextLost = (event) => {
-      event.preventDefault();
-      this.hud.status.textContent = 'Rendering context lost. Reload the page.';
-    };
 
     window.addEventListener('resize', this.onResize);
     window.addEventListener('blur', this.onBlur);
     document.addEventListener('visibilitychange', this.onVisibility);
-    this.renderer.domElement.addEventListener('webglcontextlost', this.onContextLost);
     this.resize();
   }
 
@@ -200,7 +195,17 @@ export class Game {
 
   start() {
     this.clock.last = performance.now();
+    this._fpsFrames = 0;
+    this._fpsLastTime = performance.now();
+    this._fpsEl = this.hud.fpsCounter;
     const tick = (time) => {
+      this._fpsFrames++;
+      if (time - this._fpsLastTime >= 500) {
+        const fps = Math.round(this._fpsFrames * 1000 / (time - this._fpsLastTime));
+        if (this._fpsEl) this._fpsEl.textContent = fps + ' FPS';
+        this._fpsFrames = 0;
+        this._fpsLastTime = time;
+      }
       const elapsed = Math.min((time - this.clock.last) / 1000, CONFIG.simulation.maxFrameTime);
       this.clock.last = time;
       this.clock.accumulator += elapsed;
@@ -876,7 +881,6 @@ export class Game {
     window.removeEventListener('resize', this.onResize);
     window.removeEventListener('blur', this.onBlur);
     document.removeEventListener('visibilitychange', this.onVisibility);
-    this.renderer.domElement.removeEventListener('webglcontextlost', this.onContextLost);
     this.cameraShake.reset();
     this.clearHitIndicators();
     this.explosions.dispose();
