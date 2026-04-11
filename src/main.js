@@ -110,6 +110,7 @@ const hud = {
   startBestScore: document.querySelector('#start-best-score'),
   startBestWave: document.querySelector('#start-best-wave'),
   startAchievements: document.querySelector('#start-achievement-count'),
+  fpsCounter: document.querySelector('#fps-counter'),
 };
 
 let game = null;

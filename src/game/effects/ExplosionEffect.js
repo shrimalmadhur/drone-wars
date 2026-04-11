@@ -175,7 +175,7 @@ export class ExplosionEffect {
     for (const entry of this.pool) {
       entry.active = false;
       for (const fb of entry.fireballs) fb.mesh.visible = false;
-      entry.fireLight.visible = false;
+      // no fireLight
       for (const d of entry.debris) d.mesh.visible = false;
     }
   }

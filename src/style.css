@@ -1612,3 +1612,17 @@ canvas {
     align-self: flex-end;
   }
 }
+
+#fps-counter {
+  position: fixed;
+  top: 8px;
+  right: 12px;
+  z-index: 9999;
+  font-family: monospace;
+  font-size: 14px;
+  color: #8af4ff;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 4px 10px;
+  border-radius: 4px;
+  pointer-events: none;
+}

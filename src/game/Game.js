@@ -197,7 +197,7 @@ export class Game {
     this.clock.last = performance.now();
     this._fpsFrames = 0;
     this._fpsLastTime = performance.now();
-    this._fpsEl = document.getElementById('fps-counter');
+    this._fpsEl = this.hud.fpsCounter;
     const tick = (time) => {
       this._fpsFrames++;
       if (time - this._fpsLastTime >= 500) {

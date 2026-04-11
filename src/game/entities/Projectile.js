@@ -160,7 +160,7 @@ export class ProjectilePool {
       if (playerDx * playerDx + playerDz * playerDz > CONFIG.world.arenaRadius * CONFIG.world.arenaRadius * 4) {
         return true;
       }
-      if (item.y < 15 && item.y <= context.terrain.getGroundHeight(item.x, item.z) + 0.6) {
+      if (item.y < 25 && item.y <= context.terrain.getGroundHeight(item.x, item.z) + 0.6) {
         context.recordImpact?.(item.x, item.y, item.z);
         context.spawnEffect(item.x, item.y, item.z, 0.8);
         return true;
