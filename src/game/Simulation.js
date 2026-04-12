@@ -159,6 +159,7 @@ export class Simulation {
     this.spawnQueue = [];
     this.spawnCooldown = 0;
     this.pickupSpawnTimer = 0;
+    this.repairCadenceTimer = 0;
     this.interWaveDelay = CONFIG.waves.interWaveDelay;
     this.waveElapsed = 0;
     this.wasWaveCleared = false;
@@ -211,6 +212,7 @@ export class Simulation {
     this.spawnQueue = [];
     this.spawnCooldown = 0;
     this.pickupSpawnTimer = 0;
+    this.repairCadenceTimer = 0;
     this.interWaveDelay = 0;
     this.waveElapsed = 0;
     this.lastHit = null;
@@ -233,6 +235,7 @@ export class Simulation {
     this.priorityStatusTimer = 0;
     this.state.mission = createMissionForRun(this.rng);
     this.scheduleNextPickupSpawn(true);
+    this.scheduleRepairCadence(true);
     this.beginWave(1);
   }
 
@@ -534,6 +537,9 @@ export class Simulation {
     mesh.position.copy(position);
     mesh.position.y += 4;
     this.scene.add(mesh);
+    if (type === 'repair') {
+      this.scheduleRepairCadence();
+    }
     this.pickups.push({
       type,
       age: 0,
@@ -542,16 +548,38 @@ export class Simulation {
     });
   }
 
+  scheduleRepairCadence(immediate = false) {
+    if (immediate) {
+      this.repairCadenceTimer = 8;
+      return;
+    }
+    const { repairCadenceMin, repairCadenceMax } = CONFIG.powerUps;
+    this.repairCadenceTimer = repairCadenceMin + this.rng() * (repairCadenceMax - repairCadenceMin);
+  }
+
+  shouldForceRepairPickup() {
+    return this.repairCadenceTimer <= 0
+      && !this.pickups.some((pickup) => pickup.type === 'repair');
+  }
+
   choosePickupType() {
+    if (this.shouldForceRepairPickup()) {
+      return 'repair';
+    }
+
     const weights = CONFIG.powerUps.weights ?? {};
     const isLowHealth = this.player.health <= CONFIG.powerUps.lowHealthRepairThreshold;
+    const healthRatio = this.player.runModifiers.maxHealth > 0
+      ? this.player.health / this.player.runModifiers.maxHealth
+      : 1;
+    const repairBias = Math.round(Math.max(0, 1 - healthRatio) * 6) + (isLowHealth ? 5 : 0);
     const total = CONFIG.powerUps.types.reduce((sum, type) => {
-      const bonus = isLowHealth && type === 'repair' ? 5 : 0;
+      const bonus = type === 'repair' ? repairBias : 0;
       return sum + (weights[type] ?? 1) + bonus;
     }, 0);
     let roll = this.rng() * total;
     for (const type of CONFIG.powerUps.types) {
-      roll -= (weights[type] ?? 1) + (isLowHealth && type === 'repair' ? 5 : 0);
+      roll -= (weights[type] ?? 1) + (type === 'repair' ? repairBias : 0);
       if (roll <= 0) {
         return type;
       }
@@ -920,6 +948,7 @@ export class Simulation {
 
   updatePickups(dt) {
     this.pickupSpawnTimer -= dt;
+    this.repairCadenceTimer -= dt;
     this.emergencyRepairTimer = Math.max(0, this.emergencyRepairTimer - dt);
     if (this.pickupSpawnTimer <= 0) {
       this.spawnAmbientPickup();

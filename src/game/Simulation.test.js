@@ -385,6 +385,51 @@ describe('Simulation audio events', () => {
     expect(simulation.scheduleNextPickupSpawn).toHaveBeenCalled();
   });
 
+  it('forces a repair pickup after the repair cadence expires', () => {
+    const simulation = {
+      pickups: [],
+      repairCadenceTimer: 0,
+      shouldForceRepairPickup: Simulation.prototype.shouldForceRepairPickup,
+      player: {
+        health: 100,
+        runModifiers: { maxHealth: 100 },
+      },
+    };
+
+    expect(Simulation.prototype.choosePickupType.call(simulation)).toBe('repair');
+  });
+
+  it('resets the repair cadence when a repair pickup spawns', () => {
+    const simulation = {
+      rng: () => 0,
+      pickups: [],
+      repairCadenceTimer: 0,
+      scene: { add() {} },
+      scheduleRepairCadence: Simulation.prototype.scheduleRepairCadence,
+    };
+
+    Simulation.prototype.spawnPickup.call(simulation, { x: 1, y: 2, z: 3 }, 'repair');
+
+    expect(simulation.repairCadenceTimer).toBe(CONFIG.powerUps.repairCadenceMin);
+    expect(simulation.pickups).toHaveLength(1);
+    expect(simulation.pickups[0].type).toBe('repair');
+  });
+
+  it('adds stronger repair bias when the player is hurt', () => {
+    const simulation = {
+      rng: () => 0,
+      pickups: [],
+      repairCadenceTimer: 99,
+      shouldForceRepairPickup: Simulation.prototype.shouldForceRepairPickup,
+      player: {
+        health: 55,
+        runModifiers: { maxHealth: 100 },
+      },
+    };
+
+    expect(Simulation.prototype.choosePickupType.call(simulation)).toBe('repair');
+  });
+
   it('records enemy fire and missile damage with compatible payloads', () => {
     const applyDamage = vi.fn(() => true);
     const spawn = vi.fn(() => true);

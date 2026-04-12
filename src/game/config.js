@@ -257,6 +257,8 @@ export const CONFIG = {
     spawnIntervalMax: 9.5,
     lowHealthRepairThreshold: 38,
     emergencyRepairCooldown: 16,
+    repairCadenceMin: 18,
+    repairCadenceMax: 28,
     spawnDistanceMin: 34,
     spawnDistanceMax: 118,
     types: ['repair', 'overdrive', 'spread', 'shield'],
