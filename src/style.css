@@ -636,6 +636,38 @@ body.mobile-device.run-active .mobile-controls {
   margin-bottom: 12px;
 }
 
+.onboarding-panel {
+  margin-bottom: 12px;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 209, 102, 0.22);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at top right, rgba(255, 209, 102, 0.1), transparent 34%),
+    linear-gradient(180deg, rgba(255, 209, 102, 0.08), rgba(255, 255, 255, 0.02));
+}
+
+.onboarding-checklist {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.onboarding-checklist__item {
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(138, 244, 255, 0.12);
+  background: rgba(8, 13, 28, 0.44);
+  color: var(--muted-strong);
+  font-size: 0.84rem;
+}
+
+.onboarding-checklist__item[data-complete='true'] {
+  border-color: rgba(119, 245, 155, 0.24);
+  color: var(--ok);
+}
+
 .hangar-panel__wallet {
   min-width: 112px;
   padding: 10px 12px;
@@ -927,6 +959,19 @@ body.mobile-device.run-active .mobile-controls {
   line-height: 1.5;
   font-size: 1.02rem;
   max-width: 44ch;
+}
+
+.run-summary__unlock-banner {
+  margin: 14px 0 0;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 209, 102, 0.24);
+  background:
+    radial-gradient(circle at top right, rgba(255, 209, 102, 0.16), transparent 38%),
+    linear-gradient(180deg, rgba(255, 209, 102, 0.08), rgba(255, 255, 255, 0.02));
+  color: rgba(244, 248, 255, 0.94);
+  line-height: 1.45;
+  font-size: 0.92rem;
 }
 
 .run-summary__actions {

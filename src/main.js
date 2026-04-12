@@ -12,6 +12,12 @@ import {
 import { createRunModifiers } from './game/meta/runModifiers.js';
 import { ABILITY_DEFINITIONS, getUnlockedAbilities, isAbilityUnlocked } from './game/meta/abilities.js';
 import { ARCHETYPE_DEFINITIONS } from './game/meta/archetypes.js';
+import {
+  getNewUnlocks,
+  getOnboardingChecklist,
+  getPreflightGuidance,
+  shouldShowOnboarding,
+} from './game/meta/onboarding.js';
 import { MUTATOR_DEFINITIONS } from './game/meta/mutators.js';
 import { getUpgradeCost, UPGRADE_DEFINITIONS } from './game/meta/upgrades.js';
 import { getPortalContext } from './game/portal.js';
@@ -41,6 +47,9 @@ const mapThemeInputs = Array.from(document.querySelectorAll('input[name="mapThem
 const abilityInputs = Array.from(document.querySelectorAll('input[name="ability"]'));
 const archetypeInputs = Array.from(document.querySelectorAll('input[name="archetype"]'));
 const mutatorInputs = Array.from(document.querySelectorAll('input[name="mutator"]'));
+const onboardingPanel = document.querySelector('#onboarding-panel');
+const onboardingLead = document.querySelector('#onboarding-lead');
+const onboardingChecklist = document.querySelector('#onboarding-checklist');
 const archetypeNote = document.querySelector('#archetype-note');
 const abilityUnlockNote = document.querySelector('#ability-unlock-note');
 const mutatorNote = document.querySelector('#mutator-note');
@@ -76,6 +85,7 @@ const summaryAchievements = document.querySelector('#summary-achievements');
 const summaryAchievementCopy = document.querySelector('#summary-achievement-copy');
 const summaryAwardsDetail = document.querySelector('#summary-awards-detail');
 const summaryCurrency = document.querySelector('#summary-currency');
+const summaryUnlocks = document.querySelector('#summary-unlocks');
 const summaryOutcome = document.querySelector('#summary-outcome');
 const summaryMission = document.querySelector('#summary-mission');
 const summaryMissionCopy = document.querySelector('#summary-mission-copy');
@@ -291,6 +301,7 @@ function buildMissionSummary(mission) {
 
 function showRunSummary(result, previousProgress) {
   const { runSummary: stats, newAchievements, currencyEarned } = result;
+  const newUnlocks = getNewUnlocks(previousProgress, playerProgress);
   const missionSummary = buildMissionSummary(stats.mission);
   summaryScore.textContent = stats.score.toString();
   summaryWave.textContent = stats.highestWave.toString();
@@ -317,6 +328,10 @@ function showRunSummary(result, previousProgress) {
     : newAchievements.length > 0
       ? `New awards unlocked: ${newAchievements.join(', ')}.`
       : 'Review the weak spots, spend salvage if needed, and relaunch with a stronger build.';
+  summaryUnlocks.hidden = newUnlocks.length === 0;
+  summaryUnlocks.textContent = newUnlocks.length > 0
+    ? `New unlocks: ${newUnlocks.map((unlock) => `${unlock.label} (${unlock.summary})`).join(' · ')}`
+    : '';
   runSummary.hidden = false;
   document.body.classList.remove('run-active');
 }
@@ -354,6 +369,18 @@ function renderAbilityPicker() {
     const unlocked = isAbilityUnlocked(input.value, playerProgress);
     input.disabled = !unlocked;
     input.checked = unlocked && input.value === equippedAbility;
+    const card = input.closest('.map-option')?.querySelector('.map-option__card');
+    const eyebrow = card?.querySelector('.map-option__eyebrow');
+    const copy = card?.querySelector('.map-option__copy');
+    const definition = ABILITY_DEFINITIONS[input.value];
+    if (eyebrow && definition) {
+      eyebrow.textContent = unlocked ? 'Ready' : `Unlock wave ${definition.unlockWave}`;
+    }
+    if (copy && definition) {
+      copy.textContent = unlocked
+        ? definition.summary
+        : `${definition.summary} Unlocks at wave ${definition.unlockWave}.`;
+    }
   }
 
   const unlockedAbilities = getUnlockedAbilities(playerProgress);
@@ -364,6 +391,20 @@ function renderAbilityPicker() {
   abilityUnlockNote.textContent = nextUnlock
     ? `Next ability unlocks at wave ${nextUnlock.unlockWave}: ${nextUnlock.label}.`
     : `All abilities unlocked. Equipped: ${unlockedAbilities.find((ability) => ability.id === equippedAbility)?.label ?? ABILITY_DEFINITIONS.pulse.label}.`;
+}
+
+function renderOnboarding() {
+  const visible = shouldShowOnboarding(playerProgress);
+  onboardingPanel.hidden = !visible;
+  onboardingLead.textContent = getPreflightGuidance(playerProgress);
+  onboardingChecklist.innerHTML = '';
+  for (const item of getOnboardingChecklist(playerProgress)) {
+    const element = document.createElement('li');
+    element.className = 'onboarding-checklist__item';
+    element.dataset.complete = item.complete ? 'true' : 'false';
+    element.textContent = `${item.complete ? 'Complete' : 'Next'}: ${item.label}`;
+    onboardingChecklist.appendChild(element);
+  }
 }
 
 function renderArchetypePicker() {
@@ -420,6 +461,7 @@ function createGameInstance(mapTheme, playerName) {
       playerProgress = result.progress;
       updateProfileReadouts();
       renderUpgradeShop();
+      renderOnboarding();
       renderArchetypePicker();
       renderAbilityPicker();
       renderMutatorPicker();
@@ -459,6 +501,7 @@ function beginRun({ fromSummary = false, forcedPlayerName, forcedMapTheme } = {}
   playerProgress = recordRunStart().progress;
   updateProfileReadouts();
   renderUpgradeShop();
+  renderOnboarding();
   renderArchetypePicker();
   renderAbilityPicker();
   renderMutatorPicker();
@@ -501,6 +544,7 @@ for (const input of mapThemeInputs) {
 applyIdentity(initialPlayerName, savedMapTheme);
 updateProfileReadouts();
 renderUpgradeShop();
+renderOnboarding();
 renderArchetypePicker();
 renderAbilityPicker();
 renderMutatorPicker();
@@ -527,6 +571,7 @@ upgradeShop.addEventListener('click', (event) => {
   playerProgress = result.progress;
   updateProfileReadouts();
   renderUpgradeShop();
+  renderOnboarding();
   renderArchetypePicker();
   renderAbilityPicker();
   renderMutatorPicker();
