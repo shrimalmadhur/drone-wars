@@ -172,6 +172,7 @@ export class Simulation {
     this._waveDamageTaken = 0;
     this.emergencyRepairTimer = 0;
     this.jammerStrength = 0;
+    this.priorityStatusTimer = 0;
   }
 
   setRunConfig({ playerProgress, runModifiers, loadout } = {}) {
@@ -229,9 +230,15 @@ export class Simulation {
     this._waveDamageTaken = 0;
     this.emergencyRepairTimer = 0;
     this.jammerStrength = 0;
+    this.priorityStatusTimer = 0;
     this.state.mission = createMissionForRun(this.rng);
     this.scheduleNextPickupSpawn(true);
     this.beginWave(1);
+  }
+
+  setPriorityStatus(message, duration = 1.2) {
+    this.state.status = message;
+    this.priorityStatusTimer = Math.max(this.priorityStatusTimer, duration);
   }
 
   clearEnemies() {
@@ -784,8 +791,13 @@ export class Simulation {
         this.applyEnemyRepairPulse(enemy, event.radius, event.amount);
       } else if (event.type === 'effect') {
         this.spawnEffect(event.position.x, event.position.y, event.position.z, event.size);
+      } else if (event.type === 'status') {
+        this.setPriorityStatus(event.message, event.duration);
       } else if (event.type === 'spawnEnemy' && event.enemyType === 'missile') {
-        this.enemies.push(new MissileEnemy(this.scene, event.position, buildEnemySpawnProfile('missile', this.state.wave, this.player.runModifiers)));
+        this.enemies.push(new MissileEnemy(this.scene, event.position, buildEnemySpawnProfile('missile', this.state.wave, {
+          ...this.player.runModifiers,
+          waveDirective: this.state.waveDirective,
+        })));
       }
     }
   }
@@ -1035,6 +1047,7 @@ export class Simulation {
     this.waveElapsed += dt;
     this.hitFlash = Math.max(0, this.hitFlash - dt);
     this.fireFlash = Math.max(0, this.fireFlash - dt);
+    this.priorityStatusTimer = Math.max(0, this.priorityStatusTimer - dt);
     this.player.update(dt, controls);
     if (this.player.consumeShieldExpiredEvent?.()) {
       this.recordShieldEvent('expired');
@@ -1113,7 +1126,11 @@ export class Simulation {
       if (this.interWaveDelay <= 0) {
         this.beginWave(this.state.wave + 1);
       }
-    } else if (!this.state.status.includes('engaged') && !this.state.status.includes('burst')) {
+    } else if (
+      this.priorityStatusTimer <= 0
+      && !this.state.status.includes('engaged')
+      && !this.state.status.includes('burst')
+    ) {
       this.state.status = `Wave ${this.state.wave} in progress.`;
     }
 

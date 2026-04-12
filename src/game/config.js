@@ -145,6 +145,20 @@ export const CONFIG = {
       score: 1200,
       radius: 10.5,
       damage: 16,
+      phaseThresholds: {
+        phase2: 0.66,
+        phase3: 0.33,
+      },
+      attackWarmup: {
+        plasmaFan: 0.65,
+        crossfireSweep: 0.8,
+        missileBarrage: 0.95,
+      },
+      attackCooldownRange: {
+        phase1: [1.4, 2.1],
+        phase2: [1.0, 1.7],
+        phase3: [0.75, 1.3],
+      },
     },
   },
   waves: {
