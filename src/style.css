@@ -132,18 +132,8 @@ body.mobile-device.run-active .mobile-controls {
   transition: transform 40ms linear;
 }
 
-.mobile-buttons {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  width: min(220px, 42vw);
-  pointer-events: auto;
-}
-
 .mobile-button {
-  min-height: 50px;
   border: 1px solid rgba(138, 244, 255, 0.2);
-  border-radius: 16px;
   background: linear-gradient(180deg, rgba(138, 244, 255, 0.2), rgba(11, 20, 43, 0.94));
   color: var(--text);
   font: 700 0.72rem/1 'Space Grotesk', sans-serif;
@@ -153,6 +143,67 @@ body.mobile-device.run-active .mobile-controls {
   touch-action: none;
 }
 
+.mobile-flight {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  pointer-events: auto;
+}
+
+.mobile-flight__utility {
+  display: flex;
+  gap: 8px;
+}
+
+.mobile-flight__cluster {
+  position: relative;
+  width: 170px;
+  height: 170px;
+}
+
+.mobile-button--utility {
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(14, 20, 40, 0.68);
+  backdrop-filter: blur(10px);
+}
+
+.mobile-button--arc {
+  position: absolute;
+  left: 50%;
+  width: 132px;
+  height: 58px;
+  margin-left: -66px;
+  border-radius: 999px;
+  background: rgba(10, 16, 34, 0.58);
+  backdrop-filter: blur(10px);
+}
+
+.mobile-button--arc-up {
+  top: 0;
+}
+
+.mobile-button--arc-down {
+  bottom: 0;
+}
+
+.mobile-button--ability {
+  position: absolute;
+  top: 26px;
+  right: 8px;
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 30%, rgba(255, 209, 102, 0.28), transparent 45%),
+    rgba(22, 25, 46, 0.82);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 14px 24px rgba(0, 0, 0, 0.2);
+}
+
 .mobile-button--ghost {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(11, 20, 43, 0.94));
 }
@@ -160,6 +211,18 @@ body.mobile-device.run-active .mobile-controls {
 .mobile-button--fire {
   border-color: rgba(255, 107, 107, 0.28);
   background: linear-gradient(180deg, rgba(255, 107, 107, 0.34), rgba(104, 20, 28, 0.9));
+}
+
+.mobile-button--trigger {
+  position: absolute;
+  right: 0;
+  bottom: 10px;
+  width: 108px;
+  height: 108px;
+  border-radius: 50%;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 18px 34px rgba(0, 0, 0, 0.24);
 }
 
 .start-screen {
@@ -1725,64 +1788,134 @@ body.mobile-device.run-active .mobile-controls {
   }
 
   body.mobile-device .hud {
-    padding-bottom: 184px;
+    padding: 12px 12px 170px;
+    gap: 10px;
   }
 
-  body.mobile-device .hud__bottom {
-    gap: 8px;
-  }
-
-  body.mobile-device .controls-card__line {
-    font-size: 0.76rem;
-  }
-
-  body.mobile-device #fps-counter {
+  body.mobile-device #fps-counter,
+  body.mobile-device .hud__identity,
+  body.mobile-device .hud-drawer,
+  body.mobile-device .hud__rail--right {
     display: none;
   }
 
-  body.mobile-device .reticle {
-    transform: translate(-50%, calc(-50% - 56px));
-  }
-
-  .mobile-controls {
-    gap: 12px;
-    padding-bottom: max(14px, env(safe-area-inset-bottom));
-  }
-
-  .mobile-stick {
-    width: 108px;
-    height: 108px;
-  }
-
-  .mobile-buttons {
-    width: min(200px, 44vw);
-  }
-}
-
-@media (max-width: 640px) {
-  body.mobile-device .hud {
-    padding: 12px 12px 194px;
+  body.mobile-device .hud__topbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 8px;
   }
 
   body.mobile-device .hud__metrics {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  body.mobile-device .hud__metrics .metric:nth-child(2),
+  body.mobile-device .hud__metrics .metric:nth-child(4),
+  body.mobile-device .hud__metrics .metric:nth-child(6) {
+    display: none;
+  }
+
+  body.mobile-device .metric {
+    min-height: 0;
+    padding: 8px 10px;
+    border-radius: 14px;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 18%),
+      rgba(8, 14, 30, 0.68);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.03),
+      0 10px 24px rgba(0, 0, 0, 0.18);
+  }
+
+  body.mobile-device .metric__label {
+    font-size: 0.56rem;
+    letter-spacing: 0.14em;
+  }
+
+  body.mobile-device .metric strong {
+    margin-top: 4px;
+    font-size: 0.96rem;
   }
 
   body.mobile-device .hud__command-stack {
-    flex-direction: column;
-  }
-
-  body.mobile-device .radar {
-    width: 84px;
-    height: 84px;
+    align-items: flex-end;
+    gap: 6px;
   }
 
   body.mobile-device .status-card--top {
-    min-height: 0;
+    width: auto;
+    max-width: 44vw;
+    padding: 7px 10px;
+    border-radius: 12px;
+    font-size: 0.76rem;
+    line-height: 1.3;
+    text-align: right;
+  }
+
+  body.mobile-device .radar {
+    width: 74px;
+    height: 74px;
+    border-width: 1px;
+    box-shadow: 0 10px 22px rgba(0, 0, 0, 0.18);
+  }
+
+  body.mobile-device .hud__bottom {
+    margin-top: auto;
+    align-items: stretch;
+    gap: 0;
+  }
+
+  body.mobile-device .hud__rail--left {
+    width: 100%;
+  }
+
+  body.mobile-device .health-card {
+    padding: 10px 12px 12px;
+    border-radius: 18px;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.018), transparent 20%),
+      rgba(8, 14, 30, 0.72);
+  }
+
+  body.mobile-device .health-card__label {
+    align-items: center;
+  }
+
+  body.mobile-device .health-card__label span {
+    font-size: 0.78rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  body.mobile-device .health-card strong {
+    margin-top: 0;
+    font-size: 1rem;
+  }
+
+  body.mobile-device .health-bar {
+    margin-top: 8px;
+    height: 10px;
+  }
+
+  body.mobile-device .reticle {
+    transform: translate(-50%, calc(-50% - 24px));
+  }
+
+  body.mobile-device .reticle__label {
+    top: calc(100% + 2px);
+    padding: 3px 7px;
+    font-size: 0.56rem;
+    letter-spacing: 0.08em;
   }
 
   .mobile-controls {
-    align-items: stretch;
+    align-items: flex-end;
+    gap: 10px;
+    padding: 0 12px max(12px, env(safe-area-inset-bottom));
   }
 
   .mobile-controls__left,
@@ -1791,18 +1924,118 @@ body.mobile-device.run-active .mobile-controls {
   }
 
   .mobile-stick {
-    width: 96px;
-    height: 96px;
+    width: 92px;
+    height: 92px;
   }
 
-  .mobile-buttons {
-    width: min(188px, 48vw);
+  .mobile-stick__thumb {
+    width: 40px;
+    height: 40px;
+    margin: -20px 0 0 -20px;
+  }
+
+  .mobile-flight {
     gap: 8px;
   }
 
+  .mobile-flight__cluster {
+    width: 156px;
+    height: 156px;
+  }
+
   .mobile-button {
-    min-height: 46px;
-    font-size: 0.66rem;
+    font-size: 0.62rem;
+    letter-spacing: 0.06em;
+  }
+
+  .mobile-button--utility {
+    min-height: 32px;
+    padding: 0 10px;
+  }
+
+  .mobile-button--arc {
+    width: 120px;
+    height: 50px;
+    margin-left: -60px;
+  }
+
+  .mobile-button--ability {
+    top: 24px;
+    width: 56px;
+    height: 56px;
+  }
+
+  .mobile-button--trigger {
+    width: 98px;
+    height: 98px;
+  }
+}
+
+@media (max-width: 640px) {
+  body.mobile-device .hud {
+    padding: 10px 10px 156px;
+  }
+
+  body.mobile-device .hud__topbar {
+    grid-template-columns: 1fr;
+  }
+
+  body.mobile-device .hud__command-stack {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  body.mobile-device .status-card--top {
+    max-width: none;
+    flex: 1;
+    text-align: left;
+  }
+
+  body.mobile-device .radar {
+    width: 64px;
+    height: 64px;
+  }
+
+  .mobile-controls {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .mobile-stick {
+    width: 84px;
+    height: 84px;
+  }
+
+  .mobile-flight__cluster {
+    width: 142px;
+    height: 142px;
+  }
+
+  .mobile-button {
+    font-size: 0.58rem;
+  }
+
+  .mobile-button--utility {
+    min-height: 30px;
+    padding: 0 9px;
+  }
+
+  .mobile-button--arc {
+    width: 110px;
+    height: 46px;
+    margin-left: -55px;
+  }
+
+  .mobile-button--ability {
+    top: 22px;
+    width: 50px;
+    height: 50px;
+  }
+
+  .mobile-button--trigger {
+    width: 90px;
+    height: 90px;
   }
 }
 

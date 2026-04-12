@@ -326,13 +326,17 @@
           <div class="mobile-stick__ring"></div>
           <div id="mobile-aim-thumb" class="mobile-stick__thumb"></div>
         </div>
-        <div class="mobile-buttons">
-          <button id="mobile-motion-toggle" class="mobile-button mobile-button--ghost" type="button" hidden>Enable Motion</button>
-          <button id="mobile-pause-button" class="mobile-button mobile-button--ghost" type="button">Pause</button>
-          <button id="mobile-ascend-button" class="mobile-button mobile-button--ghost" type="button">Up</button>
-          <button id="mobile-descend-button" class="mobile-button mobile-button--ghost" type="button">Down</button>
-          <button id="mobile-ability-button" class="mobile-button" type="button">Ability</button>
-          <button id="mobile-fire-button" class="mobile-button mobile-button--fire" type="button">Fire</button>
+        <div class="mobile-flight">
+          <div class="mobile-flight__utility">
+            <button id="mobile-motion-toggle" class="mobile-button mobile-button--ghost mobile-button--utility" type="button" hidden>Motion</button>
+            <button id="mobile-pause-button" class="mobile-button mobile-button--ghost mobile-button--utility" type="button">Pause</button>
+          </div>
+          <div class="mobile-flight__cluster">
+            <button id="mobile-ascend-button" class="mobile-button mobile-button--arc mobile-button--arc-up" type="button">Climb</button>
+            <button id="mobile-descend-button" class="mobile-button mobile-button--arc mobile-button--arc-down" type="button">Dive</button>
+            <button id="mobile-ability-button" class="mobile-button mobile-button--ability" type="button">Ability</button>
+            <button id="mobile-fire-button" class="mobile-button mobile-button--fire mobile-button--trigger" type="button">Fire</button>
+          </div>
         </div>
       </div>
     </div>
