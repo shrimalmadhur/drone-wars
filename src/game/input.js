@@ -9,6 +9,21 @@ function clampAxis(value) {
   return Math.max(-1, Math.min(1, value));
 }
 
+function shapeAnalogAxis(value, {
+  deadzone = 0,
+  exponent = 1,
+  gain = 1,
+} = {}) {
+  const abs = Math.abs(value);
+  if (abs <= deadzone) {
+    return 0;
+  }
+
+  const normalized = (abs - deadzone) / (1 - deadzone);
+  const curved = Math.pow(normalized, exponent);
+  return clampAxis(Math.sign(value) * curved * gain);
+}
+
 export function createControlSnapshot(overrides = {}) {
   return {
     thrust: 0,
@@ -425,6 +440,16 @@ export class MobileInputController {
   }
 
   snapshot() {
+    const mobileThrust = shapeAnalogAxis(-this.move.y, {
+      deadzone: 0.08,
+      exponent: 0.78,
+      gain: 1.18,
+    });
+    const mobileStrafe = shapeAnalogAxis(this.move.x, {
+      deadzone: 0.08,
+      exponent: 0.9,
+      gain: 1.05,
+    });
     const yaw = this.motionEnabled && !this.motionNeedsCalibration
       ? clampAxis((this.motionGamma - this.motionBaseGamma) / 24)
       : this.aim.x;
@@ -433,8 +458,8 @@ export class MobileInputController {
       : -this.aim.y;
 
     const snapshot = createControlSnapshot({
-      thrust: -this.move.y,
-      strafe: this.move.x,
+      thrust: mobileThrust,
+      strafe: mobileStrafe,
       yaw,
       pitch,
       vertical: Number(this.ascendHeld) - Number(this.descendHeld),

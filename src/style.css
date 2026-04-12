@@ -1983,12 +1983,13 @@ body.mobile-device.run-active .mobile-controls {
 
   body.mobile-device .health-card {
     position: fixed;
-    left: 12px;
+    left: auto;
     right: 12px;
     top: 102px;
     z-index: 9;
-    padding: 8px 10px 10px;
-    border-radius: 16px;
+    min-width: 104px;
+    padding: 8px 12px;
+    border-radius: 14px;
     background:
       linear-gradient(180deg, rgba(255, 255, 255, 0.018), transparent 20%),
       rgba(8, 14, 30, 0.72);
@@ -1998,22 +1999,31 @@ body.mobile-device.run-active .mobile-controls {
   }
 
   body.mobile-device .health-card__label {
-    align-items: center;
-    justify-content: flex-end;
+    display: block;
   }
 
   body.mobile-device .health-card__label span {
-    display: none;
+    display: block;
+    margin-bottom: 4px;
+    font-size: 0.5rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
   }
 
   body.mobile-device .health-card strong {
     margin-top: 0;
-    font-size: 0.92rem;
+    display: block;
+    font-size: 1rem;
+    line-height: 1;
+    background: linear-gradient(90deg, var(--ok) 0%, var(--accent-strong) 72%, #ff8f70 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
   }
 
   body.mobile-device .health-bar {
-    margin-top: 6px;
-    height: 8px;
+    display: none;
   }
 
   body.mobile-device .reticle {
@@ -2125,9 +2135,10 @@ body.mobile-device.run-active .mobile-controls {
   }
 
   body.mobile-device .health-card {
-    left: 10px;
     right: 10px;
     top: 96px;
+    min-width: 96px;
+    padding: 7px 10px;
   }
 
   body.mobile-device .radar {
