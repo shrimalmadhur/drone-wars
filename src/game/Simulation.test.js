@@ -134,6 +134,8 @@ describe('Simulation spawning', () => {
         group: { position: {} },
       },
       jammerStrength: 0,
+      jammerAlertActive: false,
+      setPriorityStatus: vi.fn(),
     };
 
     Simulation.prototype.updateJammerStrength.call(simulation);
@@ -157,12 +159,15 @@ describe('Simulation spawning', () => {
     const simulation = {
       enemies: [source, target],
       spawnEffect: vi.fn(),
+      supportAlertTimer: 0,
+      setPriorityStatus: vi.fn(),
     };
 
     Simulation.prototype.applyEnemyRepairPulse.call(simulation, source, 20, 6);
 
     expect(target.health).toBe(16);
     expect(simulation.spawnEffect).toHaveBeenCalledTimes(2);
+    expect(simulation.supportAlertTimer).toBeGreaterThan(0);
   });
 
   it('applies directive pickup cadence on top of run modifiers', () => {
@@ -234,12 +239,16 @@ describe('Simulation spawning', () => {
       player: {
         group: { position: { x: 0, y: 0, z: 0 } },
         yaw: 0,
+        runModifiers: { radarRangeMultiplier: 1 },
         getCombatStatus() {
           return { abilityLabel: 'EMP Pulse' };
         },
       },
       lastHit: null,
       jammerStrength: 0.1,
+      jammerAlertActive: false,
+      supportAlertTimer: 0,
+      getMissileThreatSnapshot: Simulation.prototype.getMissileThreatSnapshot,
       mapThemeGameplay: {
         radarRangeMultiplier: 0.92,
       },
@@ -259,6 +268,57 @@ describe('Simulation spawning', () => {
 
     expect(snapshot.jammerStrength).toBeCloseTo(0.38, 5);
     expect(snapshot.radarRange).toBeCloseTo(CONFIG.world.arenaRadius * 0.92 * 0.62 * (1 - 0.38 * 0.45), 5);
+  });
+
+  it('reports missile threat proximity and support warning state in the snapshot', () => {
+    const snapshot = Simulation.prototype.getSnapshot.call({
+      state: {
+        mode: GAME_STATES.RUNNING,
+        score: 0,
+        bestScore: 0,
+        bestWave: 0,
+        achievementCount: 0,
+        wave: 4,
+        health: 70,
+        enemyCount: 3,
+        status: 'Wave 4 in progress.',
+        mission: null,
+        waveDirective: null,
+        time: 10,
+      },
+      player: {
+        group: { position: { x: 0, y: 0, z: 0 } },
+        yaw: 0,
+        runModifiers: { radarRangeMultiplier: 1 },
+        getCombatStatus() {
+          return { abilityLabel: 'EMP Pulse' };
+        },
+      },
+      lastHit: null,
+      jammerStrength: 0,
+      jammerAlertActive: false,
+      supportAlertTimer: 1.5,
+      missilePositions: [{ id: 'm1', x: 20, y: 0, z: 0 }],
+      getMissileThreatSnapshot: Simulation.prototype.getMissileThreatSnapshot,
+      mapThemeGameplay: {
+        radarRangeMultiplier: 1,
+      },
+      hitFlash: 0,
+      fireFlash: 0,
+      killEvents: [],
+      damageEvents: [],
+      fireEvents: [],
+      impactEvents: [],
+      waveCompleteEvents: [],
+      pickupEvents: [],
+      shieldEvents: [],
+      empEvents: [],
+      pickups: [],
+    });
+
+    expect(snapshot.missileThreat.count).toBe(1);
+    expect(snapshot.missileThreat.critical).toBe(true);
+    expect(snapshot.supportWarningActive).toBe(true);
   });
 });
 

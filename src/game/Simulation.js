@@ -176,6 +176,8 @@ export class Simulation {
     this.emergencyRepairTimer = 0;
     this.jammerStrength = 0;
     this.priorityStatusTimer = 0;
+    this.supportAlertTimer = 0;
+    this.jammerAlertActive = false;
   }
 
   setRunConfig({ playerProgress, runModifiers, loadout } = {}) {
@@ -235,6 +237,8 @@ export class Simulation {
     this.emergencyRepairTimer = 0;
     this.jammerStrength = 0;
     this.priorityStatusTimer = 0;
+    this.supportAlertTimer = 0;
+    this.jammerAlertActive = false;
     this.state.mission = createMissionForRun(this.rng);
     this.scheduleNextPickupSpawn(true);
     this.scheduleRepairCadence(true);
@@ -870,6 +874,8 @@ export class Simulation {
       this.spawnEffect(enemy.group.position.x, enemy.group.position.y + 1.5, enemy.group.position.z, 0.7);
     }
     if (repairedTargets > 0) {
+      this.supportAlertTimer = 2.2;
+      this.setPriorityStatus('Support drone repairing nearby hostiles.', 1.2);
       this.spawnEffect(sourceEnemy.group.position.x, sourceEnemy.group.position.y + 2, sourceEnemy.group.position.z, 1.1);
     }
   }
@@ -890,6 +896,11 @@ export class Simulation {
       jamStrength += maxStrength * (1 - distance / jamRadius);
     }
     this.jammerStrength = Math.min(0.9, jamStrength);
+    const jammerActive = this.jammerStrength >= 0.22;
+    if (jammerActive && !this.jammerAlertActive) {
+      this.setPriorityStatus('Jammer field disrupting radar and lock-on.', 1.2);
+    }
+    this.jammerAlertActive = jammerActive;
   }
 
   activatePulse() {
@@ -1084,6 +1095,27 @@ export class Simulation {
       }));
   }
 
+  getMissileThreatSnapshot() {
+    let nearestDistance = Number.POSITIVE_INFINITY;
+    let count = 0;
+    const playerPosition = this.player.group.position;
+    for (const missile of this.missilePositions) {
+      count += 1;
+      const distance = Math.hypot(
+        missile.x - playerPosition.x,
+        missile.y - playerPosition.y,
+        missile.z - playerPosition.z,
+      );
+      nearestDistance = Math.min(nearestDistance, distance);
+    }
+
+    return {
+      count,
+      nearestDistance: Number.isFinite(nearestDistance) ? nearestDistance : null,
+      critical: Number.isFinite(nearestDistance) && nearestDistance < 45,
+    };
+  }
+
   update(dt, controls) {
     if (controls.pausePressed) {
       if (this.state.mode === GAME_STATES.PAUSED) {
@@ -1103,6 +1135,7 @@ export class Simulation {
     this.hitFlash = Math.max(0, this.hitFlash - dt);
     this.fireFlash = Math.max(0, this.fireFlash - dt);
     this.priorityStatusTimer = Math.max(0, this.priorityStatusTimer - dt);
+    this.supportAlertTimer = Math.max(0, this.supportAlertTimer - dt);
     this.player.update(dt, controls);
     if (this.player.consumeShieldExpiredEvent?.()) {
       this.recordShieldEvent('expired');
@@ -1222,6 +1255,7 @@ export class Simulation {
     const mapThemeRadarMultiplier = this.mapThemeGameplay?.radarRangeMultiplier ?? 1;
     const directiveLockInterference = this.state.waveDirective?.lockInterferenceStrength ?? 0;
     const effectiveJammerStrength = Math.min(0.95, this.jammerStrength + directiveLockInterference);
+    const missileThreat = this.getMissileThreatSnapshot();
     return {
       mode: this.state.mode,
       score: this.state.score,
@@ -1238,6 +1272,9 @@ export class Simulation {
       playerYaw: this.player.yaw,
       lastHit: this.lastHit,
       jammerStrength: effectiveJammerStrength,
+      jammerWarningActive: this.jammerAlertActive,
+      supportWarningActive: this.supportAlertTimer > 0,
+      missileThreat,
       radarRange: CONFIG.world.arenaRadius
         * mapThemeRadarMultiplier
         * (this.player?.runModifiers?.radarRangeMultiplier ?? 1)

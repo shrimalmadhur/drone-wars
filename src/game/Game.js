@@ -459,12 +459,32 @@ export class Game {
       const hp = Math.max(0, Math.ceil(this.aimState.target.health));
       const maxHp = Math.ceil(this.aimState.target.maxHealth);
       this.hud.targetName.textContent = `${this.aimState.target.label.toUpperCase()} LOCKED`;
-      this.hud.targetHealth.textContent = `Health ${hp} / ${maxHp}`;
+      const targetHint = this.aimState.target.radarType === 'droneSupport'
+        ? 'Repairs nearby hostiles'
+        : this.aimState.target.radarType === 'droneJammer'
+          ? 'Disrupts radar and lock quality'
+          : this.aimState.target.radarType === 'missile'
+            ? 'High-threat proximity warhead'
+            : '';
+      this.hud.targetHealth.textContent = targetHint
+        ? `Health ${hp} / ${maxHp} • ${targetHint}`
+        : `Health ${hp} / ${maxHp}`;
     } else if (snapshot.lastHit && snapshot.hitFlash > 0) {
       this.hud.targetName.textContent = `${snapshot.lastHit.type.toUpperCase()} HIT`;
       this.hud.targetHealth.textContent = snapshot.lastHit.destroyed
         ? 'Target destroyed'
         : `Health ${snapshot.lastHit.health} / ${snapshot.lastHit.maxHealth}`;
+    } else if ((snapshot.missileThreat?.count ?? 0) > 0) {
+      this.hud.targetName.textContent = 'MISSILE ALERT';
+      this.hud.targetHealth.textContent = snapshot.missileThreat.critical
+        ? `Incoming missile inside ${Math.round(snapshot.missileThreat.nearestDistance ?? 0)}m. Break line or shoot it down.`
+        : `${snapshot.missileThreat.count} missile${snapshot.missileThreat.count === 1 ? '' : 's'} tracking your position.`;
+    } else if (snapshot.jammerWarningActive) {
+      this.hud.targetName.textContent = 'JAMMER FIELD';
+      this.hud.targetHealth.textContent = 'Sensor interference is degrading radar range and lock reliability.';
+    } else if (snapshot.supportWarningActive) {
+      this.hud.targetName.textContent = 'SUPPORT ALERT';
+      this.hud.targetHealth.textContent = 'Support drones are restoring hostile armor. Prioritize them first.';
     } else {
       this.hud.targetName.textContent = 'No target locked';
       this.hud.targetHealth.textContent = 'Bring the reticle over a target to inspect health.';
@@ -760,6 +780,16 @@ export class Game {
       ctx.arc(cx, cx, r * (0.9 - snapshot.jammerStrength * 0.18), 0, Math.PI * 2);
       ctx.stroke();
       ctx.setLineDash([]);
+    }
+
+    if ((snapshot.missileThreat?.count ?? 0) > 0) {
+      const pulse = 0.35 + (Math.sin(snapshot.time * 9) * 0.5 + 0.5) * 0.45;
+      ctx.strokeStyle = `rgba(255, 95, 95, ${pulse})`;
+      ctx.lineWidth = snapshot.missileThreat.critical ? 3 : 2;
+      ctx.beginPath();
+      ctx.arc(cx, cx, r * 0.24, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.lineWidth = 1;
     }
   }
 
