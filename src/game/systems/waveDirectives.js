@@ -1,35 +1,39 @@
 import { chooseFrom } from '../math.js';
 
 export const WAVE_DIRECTIVES = Object.freeze({
-  reinforcements: {
-    id: 'reinforcements',
-    label: 'Reinforcements',
-    description: 'Reserve armor and drones arrive faster than normal.',
-    spawnIntervalMultiplier: 0.82,
-    enemyScoreMultiplier: 1.08,
+  hunterSquad: {
+    id: 'hunterSquad',
+    label: 'Hunter Squadron',
+    description: 'Fast airborne interceptors sweep the sector with relentless pursuit.',
+    spawnIntervalMultiplier: 0.88,
+    airborneSpeedMultiplier: 1.18,
+    airborneProjectileSpeedMultiplier: 1.1,
+    enemyScoreMultiplier: 1.16,
   },
-  salvageStorm: {
-    id: 'salvageStorm',
-    label: 'Salvage Storm',
-    description: 'Power-up debris floods the sector during this wave.',
-    pickupSpawnIntervalMultiplier: 0.62,
-    enemyScoreMultiplier: 1.12,
-    immediatePickupDrop: true,
+  fortifiedConvoy: {
+    id: 'fortifiedConvoy',
+    label: 'Fortified Convoy',
+    description: 'Heavier armor columns advance in a slower but deadlier formation.',
+    spawnIntervalMultiplier: 1.06,
+    heavyArmorMultiplier: 1.24,
+    heavyDamageMultiplier: 1.08,
+    enemyScoreMultiplier: 1.18,
   },
-  hazardField: {
-    id: 'hazardField',
-    label: 'Hazard Field',
-    description: 'Environmental anomalies spread across the arena.',
-    extraHazards: 1,
-    hazardRadiusMultiplier: 1.2,
-    enemyScoreMultiplier: 1.1,
-  },
-  aceSquadron: {
-    id: 'aceSquadron',
-    label: 'Ace Squadron',
-    description: 'Elite airborne units surge in with higher pressure.',
-    droneSpeedMultiplier: 1.16,
+  blackoutSector: {
+    id: 'blackoutSector',
+    label: 'Blackout Sector',
+    description: 'Sensor interference collapses radar range and makes target locks less reliable.',
+    radarRangeMultiplier: 0.62,
+    lockInterferenceStrength: 0.28,
     enemyScoreMultiplier: 1.14,
+  },
+  salvageSurge: {
+    id: 'salvageSurge',
+    label: 'Salvage Surge',
+    description: 'Debris floods the arena, accelerating pickup drops under combat pressure.',
+    pickupSpawnIntervalMultiplier: 0.52,
+    immediatePickupDrop: true,
+    enemyScoreMultiplier: 1.15,
   },
 });
 
@@ -48,15 +52,28 @@ export function applyWaveDirectiveToSpec(spec, directive) {
   }
 
   const next = { ...spec };
-  if (directive.id === 'reinforcements') {
-    next.tank += 1;
+  if (directive.id === 'hunterSquad') {
     next.drone += 1;
-  } else if (directive.id === 'aceSquadron') {
-    next.drone += 1;
+    next.missile += 1;
     if (next.droneSupport > 0) {
       next.droneSupport += 1;
-    } else if (next.droneJammer > 0) {
+    }
+  } else if (directive.id === 'fortifiedConvoy') {
+    next.tank += 1;
+    if (next.turret > 0) {
+      next.turret += 1;
+    }
+    if (next.ship > 0) {
+      next.ship += 1;
+    }
+    next.drone = Math.max(1, next.drone - 1);
+    next.missile = Math.max(0, next.missile - 1);
+  } else if (directive.id === 'blackoutSector') {
+    if (next.droneJammer > 0) {
       next.droneJammer += 1;
+    } else if (next.drone > 1) {
+      next.drone -= 1;
+      next.droneJammer = 1;
     }
   }
   return next;
@@ -71,8 +88,18 @@ export function applyWaveDirectiveToProfile(type, profile, directive) {
     ...profile,
     score: Math.round(profile.score * (directive.enemyScoreMultiplier ?? 1)),
   };
-  if (directive.id === 'aceSquadron' && (type === 'drone' || type === 'droneSupport' || type === 'droneJammer' || type === 'missile')) {
-    next.moveSpeed = profile.moveSpeed ? profile.moveSpeed * directive.droneSpeedMultiplier : profile.moveSpeed;
+  const isAirborne = type === 'drone' || type === 'droneSupport' || type === 'droneJammer' || type === 'missile';
+  const isHeavy = type === 'tank' || type === 'turret' || type === 'ship';
+
+  if (directive.id === 'hunterSquad' && isAirborne) {
+    next.moveSpeed = profile.moveSpeed ? profile.moveSpeed * directive.airborneSpeedMultiplier : profile.moveSpeed;
+    next.projectileSpeed = profile.projectileSpeed
+      ? profile.projectileSpeed * directive.airborneProjectileSpeedMultiplier
+      : profile.projectileSpeed;
+  } else if (directive.id === 'fortifiedConvoy' && isHeavy) {
+    next.health = profile.health ? Math.round(profile.health * directive.heavyArmorMultiplier) : profile.health;
+    next.damage = profile.damage ? Math.round(profile.damage * directive.heavyDamageMultiplier) : profile.damage;
+    next.moveSpeed = profile.moveSpeed ? profile.moveSpeed * 0.94 : profile.moveSpeed;
   }
   return next;
 }

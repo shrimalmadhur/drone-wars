@@ -20,8 +20,8 @@ describe('Simulation spawning', () => {
 
     Simulation.prototype.beginWave.call(simulation, 2);
 
-    expect(simulation.state.waveDirective?.id).toBe('reinforcements');
-    expect(simulation.state.status).toContain('Directive: Reinforcements');
+    expect(simulation.state.waveDirective?.id).toBe('hunterSquad');
+    expect(simulation.state.status).toContain('Directive: Hunter Squadron');
     expect(simulation.spawnHazardsForWave).toHaveBeenCalledWith(2);
   });
 
@@ -184,6 +184,53 @@ describe('Simulation spawning', () => {
     Simulation.prototype.scheduleNextPickupSpawn.call(simulation);
 
     expect(simulation.pickupSpawnTimer).toBeCloseTo(CONFIG.powerUps.spawnIntervalMin * 0.4, 5);
+  });
+
+  it('applies blackout sector radar and lock penalties in the snapshot', () => {
+    const snapshot = Simulation.prototype.getSnapshot.call({
+      state: {
+        mode: GAME_STATES.RUNNING,
+        score: 0,
+        bestScore: 0,
+        bestWave: 0,
+        achievementCount: 0,
+        wave: 6,
+        health: 70,
+        enemyCount: 5,
+        status: 'Wave 6 in progress.',
+        mission: null,
+        waveDirective: {
+          id: 'blackoutSector',
+          radarRangeMultiplier: 0.62,
+          lockInterferenceStrength: 0.28,
+        },
+        time: 10,
+      },
+      player: {
+        group: { position: { x: 0, y: 0, z: 0 } },
+        yaw: 0,
+        getCombatStatus() {
+          return { abilityLabel: 'EMP Pulse' };
+        },
+      },
+      lastHit: null,
+      jammerStrength: 0.1,
+      hitFlash: 0,
+      fireFlash: 0,
+      killEvents: [],
+      damageEvents: [],
+      fireEvents: [],
+      impactEvents: [],
+      waveCompleteEvents: [],
+      pickupEvents: [],
+      shieldEvents: [],
+      empEvents: [],
+      missilePositions: [],
+      pickups: [],
+    });
+
+    expect(snapshot.jammerStrength).toBeCloseTo(0.38, 5);
+    expect(snapshot.radarRange).toBeCloseTo(CONFIG.world.arenaRadius * 0.62 * (1 - 0.38 * 0.45), 5);
   });
 });
 
@@ -659,6 +706,7 @@ describe('Simulation audio events', () => {
       wasWaveCleared: false,
       _waveDamageTaken: 0,
       spawnHazardsForWave: vi.fn(),
+      spawnAmbientPickup: vi.fn(),
     };
 
     Simulation.prototype.beginWave.call(simulation, 1);

@@ -1192,6 +1192,9 @@ export class Simulation {
   }
 
   getSnapshot() {
+    const directiveRadarMultiplier = this.state.waveDirective?.radarRangeMultiplier ?? 1;
+    const directiveLockInterference = this.state.waveDirective?.lockInterferenceStrength ?? 0;
+    const effectiveJammerStrength = Math.min(0.95, this.jammerStrength + directiveLockInterference);
     return {
       mode: this.state.mode,
       score: this.state.score,
@@ -1207,8 +1210,8 @@ export class Simulation {
       playerPosition: this.player.group.position,
       playerYaw: this.player.yaw,
       lastHit: this.lastHit,
-      jammerStrength: this.jammerStrength,
-      radarRange: CONFIG.world.arenaRadius * (1 - this.jammerStrength * 0.45),
+      jammerStrength: effectiveJammerStrength,
+      radarRange: CONFIG.world.arenaRadius * directiveRadarMultiplier * (1 - effectiveJammerStrength * 0.45),
       hitFlash: this.hitFlash,
       fireFlash: this.fireFlash,
       killEvents: this.killEvents.slice(),
