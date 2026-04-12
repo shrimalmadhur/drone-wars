@@ -34,6 +34,10 @@ export class Player {
       pulseCooldown: CONFIG.player.pulseCooldown,
       collectionRadius: CONFIG.powerUps.collectionRadius,
       spreadAngle: CONFIG.player.spreadAngle,
+      flightSpeedMultiplier: 1,
+      yawSpeedMultiplier: 1,
+      dashCooldown: 7.5,
+      radarRangeMultiplier: 1,
       ...runModifiers,
     };
     this.health = this.runModifiers.maxHealth;
@@ -380,6 +384,10 @@ export class Player {
       pulseCooldown: CONFIG.player.pulseCooldown,
       collectionRadius: CONFIG.powerUps.collectionRadius,
       spreadAngle: CONFIG.player.spreadAngle,
+      flightSpeedMultiplier: 1,
+      yawSpeedMultiplier: 1,
+      dashCooldown: 7.5,
+      radarRangeMultiplier: 1,
       ...runModifiers,
     };
     this.health = Math.min(this.health, this.runModifiers.maxHealth);
@@ -434,7 +442,7 @@ export class Player {
     } else if (this.activePowerUpTimer <= 0) {
       this.activePowerUp = null;
     }
-    this.yaw -= controls.yaw * CONFIG.player.yawSpeed * dt;
+    this.yaw -= controls.yaw * CONFIG.player.yawSpeed * (this.runModifiers.yawSpeedMultiplier ?? 1) * dt;
 
     const forward = this.getHeading();
     const thrustScale = controls.thrustScale ?? 1;
@@ -442,11 +450,13 @@ export class Player {
     const targetForwardSpeed = controls.thrust >= 0
       ? controls.thrust * CONFIG.player.thrust * thrustScale
       : controls.thrust * CONFIG.player.reverseThrust * reverseThrustScale;
-    const targetStrafeSpeed = -controls.strafe * CONFIG.player.strafe;
-    const targetVerticalSpeed = controls.vertical * CONFIG.player.vertical;
+    const speedMultiplier = this.runModifiers.flightSpeedMultiplier ?? 1;
+    const targetStrafeSpeed = -controls.strafe * CONFIG.player.strafe * speedMultiplier;
+    const targetVerticalSpeed = controls.vertical * CONFIG.player.vertical * speedMultiplier;
+    const adjustedForwardSpeed = targetForwardSpeed * speedMultiplier;
 
-    this.velocity.x = damp(this.velocity.x, forward.x * targetForwardSpeed + this.right.x * targetStrafeSpeed, 5, dt);
-    this.velocity.z = damp(this.velocity.z, forward.z * targetForwardSpeed + this.right.z * targetStrafeSpeed, 5, dt);
+    this.velocity.x = damp(this.velocity.x, forward.x * adjustedForwardSpeed + this.right.x * targetStrafeSpeed, 5, dt);
+    this.velocity.z = damp(this.velocity.z, forward.z * adjustedForwardSpeed + this.right.z * targetStrafeSpeed, 5, dt);
     this.velocity.y = damp(this.velocity.y, targetVerticalSpeed, 4, dt);
     this.group.position.addScaledVector(this.velocity, dt);
 
@@ -585,7 +595,7 @@ export class Player {
     this.velocity.addScaledVector(this.dashDirection, 115);
     this.invulnerability = Math.max(this.invulnerability, 0.45);
     this.dashFlashTimer = 0.45;
-    this.triggerAbilityCooldown(7.5);
+    this.triggerAbilityCooldown(this.runModifiers.dashCooldown ?? 7.5);
   }
 
   consumeShieldExpiredEvent() {
@@ -706,6 +716,8 @@ export class Player {
       abilityLabel: ability.label,
       abilitySummary: ability.summary,
       abilityCooldown: this.abilityCooldown,
+      archetypeLabel: this.runModifiers.archetypeLabel,
+      archetypeSummary: this.runModifiers.archetypeSummary,
       mutatorLabel: this.runModifiers.mutatorLabel,
       mutatorSummary: this.runModifiers.mutatorSummary,
       shieldActive: this.activePowerUp === 'shield',

@@ -229,6 +229,22 @@ export function setPreRunSelection(selection, storage = globalThis?.localStorage
   return next;
 }
 
+export function setEquippedArchetype(archetype, storage = globalThis?.localStorage) {
+  const previous = loadPlayerProgress(storage);
+  const next = savePlayerProgress({
+    ...previous,
+    preRunSelection: {
+      ...previous.preRunSelection,
+      archetype,
+    },
+    loadout: {
+      ...previous.loadout,
+      archetype,
+    },
+  }, storage);
+  return next;
+}
+
 export function setEquippedAbility(ability, storage = globalThis?.localStorage) {
   const previous = loadPlayerProgress(storage);
   const next = savePlayerProgress({

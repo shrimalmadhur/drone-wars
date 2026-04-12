@@ -30,4 +30,21 @@ describe('run modifiers', () => {
     expect(modifiers.playerDamageMultiplier).toBeLessThan(1);
     expect(modifiers.rewardMultiplier).toBeGreaterThan(1);
   });
+
+  it('applies the selected archetype through the shared modifier pipeline', () => {
+    const interceptor = createRunModifiers({
+      loadout: { archetype: 'interceptor' },
+      upgrades: { hull: 0, pulse: 0, magnet: 0, stabilizer: 0 },
+    });
+    const bruiser = createRunModifiers({
+      loadout: { archetype: 'bruiser' },
+      upgrades: { hull: 0, pulse: 0, magnet: 0, stabilizer: 0 },
+    });
+
+    expect(interceptor.archetypeId).toBe('interceptor');
+    expect(interceptor.flightSpeedMultiplier).toBeGreaterThan(1);
+    expect(interceptor.dashCooldown).toBeLessThan(7.5);
+    expect(bruiser.maxHealth).toBeGreaterThan(interceptor.maxHealth);
+    expect(bruiser.playerDamageMultiplier).toBeGreaterThan(1);
+  });
 });

@@ -9,6 +9,7 @@ import {
   purchaseUpgrade,
   recordRunStart,
   recordPlayerRun,
+  setEquippedArchetype,
   setEquippedAbility,
   setEquippedMutator,
   sanitizePlayerName,
@@ -97,6 +98,9 @@ describe('player profile', () => {
       lifetimeStats: {
         totalKills: 25,
       },
+      loadout: {
+        archetype: 'control',
+      },
     });
   });
 
@@ -175,6 +179,16 @@ describe('player profile', () => {
 
     expect(updated.loadout.ability).toBe('dash');
     expect(loadPlayerProgress(storage).loadout.ability).toBe('dash');
+  });
+
+  it('persists equipped archetype selection via storage', () => {
+    const storage = createStorage();
+
+    const updated = setEquippedArchetype('bruiser', storage);
+
+    expect(updated.loadout.archetype).toBe('bruiser');
+    expect(updated.preRunSelection.archetype).toBe('bruiser');
+    expect(loadPlayerProgress(storage).loadout.archetype).toBe('bruiser');
   });
 
   it('persists mutator selection for pre-run config', () => {

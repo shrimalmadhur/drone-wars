@@ -11,6 +11,7 @@ import {
 } from './game/analytics.js';
 import { createRunModifiers } from './game/meta/runModifiers.js';
 import { ABILITY_DEFINITIONS, getUnlockedAbilities, isAbilityUnlocked } from './game/meta/abilities.js';
+import { ARCHETYPE_DEFINITIONS } from './game/meta/archetypes.js';
 import { MUTATOR_DEFINITIONS } from './game/meta/mutators.js';
 import { getUpgradeCost, UPGRADE_DEFINITIONS } from './game/meta/upgrades.js';
 import { getPortalContext } from './game/portal.js';
@@ -23,6 +24,7 @@ import {
   purchaseUpgrade,
   recordRunComplete,
   recordRunStart,
+  setEquippedArchetype,
   setEquippedAbility,
   setEquippedMutator,
   saveMapTheme,
@@ -37,7 +39,9 @@ const startForm = document.querySelector('#start-form');
 const playerNameInput = document.querySelector('#player-name-input');
 const mapThemeInputs = Array.from(document.querySelectorAll('input[name="mapTheme"]'));
 const abilityInputs = Array.from(document.querySelectorAll('input[name="ability"]'));
+const archetypeInputs = Array.from(document.querySelectorAll('input[name="archetype"]'));
 const mutatorInputs = Array.from(document.querySelectorAll('input[name="mutator"]'));
+const archetypeNote = document.querySelector('#archetype-note');
 const abilityUnlockNote = document.querySelector('#ability-unlock-note');
 const mutatorNote = document.querySelector('#mutator-note');
 const startCurrency = document.querySelector('#start-currency');
@@ -362,6 +366,15 @@ function renderAbilityPicker() {
     : `All abilities unlocked. Equipped: ${unlockedAbilities.find((ability) => ability.id === equippedAbility)?.label ?? ABILITY_DEFINITIONS.pulse.label}.`;
 }
 
+function renderArchetypePicker() {
+  const selectedArchetype = playerProgress.preRunSelection?.archetype ?? playerProgress.loadout?.archetype;
+  for (const input of archetypeInputs) {
+    input.checked = input.value === selectedArchetype;
+  }
+  const definition = ARCHETYPE_DEFINITIONS[selectedArchetype] ?? ARCHETYPE_DEFINITIONS.control;
+  archetypeNote.textContent = `${definition.summary} ${definition.detail}.`;
+}
+
 function renderMutatorPicker() {
   const selectedMutator = playerProgress.preRunSelection?.mutator ?? playerProgress.loadout?.mutator;
   for (const input of mutatorInputs) {
@@ -407,6 +420,7 @@ function createGameInstance(mapTheme, playerName) {
       playerProgress = result.progress;
       updateProfileReadouts();
       renderUpgradeShop();
+      renderArchetypePicker();
       renderAbilityPicker();
       renderMutatorPicker();
 
@@ -445,6 +459,7 @@ function beginRun({ fromSummary = false, forcedPlayerName, forcedMapTheme } = {}
   playerProgress = recordRunStart().progress;
   updateProfileReadouts();
   renderUpgradeShop();
+  renderArchetypePicker();
   renderAbilityPicker();
   renderMutatorPicker();
 
@@ -486,6 +501,7 @@ for (const input of mapThemeInputs) {
 applyIdentity(initialPlayerName, savedMapTheme);
 updateProfileReadouts();
 renderUpgradeShop();
+renderArchetypePicker();
 renderAbilityPicker();
 renderMutatorPicker();
 setMapThemeLock(false);
@@ -511,6 +527,7 @@ upgradeShop.addEventListener('click', (event) => {
   playerProgress = result.progress;
   updateProfileReadouts();
   renderUpgradeShop();
+  renderArchetypePicker();
   renderAbilityPicker();
   renderMutatorPicker();
 
@@ -523,6 +540,16 @@ upgradeShop.addEventListener('click', (event) => {
     });
   }
 });
+
+for (const input of archetypeInputs) {
+  input.addEventListener('change', () => {
+    if (!input.checked) {
+      return;
+    }
+    playerProgress = setEquippedArchetype(input.value);
+    renderArchetypePicker();
+  });
+}
 
 for (const input of abilityInputs) {
   input.addEventListener('change', () => {
@@ -569,6 +596,7 @@ startForm.addEventListener('submit', (event) => {
     return;
   }
   playerNameInput.value = playerName;
+  playerProgress = setEquippedArchetype(new FormData(startForm).get('archetype'));
   playerProgress = setEquippedMutator(new FormData(startForm).get('mutator'));
 
   if (!game) {

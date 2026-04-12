@@ -1226,7 +1226,11 @@ export class Simulation {
       playerYaw: this.player.yaw,
       lastHit: this.lastHit,
       jammerStrength: effectiveJammerStrength,
-      radarRange: CONFIG.world.arenaRadius * mapThemeRadarMultiplier * directiveRadarMultiplier * (1 - effectiveJammerStrength * 0.45),
+      radarRange: CONFIG.world.arenaRadius
+        * mapThemeRadarMultiplier
+        * (this.player?.runModifiers?.radarRangeMultiplier ?? 1)
+        * directiveRadarMultiplier
+        * (1 - effectiveJammerStrength * 0.45),
       hitFlash: this.hitFlash,
       fireFlash: this.fireFlash,
       killEvents: this.killEvents.slice(),

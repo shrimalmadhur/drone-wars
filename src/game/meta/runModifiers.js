@@ -1,8 +1,10 @@
 import { CONFIG } from '../config.js';
+import { getArchetypeDefinition, sanitizeArchetypeId } from './archetypes.js';
 import { getMutatorDefinition, sanitizeMutatorId } from './mutators.js';
 import { DEFAULT_UPGRADES, sanitizeUpgradeLevels } from './upgrades.js';
 
 export function createDefaultRunModifiers() {
+  const defaultArchetype = getArchetypeDefinition(sanitizeArchetypeId());
   const defaultMutator = getMutatorDefinition(sanitizeMutatorId());
   return {
     maxHealth: CONFIG.player.maxHealth,
@@ -10,10 +12,17 @@ export function createDefaultRunModifiers() {
     collectionRadius: CONFIG.powerUps.collectionRadius,
     spreadAngle: CONFIG.player.spreadAngle,
     playerDamageMultiplier: 1,
+    flightSpeedMultiplier: 1,
+    yawSpeedMultiplier: 1,
+    dashCooldown: 7.5,
+    radarRangeMultiplier: 1,
     pickupSpawnIntervalMultiplier: 1,
     rewardMultiplier: 1,
     enemySpeedMultiplier: 1,
     enemyProjectileSpeedMultiplier: 1,
+    archetypeId: defaultArchetype.id,
+    archetypeLabel: defaultArchetype.label,
+    archetypeSummary: defaultArchetype.summary,
     mutatorId: defaultMutator.id,
     mutatorLabel: defaultMutator.label,
     mutatorSummary: defaultMutator.summary,
@@ -23,15 +32,33 @@ export function createDefaultRunModifiers() {
 export function createRunModifiers(progress) {
   const modifiers = createDefaultRunModifiers();
   const upgrades = sanitizeUpgradeLevels(progress?.upgrades ?? DEFAULT_UPGRADES);
+  const archetype = getArchetypeDefinition(progress?.preRunSelection?.archetype ?? progress?.loadout?.archetype);
   const mutator = getMutatorDefinition(progress?.preRunSelection?.mutator ?? progress?.loadout?.mutator);
 
   modifiers.maxHealth += upgrades.hull * 12;
   modifiers.pulseCooldown = Math.max(4, modifiers.pulseCooldown - upgrades.pulse * 0.85);
   modifiers.collectionRadius += upgrades.magnet * 1.6;
   modifiers.spreadAngle = Math.max(0.07, modifiers.spreadAngle - upgrades.stabilizer * 0.018);
+  modifiers.archetypeId = archetype.id;
+  modifiers.archetypeLabel = archetype.label;
+  modifiers.archetypeSummary = archetype.summary;
   modifiers.mutatorId = mutator.id;
   modifiers.mutatorLabel = mutator.label;
   modifiers.mutatorSummary = mutator.summary;
+
+  if (archetype.id === 'control') {
+    modifiers.playerDamageMultiplier *= 0.88;
+    modifiers.pulseCooldown = Math.max(2.8, modifiers.pulseCooldown * 0.78);
+    modifiers.radarRangeMultiplier *= 1.1;
+  } else if (archetype.id === 'interceptor') {
+    modifiers.flightSpeedMultiplier *= 1.14;
+    modifiers.yawSpeedMultiplier *= 1.12;
+    modifiers.dashCooldown *= 0.82;
+  } else if (archetype.id === 'bruiser') {
+    modifiers.maxHealth += 24;
+    modifiers.playerDamageMultiplier *= 1.14;
+    modifiers.flightSpeedMultiplier *= 0.9;
+  }
 
   if (mutator.id === 'highRisk') {
     modifiers.enemySpeedMultiplier = 1.18;
