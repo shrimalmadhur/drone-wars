@@ -27,6 +27,8 @@ function shapeAnalogAxis(value, {
 export function createControlSnapshot(overrides = {}) {
   return {
     thrust: 0,
+    thrustScale: 1,
+    reverseThrustScale: 1,
     yaw: 0,
     strafe: 0,
     pitch: 0,
@@ -48,6 +50,8 @@ export function combineControlSnapshots(...snapshots) {
 
     return {
       thrust: clampAxis(combined.thrust + snapshot.thrust),
+      thrustScale: Math.max(combined.thrustScale, snapshot.thrustScale ?? 1),
+      reverseThrustScale: Math.max(combined.reverseThrustScale, snapshot.reverseThrustScale ?? 1),
       yaw: clampAxis(combined.yaw + snapshot.yaw),
       strafe: clampAxis(combined.strafe + snapshot.strafe),
       pitch: clampAxis(combined.pitch + snapshot.pitch),
@@ -466,6 +470,8 @@ export class MobileInputController {
 
     const snapshot = createControlSnapshot({
       thrust: mobileThrust,
+      thrustScale: 1.45,
+      reverseThrustScale: 1.15,
       strafe: mobileStrafe,
       yaw,
       pitch,

@@ -437,9 +437,11 @@ export class Player {
     this.yaw -= controls.yaw * CONFIG.player.yawSpeed * dt;
 
     const forward = this.getHeading();
+    const thrustScale = controls.thrustScale ?? 1;
+    const reverseThrustScale = controls.reverseThrustScale ?? 1;
     const targetForwardSpeed = controls.thrust >= 0
-      ? controls.thrust * CONFIG.player.thrust
-      : controls.thrust * CONFIG.player.reverseThrust;
+      ? controls.thrust * CONFIG.player.thrust * thrustScale
+      : controls.thrust * CONFIG.player.reverseThrust * reverseThrustScale;
     const targetStrafeSpeed = -controls.strafe * CONFIG.player.strafe;
     const targetVerticalSpeed = controls.vertical * CONFIG.player.vertical;
 
