@@ -46,6 +46,25 @@ body {
   position: relative;
 }
 
+body,
+#app,
+.hud,
+.reticle,
+.pickup-banner,
+.mobile-controls,
+.mobile-stick,
+.mobile-button,
+.radar,
+.status-card,
+.metric,
+.health-card,
+.controls-card,
+canvas {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
 body.mobile-device {
   overscroll-behavior: none;
   touch-action: manipulation;
@@ -1078,6 +1097,9 @@ body.mobile-device.run-active .mobile-controls {
 }
 
 .start-screen__input {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
   border: 1px solid rgba(138, 244, 255, 0.22);
   padding: 12px 14px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.045));

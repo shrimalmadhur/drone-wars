@@ -440,11 +440,18 @@ export class MobileInputController {
   }
 
   snapshot() {
-    const mobileThrust = shapeAnalogAxis(-this.move.y, {
-      deadzone: 0.08,
-      exponent: 0.78,
-      gain: 1.18,
-    });
+    const mobileThrustInput = -this.move.y;
+    const mobileThrust = mobileThrustInput >= 0
+      ? shapeAnalogAxis(mobileThrustInput, {
+        deadzone: 0.04,
+        exponent: 0.62,
+        gain: 1.42,
+      })
+      : shapeAnalogAxis(mobileThrustInput, {
+        deadzone: 0.06,
+        exponent: 0.74,
+        gain: 1.18,
+      });
     const mobileStrafe = shapeAnalogAxis(this.move.x, {
       deadzone: 0.08,
       exponent: 0.9,
