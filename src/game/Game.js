@@ -344,7 +344,9 @@ export class Game {
       const missionRatio = snapshot.mission.target > 0
         ? snapshot.mission.progress / snapshot.mission.target
         : 0;
-      this.hud.missionName.textContent = snapshot.mission.label;
+      this.hud.missionName.textContent = snapshot.mission.chainDepth > 0
+        ? `${snapshot.mission.label} // Chain ${snapshot.mission.chainDepth + 1}`
+        : snapshot.mission.label;
       this.hud.missionProgress.textContent = snapshot.mission.completed
         ? `${snapshot.mission.description} complete`
         : `${snapshot.mission.description} ${snapshot.mission.progress}/${snapshot.mission.target}`;

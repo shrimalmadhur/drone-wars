@@ -1,5 +1,7 @@
 const AIRBORNE_TYPES = new Set(['drone', 'missile', 'boss']);
 const HEAVY_TYPES = new Set(['tank', 'turret', 'ship', 'boss']);
+const SPECIALIST_TYPES = new Set(['droneSupport', 'droneJammer', 'turret', 'ship', 'boss']);
+const MISSILE_TYPES = new Set(['missile']);
 
 const MISSION_DEFINITIONS = {
   survival: {
@@ -9,6 +11,7 @@ const MISSION_DEFINITIONS = {
     target: 3,
     initialProgress: 1,
     rewardScore: 250,
+    nextMissionId: 'hunter',
   },
   hunter: {
     id: 'hunter',
@@ -17,6 +20,7 @@ const MISSION_DEFINITIONS = {
     target: 5,
     initialProgress: 0,
     rewardScore: 250,
+    nextMissionId: 'priorityStrike',
   },
   demolition: {
     id: 'demolition',
@@ -25,6 +29,23 @@ const MISSION_DEFINITIONS = {
     target: 4,
     initialProgress: 0,
     rewardScore: 250,
+  },
+  salvager: {
+    id: 'salvager',
+    label: 'Salvager',
+    description: 'Collect 4 pickups',
+    target: 4,
+    initialProgress: 0,
+    rewardScore: 220,
+    nextMissionId: 'priorityStrike',
+  },
+  priorityStrike: {
+    id: 'priorityStrike',
+    label: 'Priority Strike',
+    description: 'Destroy 3 specialist targets',
+    target: 3,
+    initialProgress: 0,
+    rewardScore: 320,
   },
 };
 
@@ -57,9 +78,23 @@ const BONUS_OBJECTIVE_DEFINITIONS = {
     target: 2,
     rewardScore: 120,
   },
+  priorityTarget: {
+    id: 'priorityTarget',
+    label: 'Priority Target',
+    description: 'Destroy 1 specialist target this wave',
+    target: 1,
+    rewardScore: 140,
+  },
+  missileScreen: {
+    id: 'missileScreen',
+    label: 'Missile Screen',
+    description: 'Destroy 2 missiles this wave',
+    target: 2,
+    rewardScore: 130,
+  },
 };
 
-function createMission(id) {
+function createMission(id, chainDepth = 0) {
   const definition = MISSION_DEFINITIONS[id];
   return {
     id: definition.id,
@@ -71,6 +106,8 @@ function createMission(id) {
     rewardScore: definition.rewardScore,
     bonusObjective: null,
     bonusCompletedCount: 0,
+    nextMissionId: definition.nextMissionId ?? null,
+    chainDepth,
   };
 }
 
@@ -91,10 +128,29 @@ function createBonusObjective(id, wave) {
 function chooseBonusObjectiveId(wave, rng) {
   const objectiveIds = Object.keys(BONUS_OBJECTIVE_DEFINITIONS);
   const available = wave < 3
-    ? objectiveIds.filter((id) => id !== 'scavengeRun')
+    ? objectiveIds.filter((id) => id !== 'scavengeRun' && id !== 'priorityTarget' && id !== 'missileScreen')
+    : wave < 4
+      ? objectiveIds.filter((id) => id !== 'priorityTarget')
     : objectiveIds;
   const index = Math.min(Math.floor(rng() * available.length), available.length - 1);
   return available[index];
+}
+
+function advanceMissionChain(mission) {
+  if (!mission?.nextMissionId) {
+    return null;
+  }
+  const nextMission = createMission(mission.nextMissionId, (mission.chainDepth ?? 0) + 1);
+  return {
+    ...nextMission,
+    bonusCompletedCount: mission.bonusCompletedCount ?? 0,
+    completedContract: {
+      id: mission.id,
+      label: mission.label,
+      rewardScore: mission.rewardScore,
+      chainDepth: mission.chainDepth ?? 0,
+    },
+  };
 }
 
 function updatePrimaryMission(mission, enemyType, wave) {
@@ -103,26 +159,30 @@ function updatePrimaryMission(mission, enemyType, wave) {
   }
   if (mission.id === 'survival') {
     const progress = Math.max(mission.progress, wave ?? mission.progress);
-    return {
+    const completed = progress >= mission.target;
+    const updated = {
       ...mission,
       progress,
-      completed: progress >= mission.target,
+      completed,
     };
+    return completed ? advanceMissionChain(updated) ?? updated : updated;
   }
 
   const classification = classifyEnemyForMissions(enemyType);
   const countsForHunter = mission.id === 'hunter' && classification.airborne;
   const countsForDemolition = mission.id === 'demolition' && classification.heavy;
-  if (!countsForHunter && !countsForDemolition) {
+  const countsForPriorityStrike = mission.id === 'priorityStrike' && classification.specialist;
+  if (!countsForHunter && !countsForDemolition && !countsForPriorityStrike) {
     return mission;
   }
 
   const progress = Math.min(mission.target, mission.progress + 1);
-  return {
+  const updated = {
     ...mission,
     progress,
     completed: progress >= mission.target,
   };
+  return updated.completed ? advanceMissionChain(updated) ?? updated : updated;
 }
 
 function updateBonusObjectiveProgress(mission, updater) {
@@ -144,6 +204,8 @@ export function classifyEnemyForMissions(type) {
   return {
     airborne: AIRBORNE_TYPES.has(type),
     heavy: HEAVY_TYPES.has(type),
+    specialist: SPECIALIST_TYPES.has(type),
+    missile: MISSILE_TYPES.has(type),
   };
 }
 
@@ -154,8 +216,15 @@ export function createMissionForRun(rng = Math.random) {
 }
 
 export function createMissionForWave(wave) {
+  if (wave >= 6) {
+    return createMission('priorityStrike');
+  }
   if (wave >= 4) {
     return createMission('demolition');
+  }
+
+  if (wave >= 3) {
+    return createMission('salvager');
   }
 
   if (wave >= 2) {
@@ -198,7 +267,9 @@ export function updateMissionOnEnemyDestroyed(mission, enemyType) {
   return updateBonusObjectiveProgress(primaryUpdated, (bonusObjective) => {
     const countsForIntercept = bonusObjective.id === 'airIntercept' && classification.airborne;
     const countsForHeavyBreak = bonusObjective.id === 'heavyBreak' && classification.heavy;
-    if (!countsForIntercept && !countsForHeavyBreak) {
+    const countsForPriority = bonusObjective.id === 'priorityTarget' && classification.specialist;
+    const countsForMissiles = bonusObjective.id === 'missileScreen' && classification.missile;
+    if (!countsForIntercept && !countsForHeavyBreak && !countsForPriority && !countsForMissiles) {
       return bonusObjective;
     }
 
@@ -212,7 +283,23 @@ export function updateMissionOnEnemyDestroyed(mission, enemyType) {
 }
 
 export function updateMissionOnPickupCollected(mission) {
-  return updateBonusObjectiveProgress(mission, (bonusObjective) => {
+  if (!mission) {
+    return mission;
+  }
+
+  const primaryUpdated = mission.id === 'salvager' && !mission.completed
+    ? (() => {
+      const progress = Math.min(mission.target, mission.progress + 1);
+      const updated = {
+        ...mission,
+        progress,
+        completed: progress >= mission.target,
+      };
+      return updated.completed ? advanceMissionChain(updated) ?? updated : updated;
+    })()
+    : mission;
+
+  return updateBonusObjectiveProgress(primaryUpdated, (bonusObjective) => {
     if (bonusObjective.id !== 'scavengeRun') {
       return bonusObjective;
     }

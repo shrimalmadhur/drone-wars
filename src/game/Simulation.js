@@ -304,13 +304,25 @@ export class Simulation {
 
   applyMissionUpdate(nextMission) {
     const previousMission = this.state.mission;
-    this.state.mission = nextMission;
+    const resolvedMission = nextMission?.completedContract
+      ? { ...nextMission, completedContract: null }
+      : nextMission;
+    this.state.mission = resolvedMission;
 
     if (!previousMission || !nextMission) {
       return;
     }
 
-    if (!previousMission.completed && nextMission.completed) {
+    const completedContract = nextMission.completedContract;
+    if (completedContract) {
+      this.state.score += completedContract.rewardScore ?? 0;
+      if (this.runStats) {
+        this.runStats.score = this.state.score;
+        this.runStats.missionPrimaryCompleted = true;
+        this.runStats.missionScore += completedContract.rewardScore ?? 0;
+      }
+      this.state.status = `Contract ${completedContract.label} complete. Follow-up contract ${resolvedMission.label} live. +${completedContract.rewardScore ?? 0} score.`;
+    } else if (!previousMission.completed && nextMission.completed) {
       this.state.score += nextMission.rewardScore ?? 0;
       if (this.runStats) {
         this.runStats.score = this.state.score;

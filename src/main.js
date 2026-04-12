@@ -280,7 +280,7 @@ function buildMissionSummary(mission) {
 
   const ratio = mission.target > 0 ? mission.progress / mission.target : 0;
   return {
-    title: mission.label,
+    title: mission.chainDepth > 0 ? `${mission.label} // Chain ${mission.chainDepth + 1}` : mission.label,
     copy: mission.completed
       ? `${mission.description} completed at ${mission.progress}/${mission.target}. Bonus contracts cleared: ${mission.bonusCompletedCount ?? 0}.`
       : `${mission.description} finished at ${mission.progress}/${mission.target}. Bonus contracts cleared: ${mission.bonusCompletedCount ?? 0}.`,

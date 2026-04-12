@@ -680,7 +680,7 @@ describe('Simulation audio events', () => {
       },
     );
 
-    expect(simulation.state.score).toBe(120);
+    expect(simulation.state.score).toBe(130);
     expect(simulation.runStats.bonusObjectivesCompleted).toBe(1);
     expect(simulation.state.mission.bonusCompletedCount).toBe(1);
   });
@@ -719,7 +719,7 @@ describe('Simulation audio events', () => {
     });
   });
 
-  it('keeps the same mission for the whole run instead of replacing it by wave', () => {
+  it('keeps the active mission stable across waves unless a chain advances it', () => {
     const simulation = {
       state: {
         wave: 0,
@@ -740,7 +740,7 @@ describe('Simulation audio events', () => {
     Simulation.prototype.beginWave.call(simulation, 1);
     Simulation.prototype.beginWave.call(simulation, 4);
 
-    expect(simulation.state.mission.id).toBe('hunter');
+    expect(simulation.state.mission.id).toBe('demolition');
   });
 
   it('emits wave complete exactly once when a running wave is cleared', () => {
