@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { createRng } from '../math.js';
-import { buildEnemySpawnProfile, canSpawnType, createWaveQueue, getSpawnBaseType, getWaveDifficultyModifiers, getWaveSpec } from './waves.js';
+import { buildEnemySpawnProfile, canSpawnType, createWaveQueue, getSpawnBaseType, getWaveDifficultyModifiers, getWaveSpec, applyMapThemeToSpec } from './waves.js';
 
 describe('wave system', () => {
   it('scales wave composition by wave number', () => {
@@ -51,5 +51,44 @@ describe('wave system', () => {
     expect(getWaveDifficultyModifiers(6).tankBurstCount).toBe(2);
     expect(getWaveDifficultyModifiers(8).shipBroadsideCount).toBe(2);
     expect(getWaveDifficultyModifiers(10).bossMissileVolleyCount).toBe(3);
+  });
+
+  it('biases frontier waves toward airborne contacts', () => {
+    const spec = applyMapThemeToSpec({
+      tank: 3,
+      drone: 2,
+      droneSupport: 0,
+      droneJammer: 0,
+      missile: 1,
+      turret: 1,
+      ship: 0,
+      boss: 0,
+    }, {
+      waveBias: 'airborne',
+    });
+
+    expect(spec.tank).toBe(2);
+    expect(spec.drone).toBe(3);
+    expect(spec.missile).toBe(2);
+  });
+
+  it('biases city waves toward heavier formations', () => {
+    const spec = applyMapThemeToSpec({
+      tank: 2,
+      drone: 3,
+      droneSupport: 0,
+      droneJammer: 0,
+      missile: 1,
+      turret: 1,
+      ship: 1,
+      boss: 0,
+    }, {
+      waveBias: 'heavy',
+    });
+
+    expect(spec.tank).toBe(3);
+    expect(spec.turret).toBe(2);
+    expect(spec.ship).toBe(2);
+    expect(spec.drone).toBe(2);
   });
 });

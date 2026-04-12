@@ -168,6 +168,9 @@ describe('Simulation spawning', () => {
   it('applies directive pickup cadence on top of run modifiers', () => {
     const simulation = {
       rng: () => 0,
+      mapThemeGameplay: {
+        pickupSpawnIntervalMultiplier: 1,
+      },
       player: {
         runModifiers: {
           pickupSpawnIntervalMultiplier: 0.8,
@@ -184,6 +187,28 @@ describe('Simulation spawning', () => {
     Simulation.prototype.scheduleNextPickupSpawn.call(simulation);
 
     expect(simulation.pickupSpawnTimer).toBeCloseTo(CONFIG.powerUps.spawnIntervalMin * 0.4, 5);
+  });
+
+  it('applies map theme pickup cadence on top of run modifiers', () => {
+    const simulation = {
+      rng: () => 0,
+      mapThemeGameplay: {
+        pickupSpawnIntervalMultiplier: 0.88,
+      },
+      player: {
+        runModifiers: {
+          pickupSpawnIntervalMultiplier: 0.8,
+        },
+      },
+      state: {
+        waveDirective: null,
+      },
+      pickupSpawnTimer: 0,
+    };
+
+    Simulation.prototype.scheduleNextPickupSpawn.call(simulation);
+
+    expect(simulation.pickupSpawnTimer).toBeCloseTo(CONFIG.powerUps.spawnIntervalMin * 0.704, 5);
   });
 
   it('applies blackout sector radar and lock penalties in the snapshot', () => {
@@ -215,6 +240,9 @@ describe('Simulation spawning', () => {
       },
       lastHit: null,
       jammerStrength: 0.1,
+      mapThemeGameplay: {
+        radarRangeMultiplier: 0.92,
+      },
       hitFlash: 0,
       fireFlash: 0,
       killEvents: [],
@@ -230,7 +258,7 @@ describe('Simulation spawning', () => {
     });
 
     expect(snapshot.jammerStrength).toBeCloseTo(0.38, 5);
-    expect(snapshot.radarRange).toBeCloseTo(CONFIG.world.arenaRadius * 0.62 * (1 - 0.38 * 0.45), 5);
+    expect(snapshot.radarRange).toBeCloseTo(CONFIG.world.arenaRadius * 0.92 * 0.62 * (1 - 0.38 * 0.45), 5);
   });
 });
 

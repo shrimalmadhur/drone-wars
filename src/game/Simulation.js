@@ -24,6 +24,7 @@ import { buildEnemySpawnProfile, canSpawnType, createWaveQueue, getSpawnBaseType
 import { selectWaveDirective } from './systems/waveDirectives.js';
 import { createEnvironment } from './world/environment.js';
 import { createTerrain } from './world/terrain.js';
+import { getMapThemeGameplay } from '../mapThemes.js';
 
 function createEffectMesh(size) {
   const mesh = new THREE.Mesh(
@@ -136,6 +137,7 @@ export class Simulation {
     this.rng = createRng(seed);
     this.environment = createEnvironment(scene, { mapTheme });
     this.terrain = createTerrain(scene, this.rng, { mapTheme });
+    this.mapThemeGameplay = getMapThemeGameplay(mapTheme);
     this.player = new Player(scene, this.terrain, runModifiers, loadout);
     this.projectiles = new ProjectilePool(scene);
     this.state = createGameState();
@@ -284,7 +286,7 @@ export class Simulation {
       updateMissionOnWaveStartWithRng(this.state.mission, wave, this.rng),
     );
     this.state.waveDirective = directive;
-    this.spawnQueue = createWaveQueue(wave, this.rng, directive);
+    this.spawnQueue = createWaveQueue(wave, this.rng, directive, this.mapThemeGameplay);
     this.spawnCooldown = 0.25 * (directive?.spawnIntervalMultiplier ?? 1);
     this.waveElapsed = 0;
     this.interWaveDelay = CONFIG.waves.interWaveDelay;
@@ -596,6 +598,7 @@ export class Simulation {
     const directivePickupMultiplier = this.state.waveDirective?.pickupSpawnIntervalMultiplier ?? 1;
     this.pickupSpawnTimer = (spawnIntervalMin + this.rng() * (spawnIntervalMax - spawnIntervalMin))
       * (this.player.runModifiers.pickupSpawnIntervalMultiplier ?? 1)
+      * (this.mapThemeGameplay?.pickupSpawnIntervalMultiplier ?? 1)
       * directivePickupMultiplier;
   }
 
@@ -647,8 +650,19 @@ export class Simulation {
     }
 
     const directive = this.state.waveDirective;
-    const hazardCount = Math.min(3, 1 + Math.floor((wave - 4) / 4) + (directive?.extraHazards ?? 0));
-    const hazardRadius = CONFIG.hazards.radius * (directive?.hazardRadiusMultiplier ?? 1);
+    const hazardCount = Math.max(
+      0,
+      Math.min(
+        4,
+        1
+          + Math.floor((wave - 4) / 4)
+          + (this.mapThemeGameplay?.hazardCountBonus ?? 0)
+          + (directive?.extraHazards ?? 0),
+      ),
+    );
+    const hazardRadius = CONFIG.hazards.radius
+      * (this.mapThemeGameplay?.hazardRadiusMultiplier ?? 1)
+      * (directive?.hazardRadiusMultiplier ?? 1);
     for (let index = 0; index < hazardCount; index += 1) {
       const angle = this.rng() * Math.PI * 2;
       const radius = 32 + this.rng() * 92;
@@ -1193,6 +1207,7 @@ export class Simulation {
 
   getSnapshot() {
     const directiveRadarMultiplier = this.state.waveDirective?.radarRangeMultiplier ?? 1;
+    const mapThemeRadarMultiplier = this.mapThemeGameplay?.radarRangeMultiplier ?? 1;
     const directiveLockInterference = this.state.waveDirective?.lockInterferenceStrength ?? 0;
     const effectiveJammerStrength = Math.min(0.95, this.jammerStrength + directiveLockInterference);
     return {
@@ -1211,7 +1226,7 @@ export class Simulation {
       playerYaw: this.player.yaw,
       lastHit: this.lastHit,
       jammerStrength: effectiveJammerStrength,
-      radarRange: CONFIG.world.arenaRadius * directiveRadarMultiplier * (1 - effectiveJammerStrength * 0.45),
+      radarRange: CONFIG.world.arenaRadius * mapThemeRadarMultiplier * directiveRadarMultiplier * (1 - effectiveJammerStrength * 0.45),
       hitFlash: this.hitFlash,
       fireFlash: this.fireFlash,
       killEvents: this.killEvents.slice(),

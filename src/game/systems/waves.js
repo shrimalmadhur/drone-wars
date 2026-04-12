@@ -26,8 +26,35 @@ export function getWaveSpec(wave) {
   return spec;
 }
 
-export function createWaveQueue(wave, rng, directive = null) {
-  const spec = applyWaveDirectiveToSpec(getWaveSpec(wave), directive);
+export function applyMapThemeToSpec(spec, mapThemeGameplay = null) {
+  if (!mapThemeGameplay?.waveBias) {
+    return spec;
+  }
+
+  const next = { ...spec };
+  if (mapThemeGameplay.waveBias === 'airborne') {
+    next.drone = Math.min(CONFIG.waves.maxConcurrent.drone, next.drone + 1);
+    next.missile = Math.min(CONFIG.waves.maxConcurrent.missile, next.missile + 1);
+    next.tank = Math.max(1, next.tank - 1);
+  } else if (mapThemeGameplay.waveBias === 'heavy') {
+    next.tank = Math.min(CONFIG.waves.maxConcurrent.tank, next.tank + 1);
+    if (next.turret > 0) {
+      next.turret = Math.min(CONFIG.waves.maxConcurrent.turret, next.turret + 1);
+    }
+    if (next.ship > 0) {
+      next.ship = Math.min(CONFIG.waves.maxConcurrent.ship, next.ship + 1);
+    }
+    next.drone = Math.max(1, next.drone - 1);
+  }
+
+  return next;
+}
+
+export function createWaveQueue(wave, rng, directive = null, mapThemeGameplay = null) {
+  const spec = applyMapThemeToSpec(
+    applyWaveDirectiveToSpec(getWaveSpec(wave), directive),
+    mapThemeGameplay,
+  );
   const queue = [];
   for (const [type, count] of Object.entries(spec)) {
     for (let index = 0; index < count; index += 1) {

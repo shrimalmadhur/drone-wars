@@ -203,7 +203,12 @@ function setMapThemeLock(locked) {
   for (const input of mapThemeInputs) {
     input.disabled = locked;
   }
-  mapThemeNote.hidden = !locked;
+  mapThemeNote.hidden = false;
+  const selectedTheme = game ? getCurrentMapTheme() : new FormData(startForm).get('mapTheme');
+  const details = MAP_THEME_DETAILS[selectedTheme] ?? MAP_THEME_DETAILS[MAP_THEMES.FRONTIER];
+  mapThemeNote.textContent = locked
+    ? `${details.gameplaySummary} Map changes only apply on a full relaunch. Between runs, upgrades and loadout changes apply immediately.`
+    : details.gameplaySummary;
 }
 
 function hideRunSummary() {
@@ -476,6 +481,7 @@ function openHangar() {
 playerNameInput.value = initialPlayerName;
 for (const input of mapThemeInputs) {
   input.checked = input.value === savedMapTheme;
+  input.addEventListener('change', () => setMapThemeLock(Boolean(game)));
 }
 applyIdentity(initialPlayerName, savedMapTheme);
 updateProfileReadouts();
