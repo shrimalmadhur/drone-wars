@@ -32,6 +32,8 @@ export class Game {
     playerProgress,
     runModifiers,
     loadout,
+    seed,
+    challenge,
     portalContext,
     playerName,
     inputController,
@@ -52,10 +54,11 @@ export class Game {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, CONFIG.render.maxPixelRatio));
     this.mount.appendChild(this.renderer.domElement);
 
+    this.ownsInput = !inputController;
     this.input = inputController ?? new InputController({
       keyboard: new KeyboardInputController(window, document),
     });
-    this.simulation = new Simulation(this.scene, { mapTheme, playerProgress, runModifiers, loadout });
+    this.simulation = new Simulation(this.scene, { mapTheme, playerProgress, runModifiers, loadout, seed, challenge });
     this.portalSystem = new PortalSystem(
       this.scene,
       this.simulation.terrain,
@@ -64,7 +67,7 @@ export class Game {
     );
     this.onRunComplete = onRunComplete;
     this.onRestartRequested = onRestartRequested;
-    this.currentRunConfig = { playerProgress, runModifiers, loadout };
+    this.currentRunConfig = { playerProgress, runModifiers, loadout, seed, challenge };
     this.didRecordRun = false;
     this.audio = new AudioEngine();
     this.cameraShake = new CameraShake();
@@ -132,11 +135,13 @@ export class Game {
     return this.audio.resume();
   }
 
-  restartRun({ playerProgress, runModifiers, loadout } = {}) {
+  restartRun({ playerProgress, runModifiers, loadout, seed, challenge } = {}) {
     this.currentRunConfig = {
       playerProgress: playerProgress ?? this.currentRunConfig.playerProgress,
       runModifiers: runModifiers ?? this.currentRunConfig.runModifiers,
       loadout: loadout ?? this.currentRunConfig.loadout,
+      seed: seed ?? this.currentRunConfig.seed,
+      challenge: challenge === undefined ? this.currentRunConfig.challenge : challenge,
     };
     this.simulation.setRunConfig(this.currentRunConfig);
     this.simulation.restart();
@@ -330,6 +335,9 @@ export class Game {
         ? `${snapshot.activePowerUpTimer <= 3 ? 'SHIELD FADING' : 'SHIELD ACTIVE'} ${snapshot.activePowerUpTimer.toFixed(1)}s`
         : `${snapshot.activePowerUp.toUpperCase()} ${snapshot.activePowerUpTimer.toFixed(1)}s`
       : 'No active power-up';
+    this.hud.challenge.textContent = snapshot.challenge
+      ? `${snapshot.challenge.shortLabel} · Seed ${snapshot.challenge.seed}`
+      : 'Standard sortie';
     this.hud.mutator.textContent = `Mutator: ${snapshot.mutatorLabel}`;
     if (snapshot.equippedAbility === 'dash') {
       this.hud.pulse.textContent = snapshot.abilityCooldown > 0
@@ -920,10 +928,15 @@ export class Game {
     this.clearHitIndicators();
     this.explosions.dispose();
     this.scorePops.dispose();
-    this.input.dispose();
+    if (this.ownsInput) {
+      this.input.dispose();
+    }
     this.portalSystem?.dispose?.();
     this.simulation.dispose();
     void this.audio.dispose().catch(() => {});
     this.renderer.dispose();
+    if (this.renderer.domElement.parentNode === this.mount) {
+      this.mount.removeChild(this.renderer.domElement);
+    }
   }
 }

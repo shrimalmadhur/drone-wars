@@ -1,5 +1,6 @@
 import { DEFAULT_ABILITY, sanitizeAbilityId } from './abilities.js';
 import { DEFAULT_ARCHETYPE, sanitizeArchetypeId } from './archetypes.js';
+import { CHALLENGE_MODES, sanitizeChallengeMode } from './challenges.js';
 import { DEFAULT_MUTATOR, sanitizeMutatorId } from './mutators.js';
 
 export const DEFAULT_LOADOUT = Object.freeze({
@@ -20,5 +21,6 @@ export function sanitizePreRunSelection(selection) {
   return {
     archetype: sanitizeArchetypeId(selection?.archetype),
     mutator: sanitizeMutatorId(selection?.mutator),
+    challengeMode: sanitizeChallengeMode(selection?.challengeMode ?? CHALLENGE_MODES.STANDARD),
   };
 }

@@ -11,6 +11,7 @@ describe('game state', () => {
     state.health = 12;
     state.enemyCount = 14;
     state.status = 'bad';
+    state.challenge = { id: 'daily-2026-04-14' };
 
     resetGameState(state);
 
@@ -23,5 +24,6 @@ describe('game state', () => {
     expect(state.health).toBe(100);
     expect(state.enemyCount).toBe(0);
     expect(state.status).toContain('Sweep');
+    expect(state.challenge).toBeNull();
   });
 });

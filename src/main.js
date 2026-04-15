@@ -1,5 +1,4 @@
 import './style.css';
-import { Game } from './game/Game.js';
 import { InputController, KeyboardInputController, MobileInputController } from './game/input.js';
 import {
   trackGameStart,
@@ -12,6 +11,11 @@ import {
 import { createRunModifiers } from './game/meta/runModifiers.js';
 import { ABILITY_DEFINITIONS, getUnlockedAbilities, isAbilityUnlocked } from './game/meta/abilities.js';
 import { ARCHETYPE_DEFINITIONS } from './game/meta/archetypes.js';
+import {
+  CHALLENGE_MODES,
+  createDailyChallenge,
+  createRandomSeed,
+} from './game/meta/challenges.js';
 import {
   getNewUnlocks,
   getOnboardingChecklist,
@@ -33,6 +37,7 @@ import {
   setEquippedArchetype,
   setEquippedAbility,
   setEquippedMutator,
+  setPreRunSelection,
   saveMapTheme,
   savePlayerName,
 } from './playerProfile.js';
@@ -43,6 +48,7 @@ const startSetupView = document.querySelector('#start-setup-view');
 const startPlayButton = document.querySelector('#start-play-button');
 const startForm = document.querySelector('#start-form');
 const playerNameInput = document.querySelector('#player-name-input');
+const challengeModeInputs = Array.from(document.querySelectorAll('input[name="challengeMode"]'));
 const mapThemeInputs = Array.from(document.querySelectorAll('input[name="mapTheme"]'));
 const abilityInputs = Array.from(document.querySelectorAll('input[name="ability"]'));
 const archetypeInputs = Array.from(document.querySelectorAll('input[name="archetype"]'));
@@ -50,6 +56,7 @@ const mutatorInputs = Array.from(document.querySelectorAll('input[name="mutator"
 const onboardingPanel = document.querySelector('#onboarding-panel');
 const onboardingLead = document.querySelector('#onboarding-lead');
 const onboardingChecklist = document.querySelector('#onboarding-checklist');
+const challengeNote = document.querySelector('#challenge-note');
 const archetypeNote = document.querySelector('#archetype-note');
 const abilityUnlockNote = document.querySelector('#ability-unlock-note');
 const mutatorNote = document.querySelector('#mutator-note');
@@ -91,6 +98,7 @@ const summaryMission = document.querySelector('#summary-mission');
 const summaryMissionCopy = document.querySelector('#summary-mission-copy');
 const summaryAbility = document.querySelector('#summary-ability');
 const summaryMutator = document.querySelector('#summary-mutator');
+const summaryChallenge = document.querySelector('#summary-challenge');
 const summaryScoreDelta = document.querySelector('#summary-score-delta');
 const summaryWaveDelta = document.querySelector('#summary-wave-delta');
 const summaryMissionFill = document.querySelector('#summary-mission-fill');
@@ -120,6 +128,7 @@ const hud = {
   hitChevrons: document.querySelector('#hit-chevrons'),
   playerName: document.querySelector('#player-name-value'),
   mapTheme: document.querySelector('#map-theme-value'),
+  challenge: document.querySelector('#challenge-value'),
   bestScore: document.querySelector('#best-score-value'),
   bestWave: document.querySelector('#best-wave-value'),
   achievements: document.querySelector('#achievement-count-value'),
@@ -140,6 +149,8 @@ const hud = {
 };
 
 let game = null;
+let GameClass = null;
+let gameModulePromise = null;
 let playerProgress = loadPlayerProgress();
 let activeRunContext = null;
 let lastCompletedRunContext = null;
@@ -195,6 +206,79 @@ function createRunId() {
   return `run-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+async function loadGameClass() {
+  if (GameClass) {
+    return GameClass;
+  }
+  if (!gameModulePromise) {
+    gameModulePromise = import('./game/Game.js').then((module) => {
+      GameClass = module.Game;
+      return GameClass;
+    });
+  }
+  return gameModulePromise;
+}
+
+function preloadGameRuntime() {
+  void loadGameClass().catch(() => {});
+}
+
+function getChallengeMode() {
+  return playerProgress.preRunSelection?.challengeMode ?? CHALLENGE_MODES.STANDARD;
+}
+
+function getDailyChallengeConfig() {
+  return createDailyChallenge(new Date());
+}
+
+function getSelectedSetupTheme() {
+  return game
+    ? getCurrentMapTheme()
+    : (new FormData(startForm).get('mapTheme') ?? savedMapTheme);
+}
+
+function getRunPlan({ forcedMapTheme } = {}) {
+  const challengeMode = getChallengeMode();
+  if (challengeMode === CHALLENGE_MODES.DAILY) {
+    const challenge = getDailyChallengeConfig();
+    const runProfile = {
+      ...playerProgress,
+      preRunSelection: {
+        ...playerProgress.preRunSelection,
+        archetype: challenge.loadout.archetype,
+        mutator: challenge.loadout.mutator,
+        challengeMode,
+      },
+      loadout: {
+        ...playerProgress.loadout,
+        ...challenge.loadout,
+      },
+    };
+
+    return {
+      challenge,
+      challengeMode,
+      mapTheme: challenge.mapTheme,
+      seed: challenge.seed,
+      runProfile,
+    };
+  }
+
+  return {
+    challenge: null,
+    challengeMode,
+    mapTheme: forcedMapTheme ?? getSelectedSetupTheme(),
+    seed: createRandomSeed(),
+    runProfile: playerProgress,
+  };
+}
+
+function setChallengeReadout(challenge) {
+  hud.challenge.textContent = challenge
+    ? `${challenge.shortLabel} · Seed ${challenge.seed}`
+    : 'Standard sortie';
+}
+
 function updateProfileReadouts() {
   hud.bestScore.textContent = playerProgress.bestScore.toString();
   hud.bestWave.textContent = playerProgress.bestWave.toString();
@@ -214,13 +298,19 @@ function focusSetupSection() {
 }
 
 function setMapThemeLock(locked) {
+  const challenge = getChallengeMode() === CHALLENGE_MODES.DAILY ? getDailyChallengeConfig() : null;
   for (const input of mapThemeInputs) {
-    input.disabled = locked;
+    input.disabled = locked || Boolean(challenge);
+    if (challenge) {
+      input.checked = input.value === challenge.mapTheme;
+    }
   }
   mapThemeNote.hidden = false;
-  const selectedTheme = game ? getCurrentMapTheme() : new FormData(startForm).get('mapTheme');
+  const selectedTheme = challenge?.mapTheme ?? (game ? getCurrentMapTheme() : new FormData(startForm).get('mapTheme'));
   const details = MAP_THEME_DETAILS[selectedTheme] ?? MAP_THEME_DETAILS[MAP_THEMES.FRONTIER];
-  mapThemeNote.textContent = locked
+  mapThemeNote.textContent = challenge
+    ? `${details.gameplaySummary} Daily challenge locks the battlefield and seed for everyone on ${challenge.dateKey}.`
+    : locked
     ? `${details.gameplaySummary} Map changes only apply on a full relaunch. Between runs, upgrades and loadout changes apply immediately.`
     : details.gameplaySummary;
 }
@@ -318,6 +408,9 @@ function showRunSummary(result, previousProgress) {
   summaryOutcome.textContent = missionSummary.outcome;
   summaryAbility.textContent = stats.ability?.label ?? ABILITY_DEFINITIONS.pulse.label;
   summaryMutator.textContent = stats.mutator?.label ?? MUTATOR_DEFINITIONS.highRisk.label;
+  summaryChallenge.textContent = stats.challenge
+    ? `${stats.challenge.shortLabel} · Seed ${stats.challenge.seed}`
+    : 'Standard sortie';
   summaryMission.textContent = missionSummary.title;
   summaryMissionCopy.textContent = missionSummary.copy;
   summaryMissionFill.style.width = missionSummary.progressWidth;
@@ -364,20 +457,28 @@ function renderUpgradeShop() {
 }
 
 function renderAbilityPicker() {
+  const challenge = getChallengeMode() === CHALLENGE_MODES.DAILY ? getDailyChallengeConfig() : null;
   const equippedAbility = playerProgress.loadout?.ability ?? ABILITY_DEFINITIONS.pulse.id;
   for (const input of abilityInputs) {
     const unlocked = isAbilityUnlocked(input.value, playerProgress);
-    input.disabled = !unlocked;
-    input.checked = unlocked && input.value === equippedAbility;
+    const isChallengeAbility = challenge?.loadout.ability === input.value;
+    input.disabled = challenge ? true : !unlocked;
+    input.checked = challenge ? isChallengeAbility : unlocked && input.value === equippedAbility;
     const card = input.closest('.map-option')?.querySelector('.map-option__card');
     const eyebrow = card?.querySelector('.map-option__eyebrow');
     const copy = card?.querySelector('.map-option__copy');
     const definition = ABILITY_DEFINITIONS[input.value];
     if (eyebrow && definition) {
-      eyebrow.textContent = unlocked ? 'Ready' : `Unlock wave ${definition.unlockWave}`;
+      eyebrow.textContent = challenge
+        ? (isChallengeAbility ? 'Daily loadout' : 'Challenge locked')
+        : unlocked
+          ? 'Ready'
+          : `Unlock wave ${definition.unlockWave}`;
     }
     if (copy && definition) {
-      copy.textContent = unlocked
+      copy.textContent = challenge
+        ? (isChallengeAbility ? `${definition.summary} Daily challenge overrides the normal picker.` : definition.summary)
+        : unlocked
         ? definition.summary
         : `${definition.summary} Unlocks at wave ${definition.unlockWave}.`;
     }
@@ -388,7 +489,9 @@ function renderAbilityPicker() {
     .filter((ability) => !isAbilityUnlocked(ability.id, playerProgress))
     .sort((a, b) => a.unlockWave - b.unlockWave)[0];
 
-  abilityUnlockNote.textContent = nextUnlock
+  abilityUnlockNote.textContent = challenge
+    ? `Daily challenge equips ${ABILITY_DEFINITIONS[challenge.loadout.ability]?.label ?? challenge.loadout.ability} and ignores normal unlock gating for the run.`
+    : nextUnlock
     ? `Next ability unlocks at wave ${nextUnlock.unlockWave}: ${nextUnlock.label}.`
     : `All abilities unlocked. Equipped: ${unlockedAbilities.find((ability) => ability.id === equippedAbility)?.label ?? ABILITY_DEFINITIONS.pulse.label}.`;
 }
@@ -408,44 +511,75 @@ function renderOnboarding() {
 }
 
 function renderArchetypePicker() {
-  const selectedArchetype = playerProgress.preRunSelection?.archetype ?? playerProgress.loadout?.archetype;
+  const challenge = getChallengeMode() === CHALLENGE_MODES.DAILY ? getDailyChallengeConfig() : null;
+  const selectedArchetype = challenge?.loadout.archetype
+    ?? playerProgress.preRunSelection?.archetype
+    ?? playerProgress.loadout?.archetype;
   for (const input of archetypeInputs) {
+    input.disabled = Boolean(challenge);
     input.checked = input.value === selectedArchetype;
   }
   const definition = ARCHETYPE_DEFINITIONS[selectedArchetype] ?? ARCHETYPE_DEFINITIONS.control;
-  archetypeNote.textContent = `${definition.summary} ${definition.detail}.`;
+  archetypeNote.textContent = challenge
+    ? `Daily challenge frame: ${definition.label}. ${definition.summary} ${definition.detail}.`
+    : `${definition.summary} ${definition.detail}.`;
 }
 
 function renderMutatorPicker() {
-  const selectedMutator = playerProgress.preRunSelection?.mutator ?? playerProgress.loadout?.mutator;
+  const challenge = getChallengeMode() === CHALLENGE_MODES.DAILY ? getDailyChallengeConfig() : null;
+  const selectedMutator = challenge?.loadout.mutator
+    ?? playerProgress.preRunSelection?.mutator
+    ?? playerProgress.loadout?.mutator;
   for (const input of mutatorInputs) {
+    input.disabled = Boolean(challenge);
     input.checked = input.value === selectedMutator;
   }
   const definition = MUTATOR_DEFINITIONS[selectedMutator] ?? MUTATOR_DEFINITIONS.highRisk;
-  mutatorNote.textContent = `${definition.summary} ${definition.detail}.`;
+  mutatorNote.textContent = challenge
+    ? `Daily challenge mutator: ${definition.label}. ${definition.summary} ${definition.detail}.`
+    : `${definition.summary} ${definition.detail}.`;
+}
+
+function renderChallengeModePicker() {
+  const challengeMode = getChallengeMode();
+  const challenge = challengeMode === CHALLENGE_MODES.DAILY ? getDailyChallengeConfig() : null;
+  for (const input of challengeModeInputs) {
+    input.checked = input.value === challengeMode;
+  }
+
+  challengeNote.textContent = challenge
+    ? `Daily challenge ${challenge.dateKey}: ${MAP_THEME_DETAILS[challenge.mapTheme].label}, ${challenge.summary}. Seed ${challenge.seed}.`
+    : 'Standard sortie uses your selected battlefield and current hangar build.';
 }
 
 function applyIdentity(playerName, mapTheme) {
   playerNameInput.value = playerName;
   hud.playerName.textContent = playerName || 'Awaiting registration';
   hud.mapTheme.textContent = MAP_THEME_DETAILS[mapTheme].label;
+  setChallengeReadout(activeRunContext?.challenge ?? null);
 }
 
 function getCurrentMapTheme() {
   return currentMapTheme;
 }
 
-function createGameInstance(mapTheme, playerName) {
+async function createGameInstance(mapTheme, playerName, { runProfile = playerProgress, seed, challenge = null } = {}) {
+  if (game) {
+    game.dispose();
+  }
+  const LoadedGame = await loadGameClass();
   currentMapTheme = mapTheme;
-  const initialRunModifiers = createRunModifiers(playerProgress);
-  const initialLoadout = playerProgress.loadout;
-  game = new Game({
+  const initialRunModifiers = createRunModifiers(runProfile);
+  const initialLoadout = runProfile.loadout;
+  game = new LoadedGame({
     mount,
     hud,
     mapTheme,
-    playerProgress,
+    playerProgress: runProfile,
     runModifiers: initialRunModifiers,
     loadout: initialLoadout,
+    seed,
+    challenge,
     portalContext,
     playerName,
     inputController,
@@ -453,7 +587,7 @@ function createGameInstance(mapTheme, playerName) {
       if (!startScreen.classList.contains('start-screen--hidden')) {
         return;
       }
-      beginRun({ fromSummary: true });
+      void beginRun({ fromSummary: true });
     },
     onRunComplete(runStats) {
       const previousProgress = playerProgress;
@@ -486,39 +620,59 @@ function createGameInstance(mapTheme, playerName) {
   setMapThemeLock(true);
 }
 
-function beginRun({ fromSummary = false, forcedPlayerName, forcedMapTheme } = {}) {
+async function beginRun({ fromSummary = false, forcedPlayerName, forcedMapTheme } = {}) {
   const playerName = savePlayerName(forcedPlayerName ?? playerNameInput.value);
-  const selectedTheme = forcedMapTheme ?? (game ? getCurrentMapTheme() : new FormData(startForm).get('mapTheme'));
-  const mapTheme = game ? selectedTheme : saveMapTheme(selectedTheme);
-  currentMapTheme = mapTheme;
   if (!playerName) {
     playerNameInput.setCustomValidity('Enter a player name to launch.');
     startForm.reportValidity();
     return;
   }
-
-  applyIdentity(playerName, mapTheme);
   playerProgress = recordRunStart().progress;
   updateProfileReadouts();
   renderUpgradeShop();
+  renderChallengeModePicker();
   renderOnboarding();
   renderArchetypePicker();
   renderAbilityPicker();
   renderMutatorPicker();
 
-  const runModifiers = createRunModifiers(playerProgress);
-  const loadout = playerProgress.loadout;
+  const runPlan = getRunPlan({ forcedMapTheme });
+  const previousMapTheme = currentMapTheme;
+  const mapTheme = game ? runPlan.mapTheme : saveMapTheme(runPlan.mapTheme);
+  currentMapTheme = mapTheme;
+  applyIdentity(playerName, mapTheme);
+  if (!game || previousMapTheme !== mapTheme) {
+    await createGameInstance(mapTheme, playerName, {
+      runProfile: runPlan.runProfile,
+      seed: runPlan.seed,
+      challenge: runPlan.challenge,
+    });
+  }
+
+  const runModifiers = createRunModifiers(runPlan.runProfile);
+  const loadout = runPlan.runProfile.loadout;
   activeRunContext = {
     profileId: playerProgress.profileId,
     runId: createRunId(),
     runIndex: playerProgress.lifetimeStats.runsStarted,
     mapTheme,
+    challengeId: runPlan.challenge?.id ?? null,
+    challengeMode: runPlan.challengeMode,
+    seed: runPlan.seed,
+    challenge: runPlan.challenge,
   };
+  setChallengeReadout(runPlan.challenge);
 
   hideRunSummary();
   startScreen.classList.add('start-screen--hidden');
   document.body.classList.add('run-active');
-  game.restartRun({ playerProgress, runModifiers, loadout });
+  game.restartRun({
+    playerProgress: runPlan.runProfile,
+    runModifiers,
+    loadout,
+    seed: runPlan.seed,
+    challenge: runPlan.challenge,
+  });
   primeHudDrawersForRun();
   void game.resumeAudio().catch(() => {});
 
@@ -544,6 +698,7 @@ for (const input of mapThemeInputs) {
 applyIdentity(initialPlayerName, savedMapTheme);
 updateProfileReadouts();
 renderUpgradeShop();
+renderChallengeModePicker();
 renderOnboarding();
 renderArchetypePicker();
 renderAbilityPicker();
@@ -596,6 +751,20 @@ for (const input of archetypeInputs) {
   });
 }
 
+for (const input of challengeModeInputs) {
+  input.addEventListener('change', () => {
+    if (!input.checked) {
+      return;
+    }
+    playerProgress = setPreRunSelection({ challengeMode: input.value });
+    renderChallengeModePicker();
+    renderArchetypePicker();
+    renderAbilityPicker();
+    renderMutatorPicker();
+    setMapThemeLock(Boolean(game));
+  });
+}
+
 for (const input of abilityInputs) {
   input.addEventListener('change', () => {
     if (!input.checked) {
@@ -617,7 +786,7 @@ for (const input of mutatorInputs) {
 }
 
 summaryRerunButton.addEventListener('click', () => {
-  beginRun({ fromSummary: true });
+  void beginRun({ fromSummary: true });
 });
 
 summaryHangarButton.addEventListener('click', () => {
@@ -631,8 +800,10 @@ startPlayButton?.addEventListener('click', () => {
   }
   startForm.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
 });
+startPlayButton?.addEventListener('pointerenter', preloadGameRuntime, { once: true });
+startPlayButton?.addEventListener('focus', preloadGameRuntime, { once: true });
 
-startForm.addEventListener('submit', (event) => {
+startForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const playerName = savePlayerName(playerNameInput.value);
   if (!playerName) {
@@ -643,13 +814,9 @@ startForm.addEventListener('submit', (event) => {
   playerNameInput.value = playerName;
   playerProgress = setEquippedArchetype(new FormData(startForm).get('archetype'));
   playerProgress = setEquippedMutator(new FormData(startForm).get('mutator'));
+  playerProgress = setPreRunSelection({ challengeMode: new FormData(startForm).get('challengeMode') });
 
-  if (!game) {
-    const initialMapTheme = saveMapTheme(new FormData(startForm).get('mapTheme'));
-    createGameInstance(initialMapTheme, playerName);
-  }
-
-  beginRun();
+  await beginRun();
 });
 
 if (portalContext.active) {
@@ -658,8 +825,12 @@ if (portalContext.active) {
   playerNameInput.value = autoPlayerName;
   applyIdentity(autoPlayerName, autoMapTheme);
   startScreen.classList.add('start-screen--hidden');
-  createGameInstance(autoMapTheme, autoPlayerName);
-  beginRun({
+  await createGameInstance(autoMapTheme, autoPlayerName, {
+    runProfile: playerProgress,
+    seed: createRandomSeed(),
+    challenge: null,
+  });
+  await beginRun({
     forcedPlayerName: autoPlayerName,
     forcedMapTheme: autoMapTheme,
   });

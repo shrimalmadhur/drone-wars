@@ -52,4 +52,40 @@ describe('Game run lifecycle', () => {
     expect(game.didRecordRun).toBe(false);
     expect(game.onRunComplete).not.toHaveBeenCalled();
   });
+
+  it('keeps externally provided input controllers alive on dispose', () => {
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    vi.stubGlobal('window', { removeEventListener: vi.fn() });
+    vi.stubGlobal('document', { removeEventListener: vi.fn() });
+    const input = { dispose: vi.fn() };
+    const mount = {
+      removeChild: vi.fn(),
+    };
+    const game = {
+      frame: 0,
+      onResize: () => {},
+      onBlur: () => {},
+      onVisibility: () => {},
+      cameraShake: { reset: vi.fn() },
+      clearHitIndicators: vi.fn(),
+      explosions: { dispose: vi.fn() },
+      scorePops: { dispose: vi.fn() },
+      input,
+      ownsInput: false,
+      portalSystem: { dispose: vi.fn() },
+      simulation: { dispose: vi.fn() },
+      audio: { dispose: vi.fn(() => Promise.resolve()) },
+      renderer: {
+        dispose: vi.fn(),
+        domElement: { parentNode: mount },
+      },
+      mount,
+    };
+
+    Game.prototype.dispose.call(game);
+
+    expect(input.dispose).not.toHaveBeenCalled();
+    expect(mount.removeChild).toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
 });

@@ -12,6 +12,7 @@ import {
   setEquippedArchetype,
   setEquippedAbility,
   setEquippedMutator,
+  setPreRunSelection,
   sanitizePlayerName,
   saveMapTheme,
   savePlayerProgress,
@@ -100,6 +101,11 @@ describe('player profile', () => {
       },
       loadout: {
         archetype: 'control',
+      },
+      preRunSelection: {
+        archetype: 'control',
+        mutator: 'highRisk',
+        challengeMode: 'standard',
       },
     });
   });
@@ -199,6 +205,15 @@ describe('player profile', () => {
     expect(updated.preRunSelection.mutator).toBe('scavenger');
     expect(updated.loadout.mutator).toBe('scavenger');
     expect(loadPlayerProgress(storage).preRunSelection.mutator).toBe('scavenger');
+  });
+
+  it('persists challenge mode selection for pre-run config', () => {
+    const storage = createStorage();
+
+    const updated = setPreRunSelection({ challengeMode: 'daily' }, storage);
+
+    expect(updated.preRunSelection.challengeMode).toBe('daily');
+    expect(loadPlayerProgress(storage).preRunSelection.challengeMode).toBe('daily');
   });
 
   it('purchases upgrades when enough salvage is available', () => {

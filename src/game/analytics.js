@@ -44,16 +44,29 @@ export function trackGameOver(score, wave, timePlayed) {
   });
 }
 
-export function trackRunStarted({ profileId, runId, runIndex, mapTheme } = {}) {
+export function trackRunStarted({ profileId, runId, runIndex, mapTheme, challengeId, challengeMode, seed } = {}) {
   track('run_started', {
     profile_id: profileId,
     run_id: runId,
     run_index: runIndex,
     map_theme: mapTheme,
+    challenge_id: challengeId,
+    challenge_mode: challengeMode,
+    seed,
   });
 }
 
-export function trackRunCompleted({ profileId, runId, runIndex, score, wave, currencyEarned } = {}) {
+export function trackRunCompleted({
+  profileId,
+  runId,
+  runIndex,
+  score,
+  wave,
+  currencyEarned,
+  challengeId,
+  challengeMode,
+  seed,
+} = {}) {
   track('run_completed', {
     profile_id: profileId,
     run_id: runId,
@@ -61,6 +74,9 @@ export function trackRunCompleted({ profileId, runId, runIndex, score, wave, cur
     final_score: score,
     final_wave: wave,
     currency_earned: currencyEarned,
+    challenge_id: challengeId,
+    challenge_mode: challengeMode,
+    seed,
   });
 }
 

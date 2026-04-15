@@ -131,7 +131,7 @@ function disposeObject3D(scene, object) {
 }
 
 export class Simulation {
-  constructor(scene, { seed = 1337, mapTheme, playerProgress, runModifiers, loadout } = {}) {
+  constructor(scene, { seed = 1337, mapTheme, playerProgress, runModifiers, loadout, challenge = null } = {}) {
     this.scene = scene;
     this.seed = seed;
     this.rng = createRng(seed);
@@ -144,6 +144,7 @@ export class Simulation {
     this.state.bestScore = playerProgress?.bestScore ?? 0;
     this.state.bestWave = playerProgress?.bestWave ?? 0;
     this.state.achievementCount = playerProgress?.achievements?.length ?? 0;
+    this.state.challenge = challenge ? { ...challenge } : null;
     this.enemies = [];
     this.pickups = [];
     this.hazards = [];
@@ -180,11 +181,15 @@ export class Simulation {
     this.jammerAlertActive = false;
   }
 
-  setRunConfig({ playerProgress, runModifiers, loadout } = {}) {
+  setRunConfig({ playerProgress, runModifiers, loadout, seed, challenge } = {}) {
     if (playerProgress) {
       this.state.bestScore = playerProgress.bestScore ?? this.state.bestScore;
       this.state.bestWave = playerProgress.bestWave ?? this.state.bestWave;
       this.state.achievementCount = playerProgress.achievements?.length ?? this.state.achievementCount;
+    }
+    if (typeof seed === 'number' && Number.isFinite(seed)) {
+      this.seed = seed >>> 0;
+      this.rng = createRng(this.seed);
     }
     if (runModifiers) {
       this.player.setRunModifiers(runModifiers);
@@ -192,6 +197,7 @@ export class Simulation {
     if (loadout) {
       this.player.setLoadout(loadout);
     }
+    this.state.challenge = challenge ? { ...challenge } : null;
   }
 
   restart() {
@@ -201,10 +207,13 @@ export class Simulation {
     const bestScore = this.state.bestScore;
     const bestWave = this.state.bestWave;
     const achievementCount = this.state.achievementCount;
+    const challenge = this.state.challenge ? { ...this.state.challenge } : null;
     resetGameState(this.state);
     this.state.bestScore = bestScore;
     this.state.bestWave = bestWave;
     this.state.achievementCount = achievementCount;
+    this.state.challenge = challenge;
+    this.rng = createRng(this.seed);
     this.player.reset();
     this.environment.update(this.player.group.position, 0);
     this.terrain.update(this.player.group.position, 0);
@@ -1266,6 +1275,7 @@ export class Simulation {
       health: this.state.health,
       enemyCount: this.state.enemyCount,
       status: this.state.status,
+      challenge: this.state.challenge ? { ...this.state.challenge } : null,
       mission: this.state.mission ? { ...this.state.mission } : null,
       waveDirective: this.state.waveDirective ? { ...this.state.waveDirective } : null,
       playerPosition: this.player.group.position,
@@ -1349,6 +1359,7 @@ export class Simulation {
         rewardMultiplier: this.player?.runModifiers.rewardMultiplier ?? 1,
         ability: abilitySummary,
         mutator: mutatorSummary,
+        challenge: this.state.challenge ? { ...this.state.challenge } : null,
         mission: this.state.mission ? { ...this.state.mission } : null,
       };
     }
@@ -1360,6 +1371,7 @@ export class Simulation {
       rewardMultiplier: this.player?.runModifiers?.rewardMultiplier ?? 1,
       ability: abilitySummary,
       mutator: mutatorSummary,
+      challenge: this.state.challenge ? { ...this.state.challenge } : null,
       mission: this.state.mission ? { ...this.state.mission } : null,
     };
   }

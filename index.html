@@ -90,6 +90,39 @@
               required
             />
             <fieldset class="start-screen__map-picker">
+              <legend class="start-screen__label">Run mode</legend>
+              <div class="map-options">
+                <label class="map-option">
+                  <input
+                    class="map-option__input"
+                    type="radio"
+                    name="challengeMode"
+                    value="standard"
+                    checked
+                  />
+                  <span class="map-option__card">
+                    <span class="map-option__eyebrow">Flexible</span>
+                    <strong class="map-option__title">Standard sortie</strong>
+                    <span class="map-option__copy">Randomized seed using your selected battlefield and current hangar build.</span>
+                  </span>
+                </label>
+                <label class="map-option">
+                  <input
+                    class="map-option__input"
+                    type="radio"
+                    name="challengeMode"
+                    value="daily"
+                  />
+                  <span class="map-option__card">
+                    <span class="map-option__eyebrow">Shared seed</span>
+                    <strong class="map-option__title">Daily challenge</strong>
+                    <span class="map-option__copy">Fixed battlefield, seed, and loadout rotation for the current day.</span>
+                  </span>
+                </label>
+              </div>
+              <p id="challenge-note" class="start-screen__copy">Standard sortie uses your selected battlefield and current hangar build.</p>
+            </fieldset>
+            <fieldset class="start-screen__map-picker">
               <legend class="start-screen__label">Battlefield map</legend>
               <div class="map-options">
                 <label class="map-option">
@@ -339,6 +372,11 @@
             <small>Selected pre-run risk layer</small>
           </div>
           <div class="run-summary__stat">
+            <span>Mode</span>
+            <strong id="summary-challenge">Standard sortie</strong>
+            <small>Seed and challenge ruleset</small>
+          </div>
+          <div class="run-summary__stat">
             <span>New awards</span>
             <strong id="summary-achievements">0</strong>
             <small id="summary-awards-detail">No new awards unlocked</small>
@@ -473,6 +511,7 @@
                 <p id="powerup-value">No active power-up</p>
                 <p id="ability-value">EMP Pulse ready (F)</p>
                 <p id="mutator-value">Mutator: High Risk</p>
+                <p id="challenge-value">Standard sortie</p>
               </div>
             </div>
           </div>

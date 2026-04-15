@@ -907,4 +907,30 @@ describe('Simulation audio events', () => {
     expect(simulation.waveCompleteEvents).toEqual([]);
     expect(simulation.missilePositions).toEqual([{ id: 'm1', x: 1, y: 2, z: 3 }]);
   });
+
+  it('reseeds the simulation RNG when a new run seed is applied', () => {
+    const simulation = {
+      seed: 10,
+      rng: () => 0.25,
+      state: {
+        bestScore: 0,
+        bestWave: 0,
+        achievementCount: 0,
+        challenge: null,
+      },
+      player: {
+        setRunModifiers: vi.fn(),
+        setLoadout: vi.fn(),
+      },
+    };
+
+    Simulation.prototype.setRunConfig.call(simulation, {
+      seed: 42,
+      challenge: { id: 'daily-2026-04-14', seed: 42, shortLabel: 'Daily 2026-04-14' },
+    });
+
+    expect(simulation.seed).toBe(42);
+    expect(simulation.rng()).toBeCloseTo(0.25234517, 6);
+    expect(simulation.state.challenge?.id).toBe('daily-2026-04-14');
+  });
 });
